@@ -9,6 +9,7 @@ export function renderAll(content: NewsletterContent, issueNo: number, publishDa
     newsletterName: config.newsletterName,
     tagline: config.tagline,
     feedbackContact: config.feedbackContact,
+    audience: config.audience,
     feedbackEmail: config.feedbackEmail || undefined,
     surveyUrl: config.surveyUrl || undefined,
     archiveUrl: config.archiveUrl || undefined,

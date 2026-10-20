@@ -55,7 +55,7 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
     fallbacks: "default",
     thinking: { type: "adaptive" },
     output_config: { effort: "high", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
-    system: systemPrompt(config.newsletterName),
+    system: systemPrompt(config.newsletterName, config.audience, config.feedbackContact),
     messages: [
       {
         role: "user",

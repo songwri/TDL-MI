@@ -1,0 +1,259 @@
+<title>NEWS/INBOUND 컨셉</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: 왼쪽은 컨셉 브리프(읽는 열), 오른쪽은 실제 메일 견본(고정 열, 자체 스크롤). 폰에서는 브리프 → 견본 순으로 쌓임 */
+:root {
+  --ground: #F7F2F1;
+  --paper: #FFFFFF;
+  --ink: #2B2324;
+  --ink-soft: #6A5F60;
+  --brand: #A72B2B;
+  --tint: #FBF1EF;
+  --line: #EBDDDA;
+  --display: "Jua", "IBM Plex Sans KR", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --ground: #151112; --paper: #1E1819; --ink: #F1E8E7; --ink-soft: #B9ABAB; --brand: #E36F66; --tint: #2B1E1E; --line: #3A2F2F; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --ground: #151112; --paper: #1E1819; --ink: #F1E8E7; --ink-soft: #B9ABAB; --brand: #E36F66; --tint: #2B1E1E; --line: #3A2F2F; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.75; }
+.page {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 640px); gap: 48px;
+  max-width: 1360px; margin: 0 auto;
+  padding-block: 48px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.brief { min-width: 0; max-width: 640px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 400; text-wrap: balance; margin: 0; line-height: 1.3; }
+h2 { font-size: 26px; color: var(--ink); }
+h3 { font-size: 19px; }
+p { margin: 0; }
+.eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--brand); }
+section { display: flex; flex-direction: column; gap: 18px; }
+.rule { display: grid; grid-template-columns: 48px 1fr; height: 3px; }
+.rule::before { content: ""; background: var(--brand); }
+.rule::after { content: ""; background: var(--line); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 24px; align-items: end; }
+.hero img { width: 120px; height: auto; }
+.hero h1 { font-family: var(--mono); font-weight: 700; font-size: clamp(34px, 5.4vw, 52px); letter-spacing: -0.02em; color: var(--brand); }
+.hero h1 .cursor { display: inline-block; width: 0.55em; height: 0.12em; background: var(--brand); margin-left: 0.08em; vertical-align: baseline; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .hero h1 .cursor { animation: none; } }
+.vocab { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.vocab div { background: var(--paper); border: 1px solid var(--line); padding: 12px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+.vocab b { display: block; font-size: 15px; color: var(--ink); margin-top: 4px; }
+.todo { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.todo li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.todo li:first-child { border-top: 1px solid var(--line); }
+.todo .when { font-size: 12px; font-weight: 700; color: var(--brand); padding-top: 3px; }
+.todo small { display: block; color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+.statement { font-family: var(--display); font-size: clamp(22px, 3vw, 28px); line-height: 1.5; text-wrap: balance; }
+.statement em { font-style: normal; color: var(--brand); }
+
+/* before → after */
+.shift { display: grid; grid-template-columns: 88px minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--line); }
+.shift > * { padding: 12px 10px 12px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.shift .k { font-weight: 700; color: var(--ink-soft); font-size: 13px; padding-top: 14px; }
+.shift .from { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--line); }
+.shift .head { font-size: 12px; font-weight: 700; color: var(--ink-soft); letter-spacing: 0.04em; }
+.shift .head.to { color: var(--brand); }
+
+/* voice */
+.voice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.say { padding: 16px 18px; font-size: 15px; background: var(--paper); border: 1px solid var(--line); }
+.say.good { background: var(--tint); border-color: transparent; }
+.say b { display: block; font-size: 12px; letter-spacing: 0.04em; margin-bottom: 6px; color: var(--ink-soft); }
+.say.good b { color: var(--brand); }
+ul.rules { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
+
+/* section map */
+ol.map { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+ol.map li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: start; }
+ol.map li:first-child { border-top: 1px solid var(--line); }
+.slot { width: 64px; height: 72px; display: grid; place-items: center; }
+.slot img { max-height: 72px; width: auto; }
+.slot span { font-family: var(--display); font-size: 22px; color: var(--brand); }
+.pill { display: inline-block; font-family: var(--display); font-size: 15px; color: #fff; background: var(--brand); padding: 2px 14px; border-radius: 999px; }
+.ref { font-size: 12px; color: var(--ink-soft); margin-left: 8px; }
+ol.map p { font-size: 15px; margin-top: 6px; }
+.note { font-size: 14px; color: var(--ink-soft); }
+
+/* system */
+.swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.sw { border: 1px solid var(--line); background: var(--paper); }
+.sw i { display: block; height: 52px; }
+.sw div { padding: 8px 10px; font-size: 13px; line-height: 1.5; }
+.sw code { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+dl.spec { display: grid; grid-template-columns: 120px minmax(0, 1fr); margin: 0; font-size: 15px; }
+dl.spec dt, dl.spec dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
+dl.spec dt { font-weight: 700; color: var(--ink-soft); font-size: 13px; padding-top: 12px; }
+
+/* poses */
+.poses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.pose { background: var(--paper); border: 1px solid var(--line); padding: 12px 8px 10px; text-align: center; font-size: 13px; line-height: 1.5; }
+.pose img { height: 96px; width: auto; display: block; margin: 0 auto 8px; }
+.pose b { display: block; font-size: 14px; }
+.pose span { color: var(--ink-soft); }
+
+/* specimen */
+.specimen { min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; display: flex; flex-direction: column; gap: 10px; }
+.specimen .cap { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
+.mail { background: #FFFFFF; border: 1px solid var(--line); max-height: calc(100vh - 80px); overflow: auto; }
+.mail table[width="600"] { width: 100% !important; }
+.mail img[width="520"] { width: 100% !important; height: auto !important; }
+a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+@media (max-width: 1100px) {
+  .page { grid-template-columns: minmax(0, 1fr); }
+  .brief { max-width: 680px; margin: 0 auto; }
+  .specimen { position: static; max-width: 640px; width: 100%; margin: 0 auto; }
+  .mail { max-height: none; }
+}
+@media (max-width: 560px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero img { width: 88px; }
+  .voice, .swatches { grid-template-columns: 1fr; }
+  .poses { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shift { grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr); }
+  dl.spec { grid-template-columns: 88px minmax(0, 1fr); }
+  .mail table[width="600"] > tbody > tr > td { padding-left: 18px !important; padding-right: 18px !important; }
+}
+</style>
+
+<div class="page">
+  <main class="brief">
+    <header class="hero">
+      <img src="{{wave}}" alt="손을 흔드는 레포냥" width="120">
+      <div>
+        <p class="eyebrow">레포냥이 물어 온 물류·로봇 트렌드 · 컨셉 시트</p>
+        <h1>NEWS/INBOUND<span class="cursor" aria-hidden="true"></span></h1>
+      </div>
+    </header>
+
+    <section>
+      <p class="statement">시장 보고서 말고, <em>고양이 로봇이 2주마다 물어다 주는</em> 물류·로봇 이야기.</p>
+      <p>NEWS/INBOUND는 소식이 물류센터에 입고되듯 2주마다 들어오는 레터예요. 그래서 회차는 ‘호’가 아니라 <b>‘N차 입고’</b>로 부릅니다. 소식을 물어 오는 건 레포냥, 리포트(Report)를 물어 오는 고양이(냥)예요. TREND 고글을 쓰고 2주 동안 국내외 현장을 돌아다니다가, 우편 가방에 소식을 담아 돌아옵니다. <b>CL사업부 테크이노베이션팀</b>이 발행하고, 1차 독자는 <b>CL사업부 구성원</b>이에요. 물류센터를 운영하거나 자동화를 검토하는 동료들이죠. 메일함에서 3분 안에 훑어도 남는 게 있고, 관심 있으면 메인 리포트에서 깊게 들어갈 수 있게 짭니다.</p>
+      <div class="rule" aria-hidden="true"></div>
+    </section>
+
+    <section>
+      <h2>입고 용어</h2>
+      <p class="note">레터 안에서는 이렇게 부릅니다. 물류 말장난은 한 차수에 두세 번이면 충분해요.</p>
+      <div class="vocab">
+        <div>4호<b>4차 입고</b></div>
+        <div>지난 호<b>지난 입고</b></div>
+        <div>다음 호<b>다음 입고 · 11월 3일 예정</b></div>
+        <div>아카이브<b>입고 이력</b></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>무엇이 달라지나</h2>
+      <div class="shift">
+        <span class="head"></span><span class="head">지금까지</span><span class="head to">NEWS/INBOUND</span>
+        <span class="k">이름</span><span class="from">TDL Market Intelligence</span><span>NEWS/INBOUND · N차 입고</span>
+        <span class="k">형식</span><span class="from">카드형 섹션 보고서</span><span>가운데 정렬 600px 슬림 레터</span>
+        <span class="k">말투</span><span class="from">컨설턴트 개조식 문체</span><span>동료에게 말 거는 해요체</span>
+        <span class="k">화자</span><span class="from">로지봇 (이모지 아이콘)</span><span>레포냥 (7가지 포즈 일러스트)</span>
+        <span class="k">색</span><span class="from">네이비 + 청록</span><span>#A72B2B 한 가지에 집중</span>
+        <span class="k">구성</span><span class="from">딥다이브 · 브리프 · MI 코너</span><span>1분 냥스 · 메인 리포트 · 츄르 스테이션 · 꼬리 뉴스</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>레포냥의 목소리</h2>
+      <div class="voice">
+        <p class="say"><b>이렇게 쓰지 않아요</b>동사는 곤지암 허브에 AMR 200대 추가 도입. 출고 생산성 제고 목적임.</p>
+        <p class="say good"><b>이렇게 써요</b>곤지암 메가허브에 자율주행 로봇(AMR) 200대가 추가로 들어가요. 사람이 걷는 동선을 줄여 출고 생산성을 끌어올리는 게 목표래요.</p>
+      </div>
+      <ul class="rules">
+        <li>본문은 자연스러운 해요체. ‘~냥’은 인사·질문·마무리에만, 한 차수에 세 번 이내로 씁니다.</li>
+        <li>전문용어는 처음 나올 때 괄호로 한 번 풀어 줍니다. 예: G2P(상자가 사람에게 오는 방식)</li>
+        <li>기사에 없는 숫자는 쓰지 않아요. 추정은 “~로 보여요”, “~일 수도 있어요”로 구분합니다.</li>
+        <li>요약에서 멈추지 않고 “그래서 우리 센터엔?”까지 한 문장 더 갑니다.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>레터 구성</h2>
+      <p class="note">위에서 아래로 읽히는 순서 그대로예요. 오른쪽 견본과 같은 순서입니다.</p>
+      <ol class="map">
+        <li><div class="slot"><img src="{{wave}}" alt=""></div><div><span class="pill">헤더</span><p>NEWS/INBOUND 로고, 한 줄 소개, ‘4차 입고 · 날짜(요일)’, 그리고 이번 입고에 무엇이 들어왔는지 2~4문장 오프닝. 작업자가 입력한 기획 콘셉트를 레포냥 말투로 풀어 씁니다.</p></div></li>
+        <li><div class="slot"><span>1분</span></div><div><span class="pill">1분 냥스</span><span class="ref">참고: 1분뉴스</span><p>짧은 소식 3~4건. ‘태그 | 제목 이모지’ 한 줄과 2~3문장 요약, 끝에 자세히 보기 링크.</p></div></li>
+        <li><div class="slot"><img src="{{stand}}" alt=""></div><div><span class="pill">오늘의 메인 리포트</span><span class="ref">참고: 오늘의 메인뉴스</span><p>한 건을 깊게. 썸네일, 작은 머리말, 3~5문단 본문, ‘핵심만 쏙’ 박스, ‘우리 CL사업부엔?’ 박스, 원문 버튼.</p></div></li>
+        <li><div class="slot"><img src="{{letter}}" alt=""></div><div><span class="pill">츄르 스테이션</span><span class="ref">참고: 피자스테이션</span><p>따끈한 소식 한 입과 레포냥의 질문 하나. ‘답장으로 생각 보내기’ 버튼으로 구독자와 대화하는 칸이에요. 기사를 지정하지 않으면 기획 콘셉트에서 질문을 뽑습니다.</p></div></li>
+        <li><div class="slot"><img src="{{peek}}" alt=""></div><div><span class="pill">꼬리 뉴스</span><span class="ref">참고: 고슴이의 덧니</span><p>꼬리에 꼬리를 무는 지난 이야기. Market Intelligence 이력 매칭 결과로 “1차 입고에서 다룬 AutoStore, 그 다음 편” 같은 연결을 보여 주고, 다음 입고까지 지켜볼 것 2개를 남깁니다.</p></div></li>
+        <li><div class="slot"><img src="{{sit}}" alt=""></div><div><span class="pill">오늘 레터 어땠냥?</span><span class="ref">참고: 오늘 레터는 어땠나요</span><p>‘좋았다냥 😺’, ‘아쉬웠다냥 😿’ 두 버튼. 설문 폼 주소가 있으면 폼으로, 없으면 제목이 채워진 답장 메일로 연결됩니다.</p></div></li>
+        <li><div class="slot"><span>끝</span></div><div><span class="pill">마무리</span><p>레포냥의 한마디(다음 입고 예정일 포함), 옅은 로고, 문의처(테크이노베이션팀), 이번 입고 키워드.</p></div></li>
+      </ol>
+      <p class="note">퀴즈 코너는 넣지 않았어요. 필요해지면 꼬리 뉴스와 설문 사이에 끼울 자리를 비워 두었습니다.</p>
+    </section>
+
+    <section>
+      <h2>디자인 규칙</h2>
+      <div class="swatches">
+        <div class="sw"><i style="background:#A72B2B"></i><div>메인 레드<br><code>#A72B2B</code><br>워드마크·알약·버튼·링크</div></div>
+        <div class="sw"><i style="background:#FBF1EF"></i><div>블러시<br><code>#FBF1EF</code><br>핵심만 쏙·질문 박스</div></div>
+        <div class="sw"><i style="background:#F1D8D4"></i><div>옅은 선<br><code>#F1D8D4</code><br>구분선 뒤쪽, 테두리</div></div>
+        <div class="sw"><i style="background:#2B2324"></i><div>잉크<br><code>#2B2324</code><br>본문·제목</div></div>
+        <div class="sw"><i style="background:#2F2728"></i><div>버튼 잉크<br><code>#2F2728</code><br>답장·설문 버튼</div></div>
+        <div class="sw"><i style="background:#F6F3F2"></i><div>샌드<br><code>#F6F3F2</code><br>꼬리 뉴스 박스</div></div>
+      </div>
+      <dl class="spec">
+        <dt>폭</dt><dd>600px 프레임, 본문 520px. 가운데 정렬, 흰 바탕.</dd>
+        <dt>서체</dt><dd>본문 맑은 고딕 15px · 줄간격 1.75. 로고는 고정폭 서체 Consolas Bold로, 터미널에 찍힌 경로처럼.</dd>
+        <dt>섹션 문</dt><dd>캐릭터(96px) → 진한 선 · 빨간 알약 라벨 · 옅은 선 → 회색 한 줄 소개. 모든 섹션이 같은 문으로 시작해요.</dd>
+        <dt>시그니처</dt><dd>짧고 진한 선 + 길고 옅은 선. 오프닝 아래 한 번만 씁니다.</dd>
+        <dt>색 사용</dt><dd>빨강은 라벨·버튼·링크에만. 넓은 면은 블러시와 샌드로 받칩니다.</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>레포냥 포즈 쓰임새</h2>
+      <div class="poses">
+        <div class="pose"><img src="{{wave}}" alt=""><b>인사</b><span>헤더</span></div>
+        <div class="pose"><img src="{{stand}}" alt=""><b>가방 끈 꽉</b><span>메인 리포트</span></div>
+        <div class="pose"><img src="{{letter}}" alt=""><b>편지 전달</b><span>츄르 스테이션</span></div>
+        <div class="pose"><img src="{{peek}}" alt=""><b>빼꼼</b><span>꼬리 뉴스</span></div>
+        <div class="pose"><img src="{{sit}}" alt=""><b>앉아서 기다림</b><span>설문</span></div>
+        <div class="pose"><img src="{{walk}}" alt=""><b>걸어가는 중</b><span>예비 · 공지</span></div>
+        <div class="pose"><img src="{{run}}" alt=""><b>달려옴</b><span>예비 · 속보·특집호</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>운영 메모</h2>
+      <dl class="spec">
+        <dt>이미지</dt><dd>아웃룩은 붙여넣을 때 캐릭터 이미지를 주소에서 받아 와요. 앱을 사내에서 접속 가능한 주소로 띄우거나 이미지 공개 주소(PUBLIC_ASSET_BASE_URL)를 지정합니다.</dd>
+        <dt>답장·설문</dt><dd>답장 주소(NEWSLETTER_FEEDBACK_EMAIL)와 설문 폼(NEWSLETTER_SURVEY_URL)을 넣으면 버튼이 살아납니다.</dd>
+        <dt>아웃룩 한계</dt><dd>아웃룩 데스크톱은 둥근 모서리를 그리지 않아 알약과 버튼이 각지게 보여요. 색과 배치는 그대로 유지됩니다.</dd>
+      </dl>
+    </section>
+    <section>
+      <h2>정해야 할 것</h2>
+      <ul class="todo">
+        <li><span class="when">지금</span><span>발행 요일과 첫 입고일<small>다음 입고 예정일이 자동 계산돼요. 예: 격주 화요일, 11월 3일 1차 입고</small></span></li>
+        <li><span class="when">지금</span><span>한 줄 소개 문구 확정<small>현재: 레포냥이 물어 온 물류·로봇 트렌드</small></span></li>
+        <li><span class="when">지금</span><span>발송 계정과 배포 그룹<small>발행은 테크이노베이션팀, 대상은 CL사업부로 확정. 남은 것: 팀 공용 메일 계정, CL사업부 배포 그룹 주소, 답장을 읽을 담당자</small></span></li>
+        <li><span class="when">운영 전</span><span>답장·설문 받을 곳<small>공용 메일 주소 또는 Forms 링크 하나</small></span></li>
+        <li><span class="when">운영 전</span><span>앱을 띄울 사내 주소<small>아웃룩이 캐릭터 이미지를 받아 올 곳</small></span></li>
+        <li><span class="when">운영 전</span><span>Claude API 키, 구글 시트·서비스 계정 승인<small>보안·IT 승인과 비용 담당자</small></span></li>
+        <li><span class="when">운영 전</span><span>캐릭터 이미지와 기사 인용 범위<small>이미지 사용 권리, 사내 공유 시 요약·썸네일 허용 범위</small></span></li>
+      </ul>
+    </section>
+  </main>
+
+  <aside class="specimen" aria-label="예시 레터">
+    <div class="cap"><span>예시 레터 · 4차 입고 (샘플 기사 기준)</span><span>실제 메일과 같은 HTML</span></div>
+    <div class="mail">{{LETTER}}</div>
+  </aside>
+</div>

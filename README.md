@@ -3,13 +3,16 @@
 국내외 물류·로봇 자동화 기사를 수집 → 작업자가 3~5개를 선별하고 기획 콘셉트를 입력 → 캐릭터 **레포냥**(리포트+냥)의 말투로 Claude가 레터를 작성 → **아웃룩 데스크톱에 그대로 붙여넣을 수 있는** 테이블/인라인 CSS HTML로 출력합니다.
 
 ## NEWS/INBOUND 구성
+발행: CL사업부 테크이노베이션팀 · 1차 독자: CL사업부 구성원 (`NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE`).
+컨셉·말투·디자인 규칙은 [`docs/concept/concept-sheet.html`](docs/concept/concept-sheet.html)(브라우저로 열기)에 정리되어 있습니다. 재생성: `npx tsx scripts/render-sample.ts /tmp/f.html --fragment && python3 scripts/build-concept-sheet.py /tmp/f.html`
+
 소식이 물류센터에 입고되듯 2주마다 들어오는 레터. 회차는 **N차 입고**로 부르고, 마무리에 다음 입고 예정일(발행일+14일)을 넣습니다. 가운데 정렬 600px 슬림 레터, 메인 컬러 `#A72B2B`, 고정폭 로고(Consolas), 친근한 해요체.
 
 | 순서 | 섹션 | 캐릭터 포즈 | 내용 |
 |---|---|---|---|
 | 1 | 헤더 | 인사(wave) | NEWS/INBOUND 로고, 한 줄 소개, `4차 입고 · 날짜`, 오프닝 |
 | 2 | 1분 냥스 | - | 짧은 소식 3~4건 (태그 \| 제목 이모지 + 2~3문장) |
-| 3 | 오늘의 메인 리포트 | 가방 끈(stand) | 1건 심층: 본문, 핵심만 쏙, 우리 회사엔? |
+| 3 | 오늘의 메인 리포트 | 가방 끈(stand) | 1건 심층: 본문, 핵심만 쏙, 우리 CL사업부엔? |
 | 4 | 츄르 스테이션 | 편지(letter) | 따끈한 소식 한 입 + 구독자 질문 + 답장 버튼 |
 | 5 | 꼬리 뉴스 | 빼꼼(peek) | 지난 입고와 이어지는 이야기 (MI 이력 매칭) |
 | 6 | 오늘 레터 어땠냥? | 앉음(sit) | 좋았다냥 / 아쉬웠다냥 설문 |

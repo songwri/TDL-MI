@@ -8,6 +8,8 @@ export interface RenderMeta {
   newsletterName: string;
   tagline: string;
   feedbackContact: string;
+  /** 독자 조직명 (예: CL사업부) */
+  audience?: string;
   /** 답장·설문을 받을 메일 주소 */
   feedbackEmail?: string;
   /** 설문 폼 URL (있으면 mailto 대신 사용, ?answer=good|bad 추가) */
@@ -40,6 +42,8 @@ function letterDate(d: string) {
   const wd = WEEKDAY[new Date(Date.UTC(y, m - 1, day)).getUTCDay()];
   return `${y}.${String(m).padStart(2, "0")}.${String(day).padStart(2, "0")}. ${wd}요일`;
 }
+
+export const forUsLabel = (m: Pick<RenderMeta, "audience">) => (m.audience ? `우리 ${m.audience}엔?` : "우리 회사엔?");
 
 function assetUrl(m: RenderMeta, path: string) {
   return `${(m.assetBaseUrl ?? "").replace(/\/$/, "")}/${path}`;
@@ -191,7 +195,7 @@ function mainReport(c: NewsletterContent, m: RenderMeta): string {
       ) +
       spacer(12) +
       row(
-        `<span style="${css(txt(14, C.ink, { fontWeight: "bold" }))}">🏭 우리 회사엔?</span>` + bullets(r.forUs, "→", C.inkSoft),
+        `<span style="${css(txt(14, C.ink, { fontWeight: "bold" }))}">🏭 ${t(forUsLabel(m))}</span>` + bullets(r.forUs, "→", C.inkSoft),
         { style: { padding: "16px 18px", border: `1px solid ${C.brandLine}` } },
       ) +
       spacer(22) +
@@ -301,7 +305,7 @@ function footer(c: NewsletterContent, m: RenderMeta): string {
         style: { ...txt(12, C.mute), paddingTop: 6 },
       }) +
       (c.keywords.length ? row(`#${c.keywords.map(t).join("&nbsp; #")}`, { align: "center", style: { ...txt(12, C.brand), paddingTop: 8 } }) : "") +
-      row("사내 공유용 레터입니다. 기사 저작권은 각 언론사에 있어요.", { align: "center", style: { ...txt(11, "#B9AEAF"), paddingTop: 8 } }),
+      row(`${m.audience ? `${t(m.audience)} 구성원을 위한 ` : ""}사내 공유용 레터예요. 기사 저작권은 각 언론사에 있어요.`, { align: "center", style: { ...txt(11, "#B9AEAF"), paddingTop: 8 } }),
   );
 }
 
@@ -366,7 +370,7 @@ export function renderPlainText(c: NewsletterContent, m: RenderMeta): string {
   }
   const r = c.mainReport;
   L.push(`[${SECTIONS.mainReport.label}]`, r.kicker, r.title, `${r.source} | ${r.url}`, ...r.paragraphs, "");
-  L.push("📌 핵심만 쏙", ...r.keyPoints.map((x) => ` • ${x}`), "🏭 우리 회사엔?", ...r.forUs.map((x) => ` → ${x}`), "");
+  L.push("📌 핵심만 쏙", ...r.keyPoints.map((x) => ` • ${x}`), `🏭 ${forUsLabel(m)}`, ...r.forUs.map((x) => ` → ${x}`), "");
   const s = c.churuStation;
   L.push(`[${SECTIONS.churuStation.label}]`, s.title, s.body, ...(s.url ? [s.url] : []), `💬 ${s.question}`, "");
   L.push(`[${SECTIONS.tailNews.label}]`, c.tailNews.intro, ...c.tailNews.items.map((x) => ` [${x.pastIssueLabel}] ${x.topic}: ${x.story}`));

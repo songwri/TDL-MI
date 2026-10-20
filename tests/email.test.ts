@@ -11,7 +11,8 @@ const meta = {
   publishDate: "2026-10-20",
   newsletterName: "NEWS/INBOUND",
   tagline: "격주 레터",
-  feedbackContact: "물류혁신팀",
+  feedbackContact: "테크이노베이션팀",
+  audience: "CL사업부",
   feedbackEmail: "mi@example.com",
   assetBaseUrl: "https://mi.example.com/",
   thumbnails: { A1: "https://ex.com/t.jpg" },
@@ -44,7 +45,7 @@ describe("아웃룩 호환 템플릿", () => {
   });
 
   it("섹션 구성", () => {
-    const order = ["NEWS/INBOUND", "7차 입고", "1분 냥스", "오늘의 메인 리포트", "핵심만 쏙", "우리 회사엔?", "츄르 스테이션", "꼬리 뉴스", "오늘 레터 어땠냥?", "레포냥의 한마디"];
+    const order = ["NEWS/INBOUND", "7차 입고", "1분 냥스", "오늘의 메인 리포트", "핵심만 쏙", "우리 CL사업부엔?", "츄르 스테이션", "꼬리 뉴스", "오늘 레터 어땠냥?", "레포냥의 한마디"];
     const idx = order.map((s) => frag.indexOf(s));
     expect(idx.every((i) => i >= 0)).toBe(true);
     expect([...idx].sort((a, b) => a - b)).toEqual(idx);

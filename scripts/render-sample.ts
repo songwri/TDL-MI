@@ -19,6 +19,7 @@ const meta = {
   newsletterName: config.newsletterName,
   tagline: config.tagline,
   feedbackContact: config.feedbackContact,
+  audience: config.audience,
   feedbackEmail: config.feedbackEmail || "mi-letter@example.com",
   assetBaseUrl: config.assetBaseUrl || undefined,
 };

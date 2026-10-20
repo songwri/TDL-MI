@@ -71,7 +71,7 @@ export function ContentEditor({ value, onChange }: { value: NewsletterContent; o
           <Field label="제목" value={c.mainReport.title} onChange={(v) => mr({ title: v })} />
           <Field label="본문" hint="문단은 빈 줄로 구분" value={c.mainReport.paragraphs.join("\n\n")} rows={9} onChange={(v) => mr({ paragraphs: paras(v) })} />
           <Field label="핵심만 쏙" hint="한 줄에 하나" value={c.mainReport.keyPoints.join("\n")} rows={4} onChange={(v) => mr({ keyPoints: lines(v) })} />
-          <Field label="우리 회사엔?" hint="한 줄에 하나" value={c.mainReport.forUs.join("\n")} rows={3} onChange={(v) => mr({ forUs: lines(v) })} />
+          <Field label="우리 사업부엔?" hint="한 줄에 하나" value={c.mainReport.forUs.join("\n")} rows={3} onChange={(v) => mr({ forUs: lines(v) })} />
         </Section>
         <Section title={SECTIONS.tailNews.label}>
           <Field label="도입" value={c.tailNews.intro} rows={2} onChange={(v) => tn({ intro: v })} />

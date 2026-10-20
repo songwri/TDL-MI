@@ -12,7 +12,9 @@ export const config = {
   miLookbackDays: Number(process.env.MI_LOOKBACK_DAYS || 180),
   newsletterName: process.env.NEWSLETTER_NAME || "NEWS/INBOUND",
   tagline: process.env.NEWSLETTER_TAGLINE || "레포냥이 물어 온 물류·로봇 트렌드",
-  feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "물류혁신팀",
+  feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "테크이노베이션팀",
+  /** 독자: '우리 ○○엔?' 박스와 프롬프트에 쓰인다 */
+  audience: process.env.NEWSLETTER_AUDIENCE || "CL사업부",
   feedbackEmail: process.env.NEWSLETTER_FEEDBACK_EMAIL || "",
   surveyUrl: process.env.NEWSLETTER_SURVEY_URL || "",
   archiveUrl: process.env.NEWSLETTER_ARCHIVE_URL || "",

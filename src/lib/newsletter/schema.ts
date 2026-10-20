@@ -24,7 +24,7 @@ export const NewsletterSchema = z.object({
     url: z.string(),
     paragraphs: z.array(z.string()).describe("본문 문단 3~5개. 배경 → 무슨 일 → 왜 중요한가 흐름"),
     keyPoints: z.array(z.string()).describe("핵심만 쏙: 수치·사실 중심 3~4개"),
-    forUs: z.array(z.string()).describe("우리 회사엔?: 사내 물류센터·자동화 검토에 주는 시사점 2~3개"),
+    forUs: z.array(z.string()).describe("우리 사업부엔?: 독자 사업부의 물류센터 운영·자동화 검토에 주는 시사점 2~3개"),
   }),
   churuStation: z.object({
     articleId: z.string().describe("츄르 기사 articleId. 지정 기사가 없으면 빈 문자열"),
