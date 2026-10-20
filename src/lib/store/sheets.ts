@@ -11,7 +11,7 @@ export const ARTICLE_HEADERS = [
   "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드",
 ] as const;
 export const ISSUE_HEADERS = [
-  "호수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
+  "차수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
   "HTML(이어짐1)", "HTML(이어짐2)", "HTML(이어짐3)",
 ] as const;
 
@@ -68,7 +68,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
 
 /** ── 직렬화 ─────────────────────────────────────────────── */
 export function selectionLabel(a: Pick<Article, "selected" | "publishedInIssue">): string {
-  if (a.publishedInIssue) return `발행(${a.publishedInIssue}호)`;
+  if (a.publishedInIssue) return `발행(${a.publishedInIssue}차)`;
   return a.selected ? "후보" : "";
 }
 
@@ -82,7 +82,7 @@ export function articleToRow(a: Article): string[] {
 export function rowToArticle(r: string[]): Article | null {
   if (!r[0]) return null;
   const sel = r[8] ?? "";
-  const issueMatch = sel.match(/(\d+)\s*호/);
+  const issueMatch = sel.match(/(\d+)\s*[호차]/);
   const category = (CATEGORIES as readonly string[]).includes(r[7]) ? (r[7] as Category) : "기타";
   return {
     id: r[0],

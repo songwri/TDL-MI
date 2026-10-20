@@ -89,7 +89,7 @@ export function ContentEditor({ value, onChange }: { value: NewsletterContent; o
               })
             }
           />
-          <Field label="다음 호까지 지켜볼 것" hint="한 줄에 하나" value={c.tailNews.watchList.join("\n")} rows={2} onChange={(v) => tn({ watchList: lines(v) })} />
+          <Field label="다음 입고까지 지켜볼 것" hint="한 줄에 하나" value={c.tailNews.watchList.join("\n")} rows={2} onChange={(v) => tn({ watchList: lines(v) })} />
         </Section>
         <Section title="마무리">
           <Field label="레포냥의 한마디" value={c.closing} rows={2} onChange={(v) => set({ closing: v })} />

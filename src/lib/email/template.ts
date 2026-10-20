@@ -1,4 +1,4 @@
-import { CHARACTER, COLORS as C, PERSONA, SECTIONS, type Pose } from "@/config/brand";
+import { CHARACTER, COLORS as C, PERSONA, SECTIONS, issueLabel, type Pose } from "@/config/brand";
 import type { NewsletterContent } from "@/lib/types";
 import { FONT, css, link, row, spacer, t, table, td, tr } from "./inline";
 
@@ -22,8 +22,8 @@ export interface RenderMeta {
 
 /** 슬림한 레터: 600px 프레임, 본문 520px */
 const WIDTH = 600;
-/** 영문 워드마크: 윈도우 기본 Arial Black → 굵은 대체 서체 */
-const WORDMARK = "'Arial Black','Segoe UI Black','Helvetica Neue',Arial,sans-serif";
+/** 워드마크: 고정폭 서체로 테크 느낌 (Consolas 는 윈도우·아웃룩 기본 탑재) */
+const WORDMARK = "Consolas,'Courier New',Menlo,monospace";
 const PAD = 40;
 const INNER = WIDTH - PAD * 2;
 
@@ -130,18 +130,20 @@ function button(label: string, href: string, bg: string, width?: number): string
 /* ── 섹션 ─────────────────────────────────────────────── */
 
 function header(c: NewsletterContent, m: RenderMeta): string {
-  const archive = m.archiveUrl ? ` &nbsp;|&nbsp; ${link("지난 레터 보기", m.archiveUrl, { color: C.inkSoft, textDecoration: "underline" })}` : "";
+  const archive = m.archiveUrl ? ` &nbsp;|&nbsp; ${link("지난 입고 보기", m.archiveUrl, { color: C.inkSoft, textDecoration: "underline" })}` : "";
   return table(
     row(character(m, "wave", 112, `${PERSONA.name} 인사`), { align: "center" }) +
       spacer(10) +
       row(t(m.newsletterName), {
         align: "center",
-        style: { fontFamily: WORDMARK, fontSize: 36, lineHeight: "42px", fontWeight: 900, letterSpacing: "-1px", color: C.brand },
+        style: { fontFamily: WORDMARK, fontSize: 34, lineHeight: "42px", fontWeight: "bold", letterSpacing: "-0.5px", color: C.brand },
       }) +
       row(t(m.tagline), { align: "center", style: { ...txt(12, C.mute), paddingTop: 6 } }) +
       spacer(18) +
-      row(`${t(PERSONA.name)} 레터 제${m.issueNo}호`, { align: "center", style: txt(13, C.ink, { fontWeight: "bold" }) }) +
-      row(`${letterDate(m.publishDate)}${archive}`, { align: "center", style: txt(13, C.inkSoft) }) +
+      row(`<b style="${css({ color: C.ink })}">${issueLabel(m.issueNo)}</b> · ${letterDate(m.publishDate)}${archive}`, {
+        align: "center",
+        style: txt(13, C.inkSoft),
+      }) +
       spacer(26) +
       row(t(c.intro), { style: txt(15, C.ink) }) +
       spacer(30) +
@@ -199,7 +201,7 @@ function mainReport(c: NewsletterContent, m: RenderMeta): string {
 
 function churuStation(c: NewsletterContent, m: RenderMeta): string {
   const s = c.churuStation;
-  const reply = mailto(m, `[${PERSONA.name} 레터 ${m.issueNo}호] 츄르 스테이션 답장`);
+  const reply = mailto(m, `[${m.newsletterName} ${issueLabel(m.issueNo)}] 츄르 스테이션 답장`);
   return table(
     row(sectionHead(m, SECTIONS.churuStation.label, "letter", SECTIONS.churuStation.sub)) +
       spacer(18) +
@@ -246,7 +248,7 @@ function tailNews(c: NewsletterContent, m: RenderMeta): string {
             row(table(items.join("")), { style: { paddingTop: 2 } }) +
             (tn.watchList.length
               ? spacer(16) +
-                row(`<span style="${css(txt(13, C.ink, { fontWeight: "bold" }))}">👀 다음 호까지 지켜볼 것</span>`) +
+                row(`<span style="${css(txt(13, C.ink, { fontWeight: "bold" }))}">👀 다음 입고까지 지켜볼 것</span>`) +
                 row(bullets(tn.watchList, "◦", C.inkSoft))
               : ""),
         ),
@@ -259,14 +261,14 @@ function survey(m: RenderMeta): string {
   const href = (answer: "good" | "bad", label: string) =>
     m.surveyUrl
       ? `${m.surveyUrl}${m.surveyUrl.includes("?") ? "&" : "?"}issue=${m.issueNo}&answer=${answer}`
-      : mailto(m, `[${PERSONA.name} 레터 ${m.issueNo}호] ${label}`);
+      : mailto(m, `[${m.newsletterName} ${issueLabel(m.issueNo)}] ${label}`);
   const good = href("good", "좋았다냥");
   const bad = href("bad", "아쉬웠다냥");
   return table(
     row(character(m, "sit", 104, `${PERSONA.name}`), { align: "center" }) +
       spacer(14) +
       row(t(SECTIONS.survey.label), { align: "center", style: txt(17, C.ink, { fontWeight: "bold" }) }) +
-      row("버튼을 눌러 이번 호 의견을 남겨 주세요.<br>피드백 하나하나가 다음 레터의 재료가 돼요.", {
+      row("버튼을 눌러 이번 입고 소식에 대한 의견을 남겨 주세요.<br>피드백 하나하나가 다음 레터의 재료가 돼요.", {
         align: "center",
         style: { ...txt(13, C.inkSoft), paddingTop: 4 },
       }) +
@@ -293,7 +295,7 @@ function footer(c: NewsletterContent, m: RenderMeta): string {
       spacer(26) +
       row("&nbsp;", { style: { borderTop: `1px solid ${C.brandLine}`, fontSize: 1, lineHeight: "1px", height: 1 } }) +
       spacer(18) +
-      row(t(m.newsletterName), { align: "center", style: { fontFamily: WORDMARK, fontSize: 22, lineHeight: "28px", fontWeight: 900, color: "#B9AEAF", letterSpacing: "-0.5px" } }) +
+      row(t(m.newsletterName), { align: "center", style: { fontFamily: WORDMARK, fontSize: 20, lineHeight: "28px", fontWeight: "bold", color: "#B9AEAF" } }) +
       row(`${t(m.tagline)}<br>문의·제보 ${t(m.feedbackContact)}${m.feedbackEmail ? ` · ${t(m.feedbackEmail)}` : ""}`, {
         align: "center",
         style: { ...txt(12, C.mute), paddingTop: 6 },
@@ -357,7 +359,7 @@ ${renderFragment(c, m)}
 /** text/plain 클립보드용 */
 export function renderPlainText(c: NewsletterContent, m: RenderMeta): string {
   const L: string[] = [];
-  L.push(m.newsletterName, `${PERSONA.name} 레터 제${m.issueNo}호 · ${letterDate(m.publishDate)}`, "", c.intro, "");
+  L.push(m.newsletterName, `${issueLabel(m.issueNo)} · ${letterDate(m.publishDate)}`, "", c.intro, "");
   if (c.quickNews.length) {
     L.push(`[${SECTIONS.quickNews.label}]`);
     for (const q of c.quickNews) L.push(`${q.tag} | ${q.title} ${q.emoji}`, q.body, q.url, "");
@@ -368,7 +370,7 @@ export function renderPlainText(c: NewsletterContent, m: RenderMeta): string {
   const s = c.churuStation;
   L.push(`[${SECTIONS.churuStation.label}]`, s.title, s.body, ...(s.url ? [s.url] : []), `💬 ${s.question}`, "");
   L.push(`[${SECTIONS.tailNews.label}]`, c.tailNews.intro, ...c.tailNews.items.map((x) => ` [${x.pastIssueLabel}] ${x.topic}: ${x.story}`));
-  if (c.tailNews.watchList.length) L.push("👀 다음 호까지 지켜볼 것", ...c.tailNews.watchList.map((x) => ` ◦ ${x}`));
+  if (c.tailNews.watchList.length) L.push("👀 다음 입고까지 지켜볼 것", ...c.tailNews.watchList.map((x) => ` ◦ ${x}`));
   L.push("", `[${SECTIONS.survey.label}] 의견: ${m.feedbackEmail ?? m.feedbackContact}`, "", `${PERSONA.name}의 한마디: ${c.closing}`);
   return L.join("\n");
 }

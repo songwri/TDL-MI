@@ -68,7 +68,7 @@ async function main() {
   ];
   for (const i of issues) {
     const [main, ...quick] = i.ids;
-    const content = buildFallbackDraft({ issueNo: i.issueNo, concept: i.concept, main, quick, intel: [] });
+    const content = buildFallbackDraft({ issueNo: i.issueNo, publishDate: i.publishDate, concept: i.concept, main, quick, intel: [] });
     const { html } = renderAll(content, i.issueNo, i.publishDate, i.ids);
     await saveIssue({
       issueNo: i.issueNo,

@@ -1,10 +1,13 @@
-import { PERSONA, SECTIONS } from "@/config/brand";
+import { PERSONA, SECTIONS, issueLabel, issueShort } from "@/config/brand";
 import type { keywordTimeline } from "@/lib/mi";
 import type { Article, ArticleIntel, NewsletterIssue } from "@/lib/types";
 import { shortDate, truncate } from "@/lib/utils/text";
 
 export const systemPrompt = (newsletterName: string) => `당신은 사내 격주 뉴스레터 "${newsletterName}"를 쓰는 캐릭터 "${PERSONA.name}"입니다.
 ${PERSONA.intro}. 독자는 물류센터 운영·자동화 도입을 고민하는 사내 동료들이에요.
+
+[세계관] 이 레터는 소식이 물류센터에 '입고'되는 콘셉트예요. 발행 회차는 '호'가 아니라 'N차 입고'로 부릅니다(예: 4차 입고).
+"이번 입고", "지난 입고", "다음 입고"처럼 자연스럽게 쓰되, 물류 용어 말장난은 한 차수에 두세 번이면 충분해요.
 
 [톤앤매너]
 - ${PERSONA.voice}
@@ -16,12 +19,12 @@ ${PERSONA.intro}. 독자는 물류센터 운영·자동화 도입을 고민하�
 - 마크다운·HTML 태그는 쓰지 않습니다. 이모지는 1분 냥스 emoji 필드와 문장 강조에 가끔만.
 
 [섹션]
-1. headline / intro: 작업자가 준 기획 콘셉트를 레포냥의 말로 풀어 이번 호를 소개
+1. headline / intro: 작업자가 준 기획 콘셉트를 레포냥의 말로 풀어 이번 입고를 소개
 2. ${SECTIONS.quickNews.label}: role="quickNews" 기사 각각을 짧고 가볍게
 3. ${SECTIONS.mainReport.label}: role="main" 기사 1건을 깊게. keyPoints(핵심만 쏙), forUs(우리 회사엔?) 포함
 4. ${SECTIONS.churuStation.label}: role="churu" 기사가 있으면 그 기사로, 없으면 기획 콘셉트와 이번 호 흐름에서 가벼운 화제 한 조각을 골라 쓰고, 구독자에게 답장을 부르는 질문을 던집니다
-5. ${SECTIONS.tailNews.label}: 제공된 과거 발행 이력과 이번 호 기사를 연결합니다. 제공되지 않은 과거 연결은 만들지 말고, 없으면 '첫 등장'으로 표기합니다
-6. closing: 다음 호를 기다리게 하는 짧은 마무리
+5. ${SECTIONS.tailNews.label}: 제공된 과거 발행 이력과 이번 호 기사를 연결합니다. 제공되지 않은 과거 연결은 만들지 말고, 없으면 '첫 입고'로 표기합니다
+6. closing: 다음 입고 예정일을 넣어 기다리게 하는 짧은 마무리
 
 articleId, source, url 은 제공된 값을 그대로 복사합니다.`;
 
@@ -57,16 +60,17 @@ pastIssueLinks: ${rel.length ? rel.map((r) => r.label).join(" | ") : "없음"}
     .slice()
     .sort((a, b) => b.issueNo - a.issueNo)
     .slice(0, 12)
-    .map((i) => `- ${i.issueNo}호(${shortDate(i.publishDate)}): ${i.concept} / 키워드: ${i.keywords.join(", ")}`)
+    .map((i) => `- ${issueLabel(i.issueNo)}(${shortDate(i.publishDate)}): ${i.concept} / 키워드: ${i.keywords.join(", ")}`)
     .join("\n");
 
   const timeline = input.timeline
-    .map((t) => `- ${t.keyword}: ${t.appearances.map((a) => `${a.issueNo}호(${shortDate(a.publishDate)})`).join(", ")}`)
+    .map((t) => `- ${t.keyword}: ${t.appearances.map((a) => `${issueShort(a.issueNo)}(${shortDate(a.publishDate)})`).join(", ")}`)
     .join("\n");
 
   return `이번 호 정보
-- 호수: ${input.issueNo}호
+- 차수: ${issueLabel(input.issueNo)}
 - 발행일: ${input.publishDate}
+- 다음 입고 예정일: ${nextIssueDate(input.publishDate)}
 - 작업자 기획 콘셉트 및 메시지:
 """
 ${input.concept}
@@ -79,11 +83,18 @@ ${input.quickArticles.map((a) => fmtArticle(a, "quickNews")).join("\n\n")}
 
 ${input.churuArticle ? fmtArticle(input.churuArticle, "churu") : "(churu 역할 기사 없음: churuStation.articleId/source/url 은 빈 문자열)"}
 
-[과거 발행 이력 (최근 12개 호)]
-${recent || "아직 발행 이력이 없어요 (창간호)."}
+[지난 입고 이력 (최근 12차)]
+${recent || "아직 입고 이력이 없어요 (첫 입고)."}
 
 [핵심 키워드의 과거 등장 이력]
 ${timeline || "없음"}
 
-위 자료로 이번 호 레터를 JSON 스키마에 맞춰 작성하세요. quickNews 에는 quickNews 역할 기사 ${input.quickArticles.length}건을 모두 순서대로 넣습니다.`;
+위 자료로 이번 입고 레터를 JSON 스키마에 맞춰 작성하세요. quickNews 에는 quickNews 역할 기사 ${input.quickArticles.length}건을 모두 순서대로 넣습니다.`;
+}
+
+/** 격주 발행 기준 다음 입고 예정일 (MM월 DD일) */
+export function nextIssueDate(publishDate: string): string {
+  const d = new Date(`${publishDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 14);
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
 }

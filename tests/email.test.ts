@@ -9,7 +9,7 @@ import { sampleContent } from "./fixtures/content";
 const meta = {
   issueNo: 7,
   publishDate: "2026-10-20",
-  newsletterName: "REPONYANG",
+  newsletterName: "NEWS/INBOUND",
   tagline: "격주 레터",
   feedbackContact: "물류혁신팀",
   feedbackEmail: "mi@example.com",
@@ -44,7 +44,7 @@ describe("아웃룩 호환 템플릿", () => {
   });
 
   it("섹션 구성", () => {
-    const order = ["REPONYANG", "레포냥 레터 제7호", "1분 냥스", "오늘의 메인 리포트", "핵심만 쏙", "우리 회사엔?", "츄르 스테이션", "꼬리 뉴스", "오늘 레터 어땠냥?", "레포냥의 한마디"];
+    const order = ["NEWS/INBOUND", "7차 입고", "1분 냥스", "오늘의 메인 리포트", "핵심만 쏙", "우리 회사엔?", "츄르 스테이션", "꼬리 뉴스", "오늘 레터 어땠냥?", "레포냥의 한마디"];
     const idx = order.map((s) => frag.indexOf(s));
     expect(idx.every((i) => i >= 0)).toBe(true);
     expect([...idx].sort((a, b) => a - b)).toEqual(idx);
@@ -58,8 +58,9 @@ describe("아웃룩 호환 템플릿", () => {
     expect(html).toMatch(/^<!DOCTYPE html>/);
     expect(html).toContain("<!--[if mso]>");
     const text = renderPlainText(sampleContent, meta);
-    expect(text).toContain("레포냥 레터 제7호 · 2026.10.20. 화요일");
-    expect(text).toContain("[1호 · 05/23] AutoStore: 그때는 도입, 지금은 신형");
+    expect(text).toContain("7차 입고 · 2026.10.20. 화요일");
+    expect(frag).toContain(encodeURIComponent("[NEWS/INBOUND 7차 입고] 좋았다냥"));
+    expect(text).toContain("[1차 · 05/23] AutoStore: 그때는 도입, 지금은 신형");
   });
 });
 
@@ -69,10 +70,11 @@ describe("스키마 & 초안", () => {
       id: "A1", collectedAt: "", publishedAt: "2026-10-10T00:00:00Z", source: "s", region: "KR", title: "제목", link: "https://x",
       summary: "요약입니다. 두 번째 문장입니다.", category: "기타", keywords: ["AMR"], selected: true,
     };
-    const d = buildFallbackDraft({ issueNo: 3, concept: "콘셉트", main: a, quick: [{ ...a, id: "A2" }], churu: { ...a, id: "A3" }, intel: [] });
+    const d = buildFallbackDraft({ issueNo: 3, publishDate: "2026-10-20", concept: "콘셉트", main: a, quick: [{ ...a, id: "A2" }], churu: { ...a, id: "A3" }, intel: [] });
     expect(NewsletterSchema.safeParse(d).success).toBe(true);
     expect(d.quickNews).toHaveLength(1);
     expect(d.churuStation.articleId).toBe("A3");
+    expect(d.closing).toContain("11월 3일");
   });
 });
 
@@ -92,7 +94,8 @@ describe("시트 직렬화", () => {
       category: "AMR/AGV", keywords: ["AMR", "쿠팡"], selected: false, publishedInIssue: 5,
     };
     const r = articleToRow(a);
-    expect(r[8]).toBe("발행(5호)");
+    expect(r[8]).toBe("발행(5차)");
+    expect(rowToArticle({ ...r, 8: "발행(3호)" } as unknown as string[])?.publishedInIssue).toBe(3);
     expect(rowToArticle(r)).toMatchObject({ id: "A1", category: "AMR/AGV", publishedInIssue: 5, selected: false, keywords: ["AMR", "쿠팡"] });
   });
 });

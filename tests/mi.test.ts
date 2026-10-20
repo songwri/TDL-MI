@@ -46,7 +46,7 @@ describe("MI 이력 매칭", () => {
     const [res] = analyzeArticles([now], issues, [past, now], { now: new Date("2026-10-20") });
     expect(res.relations[0].issueNo).toBe(2);
     expect(res.relations[0].kind).toBe("follow-up");
-    expect(res.relations[0].label).toBe("2호(05/10)에서 다룬 AutoStore 솔루션의 후속 기사");
+    expect(res.relations[0].label).toBe("2차 입고(05/10)에서 다룬 AutoStore 솔루션의 후속 기사");
   });
 
   it("동일 URL 은 중복 경고", () => {

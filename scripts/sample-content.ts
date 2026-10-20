@@ -4,7 +4,7 @@ import type { NewsletterContent } from "@/lib/types";
 export const SAMPLE_LETTER: NewsletterContent = {
   headline: "로봇 팔, 드디어 피킹 현장에 출근하나요?",
   intro:
-    "안녕하세요, 레포냥이에요! 요즘 전시회마다 '로봇이 낱개 피킹까지 한다'는 얘기가 빠지지 않죠. 이번 호에서는 그 말이 얼마나 현실에 가까워졌는지 물어 왔어요. 큐브 창고에 로봇 팔이 붙은 신형 포트부터, 국내 센터의 AMR 증설 소식까지 2주치를 꾹꾹 담았어요.",
+    "안녕하세요, 레포냥이에요! 요즘 전시회마다 '로봇이 낱개 피킹까지 한다'는 얘기가 빠지지 않죠. 이번 입고에서는 그 말이 얼마나 현실에 가까워졌는지 물어 왔어요. 큐브 창고에 로봇 팔이 붙은 신형 포트부터, 국내 센터의 AMR 증설 소식까지 2주치를 꾹꾹 담았어요.",
   quickNews: [
     {
       articleId: "s1",
@@ -64,13 +64,13 @@ export const SAMPLE_LETTER: NewsletterContent = {
     url: "https://example.com/sample/c7",
   },
   tailNews: {
-    intro: "이번 호 소식 중 두 개는 지난 레터에서 다룬 이야기의 다음 편이에요.",
+    intro: "이번 입고 소식 중 두 개는 지난 입고에서 다룬 이야기의 다음 편이에요.",
     items: [
-      { pastIssueLabel: "1호 · 05/23", topic: "AutoStore", story: "그때는 국내 첫 도입 소식이었는데, 이번엔 로봇 팔까지 붙은 신형이 나왔어요." },
-      { pastIssueLabel: "2호 · 07/12", topic: "Agility Robotics", story: "현장 시범 운영 단계에서 양산 확대 단계로 넘어갔어요." },
+      { pastIssueLabel: "1차 · 05/23", topic: "AutoStore", story: "그때는 국내 첫 도입 소식이었는데, 이번엔 로봇 팔까지 붙은 신형이 나왔어요." },
+      { pastIssueLabel: "2차 · 07/12", topic: "Agility Robotics", story: "현장 시범 운영 단계에서 양산 확대 단계로 넘어갔어요." },
     ],
     watchList: ["로봇 피킹 포트의 실제 처리량(시간당 피킹 수) 공개 여부", "휴머노이드 단가가 AMR과 비교할 만한 수준으로 내려오는지"],
   },
-  closing: "다음 호에도 따끈한 소식 물어 올게요. 2주 뒤에 만나요!",
+  closing: "다음 입고는 11월 3일 예정이에요. 따끈한 소식 물어 올게요!",
   keywords: ["AutoStore", "피스피킹", "AMR", "휴머노이드", "디지털 트윈"],
 };

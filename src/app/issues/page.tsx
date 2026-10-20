@@ -25,7 +25,7 @@ export default async function IssuesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold text-brand">🧭 Market Intelligence 아카이브</h1>
-        <span className="text-sm text-slate-500">총 {issues.length}개 호 발행</span>
+        <span className="text-sm text-slate-500">총 {issues.length}차 입고</span>
         <div className="ml-auto"><SheetsControls /></div>
       </div>
 
@@ -33,7 +33,7 @@ export default async function IssuesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs text-slate-500">
             <tr>
-              <th className="px-3 py-2">호수</th>
+              <th className="px-3 py-2">차수</th>
               <th className="px-3 py-2">발행일</th>
               <th className="px-3 py-2">헤드라인 / 메인 콘셉트</th>
               <th className="px-3 py-2">선정 기사</th>
@@ -42,12 +42,12 @@ export default async function IssuesPage() {
           </thead>
           <tbody>
             {issues.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-500">아직 발행 이력이 없습니다.</td></tr>
+              <tr><td colSpan={5} className="px-3 py-10 text-center text-slate-500">아직 입고 이력이 없습니다.</td></tr>
             )}
             {issues.map((i) => (
               <tr key={i.issueNo} className="border-t border-slate-100 align-top hover:bg-slate-50">
                 <td className="px-3 py-2 font-bold text-brand">
-                  <Link href={`/issues/${i.issueNo}`} className="hover:underline">{i.issueNo}호</Link>
+                  <Link href={`/issues/${i.issueNo}`} className="hover:underline">{i.issueNo}차</Link>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2">{i.publishDate}</td>
                 <td className="px-3 py-2">
@@ -75,7 +75,7 @@ export default async function IssuesPage() {
                 <tr className="bg-slate-50 text-slate-500">
                   <th className="sticky left-0 bg-slate-50 px-3 py-2 text-left">키워드</th>
                   {asc.map((i) => (
-                    <th key={i.issueNo} className="px-2 py-2 font-medium">{i.issueNo}호<div className="font-normal">{shortDate(i.publishDate)}</div></th>
+                    <th key={i.issueNo} className="px-2 py-2 font-medium">{i.issueNo}차<div className="font-normal">{shortDate(i.publishDate)}</div></th>
                   ))}
                   <th className="px-3 py-2">횟수</th>
                 </tr>
@@ -86,7 +86,7 @@ export default async function IssuesPage() {
                     <td className="sticky left-0 bg-white px-3 py-1.5 font-medium text-slate-700">{k}</td>
                     {asc.map((i) => (
                       <td key={i.issueNo} className="px-2 py-1.5 text-center">
-                        {set.has(i.issueNo) ? <span className="inline-block size-3 rounded-sm bg-accent" title={`${i.issueNo}호`} /> : <span className="inline-block size-3 rounded-sm bg-slate-100" />}
+                        {set.has(i.issueNo) ? <span className="inline-block size-3 rounded-sm bg-accent" title={`${i.issueNo}차 입고`} /> : <span className="inline-block size-3 rounded-sm bg-slate-100" />}
                       </td>
                     ))}
                     <td className="px-3 py-1.5 text-center text-slate-500">{set.size}</td>

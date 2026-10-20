@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     };
     const parsed = NewsletterSchema.safeParse(body.content);
     if (!parsed.success) return fail(new Error(`콘텐츠 형식 오류: ${parsed.error.message}`), 400);
-    if (!Number.isInteger(body.issueNo) || body.issueNo < 1) return fail(new Error("호수가 올바르지 않습니다."), 400);
+    if (!Number.isInteger(body.issueNo) || body.issueNo < 1) return fail(new Error("입고 차수가 올바르지 않습니다."), 400);
     const articles = await getArticles(body.articleIds);
     const { html } = renderAll(parsed.data, body.issueNo, body.publishDate, articles);
     const issue: NewsletterIssue = {

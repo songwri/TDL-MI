@@ -1,3 +1,4 @@
+import { issueLabel } from "@/config/brand";
 import { ENTITIES } from "@/config/taxonomy";
 import { config } from "@/lib/config";
 import type { Article, ArticleIntel, IssueRelation, NewsletterIssue, RelationKind } from "@/lib/types";
@@ -153,7 +154,7 @@ export function analyzeArticles(
 
 export function relationLabel(issue: Pick<NewsletterIssue, "issueNo" | "publishDate">, shared: string[], kind: RelationKind) {
   const topic = shared.find((k) => KIND.get(k) !== "tech") ?? shared[0];
-  const head = `${issue.issueNo}호(${shortDate(issue.publishDate)})`;
+  const head = `${issueLabel(issue.issueNo)}(${shortDate(issue.publishDate)})`;
   if (kind === "duplicate") return `${head}에서 이미 다룬 기사와 중복 가능성`;
   if (kind === "follow-up") return `${head}에서 다룬 ${topic} 솔루션의 후속 기사`;
   return topic ? `${head}에서 다룬 ${topic} 주제와 연관` : `${head} 주제와 유사`;

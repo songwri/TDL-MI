@@ -1,6 +1,7 @@
-import { PERSONA } from "@/config/brand";
+import { PERSONA, issueLabel, issueShort } from "@/config/brand";
 import type { Article, ArticleIntel, NewsletterContent } from "@/lib/types";
 import { shortDate, truncate } from "@/lib/utils/text";
+import { nextIssueDate } from "./prompt";
 
 const TAG: Record<string, string> = {
   "AMR/AGV": "AMR",
@@ -17,6 +18,7 @@ const chunk = <T,>(xs: T[], n: number) =>
 /** LLM 미설정 시 사용하는 규칙 기반 초안 (편집 출발점 용도) */
 export function buildFallbackDraft(input: {
   issueNo: number;
+  publishDate?: string;
   concept: string;
   main: Article;
   quick: Article[];
@@ -32,7 +34,7 @@ export function buildFallbackDraft(input: {
 
   return {
     headline: truncate(conceptLine || main.title, 40),
-    intro: `안녕하세요, ${PERSONA.name}이에요! ${input.issueNo}호 주제는 "${truncate(conceptLine || "최근 2주간의 물류·로봇 소식", 50)}"예요. 메인 리포트에서는 ${main.source}의 "${truncate(main.title, 36)}" 이야기를 깊게 들여다봐요.`,
+    intro: `안녕하세요, ${PERSONA.name}이에요! ${issueLabel(input.issueNo)} 주제는 "${truncate(conceptLine || "최근 2주간의 물류·로봇 소식", 50)}"예요. 메인 리포트에서는 ${main.source}의 "${truncate(main.title, 36)}" 이야기를 깊게 들여다봐요.`,
     quickNews: quick.map((a) => ({
       articleId: a.id,
       tag: TAG[a.category] ?? "물류",
@@ -71,18 +73,20 @@ export function buildFallbackDraft(input: {
         },
     tailNews: {
       intro: relations.length
-        ? "이번 호 소식 중 일부는 지난 레터에서 다룬 이야기와 이어져요."
-        : "이번 호 소식은 레포냥 레터에 처음 등장하는 주제예요.",
+        ? "이번 입고 소식 중 일부는 지난 입고에서 다룬 이야기와 이어져요."
+        : "이번 입고 소식은 처음 들어온 주제예요.",
       items: relations.length
         ? relations.slice(0, 3).map((r) => ({
-            pastIssueLabel: `${r.issueNo}호 · ${shortDate(r.publishDate)}`,
+            pastIssueLabel: `${issueShort(r.issueNo)} · ${shortDate(r.publishDate)}`,
             topic: r.sharedKeywords.join(", ") || "유사 주제",
             story: r.label,
           }))
-        : [{ pastIssueLabel: "첫 등장", topic: keywords.slice(0, 3).join(", ") || main.category, story: "다음 호부터 이어지는 소식을 추적해 볼게요." }],
+        : [{ pastIssueLabel: "첫 입고", topic: keywords.slice(0, 3).join(", ") || main.category, story: "다음 입고부터 이어지는 소식을 추적해 볼게요." }],
       watchList: keywords.slice(0, 2).map((k) => `${k}의 다음 행보`),
     },
-    closing: "다음 호에도 따끈한 소식 물어 올게요. 2주 뒤에 만나요!",
+    closing: input.publishDate
+      ? `다음 입고는 ${nextIssueDate(input.publishDate)} 예정이에요. 따끈한 소식 물어 올게요!`
+      : "2주 뒤에 따끈한 소식 물어 올게요!",
     keywords,
   };
 }

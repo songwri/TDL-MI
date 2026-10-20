@@ -17,7 +17,7 @@ export const sampleContent: NewsletterContent = {
   churuStation: { articleId: "", title: "띵동! 질문 도착", body: "소식 한 조각", question: "여러분 센터는 어때요?", source: "", url: "" },
   tailNews: {
     intro: "지난 호와 이어져요.",
-    items: [{ pastIssueLabel: "1호 · 05/23", topic: "AutoStore", story: "그때는 도입, 지금은 신형" }],
+    items: [{ pastIssueLabel: "1차 · 05/23", topic: "AutoStore", story: "그때는 도입, 지금은 신형" }],
     watchList: ["관전 1"],
   },
   closing: "2주 뒤에 만나요!",

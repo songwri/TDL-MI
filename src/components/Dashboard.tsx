@@ -237,13 +237,13 @@ export function Dashboard() {
 
   const publish = async () => {
     if (!gen) return;
-    if (!confirm(`${gen.issueNo}호를 발행 이력(Newsletter_Issues)에 저장할까요? 같은 호수가 있으면 덮어씁니다.`)) return;
+    if (!confirm(`${gen.issueNo}차 입고를 발행 이력(Newsletter_Issues)에 저장할까요? 같은 차수가 있으면 덮어씁니다.`)) return;
     setPublishing(true);
     try {
       const r = await api<{ issueNo: number; warning?: string }>("/api/issues", {
         json: { issueNo: gen.issueNo, publishDate: gen.publishDate, concept: gen.concept, articleIds: gen.articleIds, content: gen.content },
       });
-      push(`${r.issueNo}호 발행 이력을 저장했습니다.`, "success");
+      push(`${r.issueNo}차 입고 이력을 저장했습니다.`, "success");
       if (r.warning) push(r.warning, "error");
       saveDraft(null);
       setOrder([]);
@@ -265,7 +265,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge tone={status?.llm ? "green" : "amber"}>{status?.llm ? `🧠 Claude 연결됨 · ${status.llm}` : "🧠 LLM 미설정 (기본 초안 모드)"}</Badge>
         <Badge tone={status?.sheets ? "green" : "amber"}>{status?.sheets ? "📗 Google Sheets 연동" : "📗 Sheets 미설정 (로컬 캐시만 사용)"}</Badge>
-        <Badge>기사 {status?.articleCount ?? 0}건 · 발행 {status?.issueCount ?? 0}호</Badge>
+        <Badge>기사 {status?.articleCount ?? 0}건 · 입고 {status?.issueCount ?? 0}차</Badge>
         {status?.lastRefreshAt && <Badge>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR")}</Badge>}
       </div>
 
@@ -352,7 +352,7 @@ export function Dashboard() {
             <h2 className="font-bold text-brand">✍️ 이번 호 작성</h2>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <label className="space-y-1">
-                <span className="text-xs font-semibold text-slate-600">호수</span>
+                <span className="text-xs font-semibold text-slate-600">입고 차수</span>
                 <input type="number" min={1} className="w-full rounded border border-slate-300 px-2 py-1.5" value={issueNo} onChange={(e) => setIssueNo(Number(e.target.value))} />
               </label>
               <label className="space-y-1">
@@ -399,7 +399,7 @@ export function Dashboard() {
                 </ol>
               )}
               {selected.some((a) => a.relations.some((r) => r.kind === "duplicate")) && (
-                <p className="mt-2 rounded bg-red-50 px-2 py-1.5 text-xs text-red-700">⚠️ 과거 호와 중복 가능성이 있는 기사가 포함되어 있습니다.</p>
+                <p className="mt-2 rounded bg-red-50 px-2 py-1.5 text-xs text-red-700">⚠️ 지난 입고와 중복 가능성이 있는 기사가 포함되어 있습니다.</p>
               )}
             </div>
 
@@ -414,11 +414,11 @@ export function Dashboard() {
               />
             </label>
             <Button variant="primary" className="w-full py-2" onClick={generate} disabled={generating || !selected.length}>
-              {generating ? "⏳ 레포냥이 소식 물어 오는 중… (1~2분)" : "🐾 레포냥 레터 생성"}
+              {generating ? "⏳ 레포냥이 소식 물어 오는 중… (1~2분)" : "📦 이번 차수 입고하기"}
             </Button>
           </div>
           <p className="px-1 text-xs text-slate-500">
-            과거 발행 이력과 비교한 연관 태그는 최근 6개월 내 호수를 기준으로 표시됩니다. 전체 이력은{" "}
+            과거 발행 이력과 비교한 연관 태그는 최근 6개월 내 입고를 기준으로 표시됩니다. 전체 이력은{" "}
             <Link href="/issues" className="text-brand underline">MI 아카이브</Link>에서 확인하세요.
           </p>
         </aside>
@@ -428,7 +428,7 @@ export function Dashboard() {
       {gen && (
         <section id="preview" className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-bold text-brand">📧 {gen.issueNo}호 미리보기</h2>
+            <h2 className="font-bold text-brand">📦 {gen.issueNo}차 입고 미리보기</h2>
             <Badge tone={gen.mode === "llm" ? "green" : "amber"}>{gen.mode === "llm" ? `Claude 생성 · ${gen.model ?? ""}` : "기본 초안 (LLM 미사용)"}</Badge>
             <div className="inline-flex rounded-md border border-slate-300 p-0.5 text-sm">
               {(["preview", "edit"] as const).map((t) => (
@@ -449,7 +449,7 @@ export function Dashboard() {
               html={gen.html}
               fragment={gen.fragment}
               text={gen.text}
-              fileName={`TDL-MI-${gen.issueNo}호-${gen.publishDate}.html`}
+              fileName={`NEWS-INBOUND-${gen.issueNo}차-${gen.publishDate}.html`}
               onToast={push}
               extraActions={
                 <Button variant="primary" onClick={publish} disabled={publishing}>

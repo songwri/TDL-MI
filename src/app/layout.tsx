@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "레포냥 레터 스튜디오",
+  title: "NEWS/INBOUND 스튜디오",
   description: "물류·로봇 자동화 바이위클리 Market Intelligence 뉴스레터 생성기",
 };
 
@@ -16,12 +16,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Link href="/" className="flex items-center gap-2 font-bold text-brand">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/character/wave.png" alt="" width={23} height={30} />
-              <span className="text-lg font-black tracking-tight">REPONYANG</span>
-              <span className="rounded bg-brand/10 px-1.5 py-0.5 text-xs font-medium">레포냥 레터 스튜디오</span>
+              <span className="font-mono text-lg font-bold tracking-tight">NEWS/INBOUND</span>
+              <span className="rounded bg-brand/10 px-1.5 py-0.5 text-xs font-medium">입고 스튜디오</span>
             </Link>
             <nav className="flex gap-4 text-sm text-slate-600">
               <Link href="/" className="hover:text-brand">대시보드</Link>
-              <Link href="/issues" className="hover:text-brand">발행 이력 (MI 아카이브)</Link>
+              <Link href="/issues" className="hover:text-brand">입고 이력 (MI 아카이브)</Link>
             </nav>
           </div>
         </header>

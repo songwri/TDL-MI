@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const NewsletterSchema = z.object({
   headline: z.string().describe("메일 제목. 궁금증을 부르는 한 줄 (35자 이내)"),
-  intro: z.string().describe("레포냥의 오프닝. 이번 호에서 무엇을 정리했는지 2~4문장"),
+  intro: z.string().describe("레포냥의 오프닝. 이번 입고에서 무엇을 정리했는지 2~4문장"),
   quickNews: z
     .array(
       z.object({
@@ -35,20 +35,20 @@ export const NewsletterSchema = z.object({
     url: z.string(),
   }),
   tailNews: z.object({
-    intro: z.string().describe("이번 호 소식이 지난 호와 어떻게 이어지는지 1~2문장"),
+    intro: z.string().describe("이번 입고 소식이 지난 입고와 어떻게 이어지는지 1~2문장"),
     items: z
       .array(
         z.object({
-          pastIssueLabel: z.string().describe("예: '3호 · 09/08'. 이력이 없으면 '첫 등장'"),
+          pastIssueLabel: z.string().describe("예: '3차 · 09/08'. 이력이 없으면 '첫 입고'"),
           topic: z.string(),
           story: z.string().describe("그때와 지금 무엇이 달라졌는지 1~2문장"),
         }),
       )
       .describe("1~3개"),
-    watchList: z.array(z.string()).describe("다음 호까지 지켜볼 것 2개"),
+    watchList: z.array(z.string()).describe("다음 입고까지 지켜볼 것 2개"),
   }),
-  closing: z.string().describe("레포냥의 마무리 인사 1~2문장"),
-  keywords: z.array(z.string()).describe("이번 호 핵심 키워드 3~6개"),
+  closing: z.string().describe("레포냥의 마무리 인사 1~2문장. 다음 입고 예정일 포함"),
+  keywords: z.array(z.string()).describe("이번 입고 핵심 키워드 3~6개"),
 });
 
 export type NewsletterDraft = z.infer<typeof NewsletterSchema>;
