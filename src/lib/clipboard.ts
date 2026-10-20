@@ -59,3 +59,12 @@ export function downloadFile(name: string, content: string, type = "text/html;ch
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/**
+ * 상대경로 이미지(src="/character/...")를 현재 접속 주소 기준 절대 URL로 바꾼다.
+ * 아웃룩은 붙여넣을 때 이 주소에서 이미지를 받아 오므로, 사내에서 접근 가능한 주소로 앱을 띄워야 한다.
+ * (PUBLIC_ASSET_BASE_URL 을 설정하면 서버에서 이미 절대 URL로 렌더링된다)
+ */
+export function absolutizeAssets(html: string): string {
+  return html.replace(/(src|href)="\/(?!\/)/g, `$1="${window.location.origin}/`);
+}

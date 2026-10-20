@@ -1,60 +1,88 @@
 import { PERSONA } from "@/config/brand";
 import type { Article, ArticleIntel, NewsletterContent } from "@/lib/types";
-import { truncate } from "@/lib/utils/text";
+import { shortDate, truncate } from "@/lib/utils/text";
 
-const chunk = <T,>(xs: T[], n: number) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n)).slice(0, 3);
+const TAG: Record<string, string> = {
+  "AMR/AGV": "AMR",
+  "풀필먼트 자동화": "풀필먼트",
+  "소팅/보관설비": "설비",
+  "로봇 피킹/매니퓰레이션": "로봇",
+  "글로벌 트렌드": "글로벌",
+  기타: "물류",
+};
+
+const chunk = <T,>(xs: T[], n: number) =>
+  Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n)).slice(0, 4);
 
 /** LLM 미설정 시 사용하는 규칙 기반 초안 (편집 출발점 용도) */
 export function buildFallbackDraft(input: {
   issueNo: number;
   concept: string;
   main: Article;
-  briefs: Article[];
+  quick: Article[];
+  churu?: Article;
   intel: ArticleIntel[];
 }): NewsletterContent {
-  const { main, briefs, intel } = input;
-  const sentences = (s: string) => s.split(/(?<=[.!?다])\s+/).filter((x) => x.length > 15);
+  const { main, quick, churu, intel } = input;
+  const sentences = (s: string) => s.split(/(?<=[.!?다요])\s+/).filter((x) => x.length > 15);
   const body = sentences(main.content || main.summary);
   const relations = intel.flatMap((i) => i.relations);
-  const keywords = [...new Set([main, ...briefs].flatMap((a) => a.keywords))].slice(0, 7);
+  const keywords = [...new Set([main, ...quick, ...(churu ? [churu] : [])].flatMap((a) => a.keywords))].slice(0, 6);
   const conceptLine = input.concept.split("\n")[0].trim();
 
   return {
-    headline: truncate(`[${input.issueNo}호] ${conceptLine || main.title}`, 60),
-    conceptBriefing: conceptLine || "이번 호 주요 물류·로봇 자동화 동향",
-    editorNote: `안녕하세요, ${PERSONA.name}입니다. 이번 ${input.issueNo}호에서는 ${main.source}의 "${truncate(main.title, 40)}" 기사를 중심으로 최근 2주간의 물류·로봇 자동화 동향을 정리했습니다.`,
-    deepDive: {
+    headline: truncate(conceptLine || main.title, 40),
+    intro: `안녕하세요, ${PERSONA.name}이에요! ${input.issueNo}호 주제는 "${truncate(conceptLine || "최근 2주간의 물류·로봇 소식", 50)}"예요. 메인 리포트에서는 ${main.source}의 "${truncate(main.title, 36)}" 이야기를 깊게 들여다봐요.`,
+    quickNews: quick.map((a) => ({
+      articleId: a.id,
+      tag: TAG[a.category] ?? "물류",
+      title: a.title,
+      emoji: "📦",
+      body: truncate(a.summary, 220),
+      source: a.source,
+      url: a.link,
+    })),
+    mainReport: {
       articleId: main.id,
+      kicker: `${main.source} · ${main.category}`,
       title: main.title,
       source: main.source,
       url: main.link,
-      summary: truncate(main.summary, 300),
-      analysis: body.length > 1 ? chunk(body.slice(1), 3).map((g) => truncate(g.join(" "), 500)) : ["[작성 필요] 기사 내용에 대한 심층 분석"],
+      paragraphs: body.length > 1 ? chunk(body, 3).map((g) => truncate(g.join(" "), 500)) : [main.summary || "[작성 필요] 본문"],
       keyPoints: body.length > 1 ? body.slice(0, 3).map((s) => truncate(s, 140)) : ["[작성 필요] 핵심 수치·사실"],
-      implications: ["[작성 필요] 당사 센터 운영 관점의 적용 가능성", "[작성 필요] 투자 대비 효과 및 검토 우선순위"],
+      forUs: ["[작성 필요] 우리 센터에 적용해 볼 만한 부분", "[작성 필요] 검토할 때 따져 볼 비용·효과"],
     },
-    briefs: briefs.map((a) => ({
-      articleId: a.id,
-      title: a.title,
-      source: a.source,
-      url: a.link,
-      summary: truncate(a.summary, 240),
-      keyPoint: a.keywords.length ? `관련 키워드: ${a.keywords.slice(0, 3).join(", ")}` : a.category,
-    })),
-    marketIntelligence: {
-      overview: relations.length
-        ? "이번 호 기사 중 일부는 과거 발행 주제와 연결됩니다. 기술 흐름의 연속성을 점검해 보세요."
-        : "이번 호 기사는 최근 발행 이력과 겹치지 않는 신규 관측 주제입니다.",
-      connections: relations.length
-        ? relations.slice(0, 4).map((r) => ({
-            pastIssueLabel: r.label.split("에서")[0],
+    churuStation: churu
+      ? {
+          articleId: churu.id,
+          title: `띵동! ${truncate(churu.title, 40)}`,
+          body: truncate(churu.summary, 220),
+          question: "여러분 센터라면 이 소식, 어떻게 보세요? 답장으로 알려 주세요.",
+          source: churu.source,
+          url: churu.link,
+        }
+      : {
+          articleId: "",
+          title: "띵동! 이번 호 주제, 여러분 생각이 궁금해요",
+          body: `${conceptLine || "이번 호 주제"}에 대해 현장에서 느끼는 점이 있다면 들려주세요.`,
+          question: "지금 우리 센터에서 가장 먼저 자동화하고 싶은 공정은 어디인가요?",
+          source: "",
+          url: "",
+        },
+    tailNews: {
+      intro: relations.length
+        ? "이번 호 소식 중 일부는 지난 레터에서 다룬 이야기와 이어져요."
+        : "이번 호 소식은 레포냥 레터에 처음 등장하는 주제예요.",
+      items: relations.length
+        ? relations.slice(0, 3).map((r) => ({
+            pastIssueLabel: `${r.issueNo}호 · ${shortDate(r.publishDate)}`,
             topic: r.sharedKeywords.join(", ") || "유사 주제",
-            insight: r.label,
+            story: r.label,
           }))
-        : [{ pastIssueLabel: "신규 관측", topic: keywords.slice(0, 3).join(", ") || main.category, insight: "향후 호에서 후속 동향을 추적합니다." }],
-      watchList: keywords.slice(0, 3).map((k) => `${k} 관련 후속 발표`),
+        : [{ pastIssueLabel: "첫 등장", topic: keywords.slice(0, 3).join(", ") || main.category, story: "다음 호부터 이어지는 소식을 추적해 볼게요." }],
+      watchList: keywords.slice(0, 2).map((k) => `${k}의 다음 행보`),
     },
-    closingTip: "의견이나 다뤄 주었으면 하는 주제가 있다면 언제든 회신 주세요.",
+    closing: "다음 호에도 따끈한 소식 물어 올게요. 2주 뒤에 만나요!",
     keywords,
   };
 }

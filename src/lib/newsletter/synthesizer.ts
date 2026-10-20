@@ -13,6 +13,7 @@ export interface SynthesizeInput {
   concept: string;
   articles: Article[]; // 선택 순서 유지
   mainArticleId?: string;
+  churuArticleId?: string;
   issues: NewsletterIssue[];
   allArticles: Article[];
 }
@@ -33,14 +34,15 @@ delete OUTPUT_SCHEMA.$schema;
 export async function synthesizeNewsletter(input: SynthesizeInput): Promise<SynthesizeOutput> {
   const main = input.articles.find((a) => a.id === input.mainArticleId) ?? input.articles[0];
   if (!main) throw new Error("선택된 기사가 없습니다.");
-  const briefs = input.articles.filter((a) => a.id !== main.id);
+  const churu = input.articles.find((a) => a.id === input.churuArticleId && a.id !== main.id);
+  const quick = input.articles.filter((a) => a.id !== main.id && a.id !== churu?.id);
   const intel = analyzeArticles(input.articles, input.issues, input.allArticles, { excludeIssueNo: input.issueNo });
   const keywords = [...new Set(input.articles.flatMap((a) => a.keywords))];
   const timeline = keywordTimeline(keywords, input.issues.filter((i) => i.issueNo !== input.issueNo), input.allArticles);
 
   if (!llmEnabled()) {
     return {
-      content: buildFallbackDraft({ ...input, main, briefs, intel }),
+      content: buildFallbackDraft({ ...input, main, quick, churu, intel }),
       mode: "draft",
       notice: "ANTHROPIC_API_KEY 가 없어 기사 원문 기반 기본 초안으로 생성했습니다.",
     };
@@ -62,7 +64,8 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
           publishDate: input.publishDate,
           concept: input.concept,
           mainArticle: main,
-          briefArticles: briefs,
+          quickArticles: quick,
+          churuArticle: churu,
           intel,
           issues: input.issues.filter((i) => i.issueNo !== input.issueNo),
           timeline,
@@ -82,20 +85,23 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
   const parsed = NewsletterSchema.safeParse(JSON.parse(text));
   if (!parsed.success) throw new Error(`생성 결과 형식 오류: ${parsed.error.message}`);
 
-  return { content: anchorToSources(parsed.data, main, briefs), mode: "llm", model: message.model };
+  return { content: anchorToSources(parsed.data, main, quick, churu), mode: "llm", model: message.model };
 }
 
 /** 링크/출처는 모델 출력 대신 원본 데이터로 고정 (환각 링크 방지) */
-function anchorToSources(c: NewsletterContent, main: Article, briefs: Article[]): NewsletterContent {
-  const pick = (id: string, i: number) => briefs.find((a) => a.id === id) ?? briefs[i];
+function anchorToSources(c: NewsletterContent, main: Article, quick: Article[], churu?: Article): NewsletterContent {
+  const pick = (id: string, i: number) => quick.find((a) => a.id === id) ?? quick[i];
   return {
     ...c,
-    deepDive: { ...c.deepDive, articleId: main.id, source: main.source, url: main.link },
-    briefs: c.briefs
-      .map((b, i) => {
-        const a = pick(b.articleId, i);
-        return a ? { ...b, articleId: a.id, source: a.source, url: a.link } : null;
+    mainReport: { ...c.mainReport, articleId: main.id, source: main.source, url: main.link },
+    quickNews: c.quickNews
+      .map((q, i) => {
+        const a = pick(q.articleId, i);
+        return a ? { ...q, articleId: a.id, source: a.source, url: a.link } : null;
       })
-      .filter((b): b is NewsletterContent["briefs"][number] => b !== null),
+      .filter((q): q is NewsletterContent["quickNews"][number] => q !== null),
+    churuStation: churu
+      ? { ...c.churuStation, articleId: churu.id, source: churu.source, url: churu.link }
+      : { ...c.churuStation, articleId: "", source: "", url: "" },
   };
 }

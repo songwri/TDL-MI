@@ -25,7 +25,7 @@ export function ArticleCard({
         disabled && !checked && "opacity-60",
       )}
     >
-      <input type="checkbox" className="mt-1 size-4 accent-[#0b3d91]" checked={checked} onChange={onToggle} disabled={disabled && !checked} />
+      <input type="checkbox" className="mt-1 size-4 accent-[#a72b2b]" checked={checked} onChange={onToggle} disabled={disabled && !checked} />
       {a.thumbnail ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={a.thumbnail} alt="" className="hidden h-[72px] w-[108px] shrink-0 rounded object-cover sm:block" loading="lazy" />

@@ -67,8 +67,8 @@ async function main() {
     { issueNo: 3, publishDate: at(42).slice(0, 10), concept: "LogiMAT로 본 피스피킹 상용화와 대형 AS/RS 투자", ids: [past[4], past[5]] },
   ];
   for (const i of issues) {
-    const [main, ...briefs] = i.ids;
-    const content = buildFallbackDraft({ issueNo: i.issueNo, concept: i.concept, main, briefs, intel: [] });
+    const [main, ...quick] = i.ids;
+    const content = buildFallbackDraft({ issueNo: i.issueNo, concept: i.concept, main, quick, intel: [] });
     const { html } = renderAll(content, i.issueNo, i.publishDate, i.ids);
     await saveIssue({
       issueNo: i.issueNo,

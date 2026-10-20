@@ -1,46 +1,54 @@
 import { z } from "zod";
 
 export const NewsletterSchema = z.object({
-  headline: z.string().describe("메일 제목으로 쓸 한 줄 헤드라인 (40자 이내)"),
-  conceptBriefing: z.string().describe("이번 호 기획 콘셉트 한 줄 브리핑"),
-  editorNote: z.string().describe("로지봇 페르소나의 2~3문장 오프닝 인사 및 이번 호 안내"),
-  deepDive: z.object({
-    articleId: z.string(),
-    title: z.string().describe("딥다이브 섹션 제목 (원문 제목을 한국어로 재구성)"),
-    source: z.string(),
-    url: z.string(),
-    summary: z.string().describe("기사 핵심 요약 2~3문장"),
-    analysis: z.array(z.string()).describe("심층 분석 문단 2~4개"),
-    keyPoints: z.array(z.string()).describe("핵심 포인트 3~5개 (수치/사실 중심)"),
-    implications: z.array(z.string()).describe("사내 도입 시사점 2~4개 (실행 가능한 관점)"),
-  }),
-  briefs: z
+  headline: z.string().describe("메일 제목. 궁금증을 부르는 한 줄 (35자 이내)"),
+  intro: z.string().describe("레포냥의 오프닝. 이번 호에서 무엇을 정리했는지 2~4문장"),
+  quickNews: z
     .array(
       z.object({
         articleId: z.string(),
-        title: z.string(),
+        tag: z.string().describe("짧은 분야 태그. 예: 'AMR', '풀필먼트', '글로벌'"),
+        title: z.string().describe("기사 핵심을 담은 한 줄 제목 (물음표·따옴표 활용 가능)"),
+        emoji: z.string().describe("제목 끝에 붙일 이모지 1개"),
+        body: z.string().describe("2~3문장 요약. 왜 중요한지까지"),
         source: z.string(),
         url: z.string(),
-        summary: z.string().describe("2~3문장 요약"),
-        keyPoint: z.string().describe("한 줄 핵심 포인트"),
       }),
     )
-    .describe("테크 & 인더스트리 브리프: 딥다이브 외 나머지 선택 기사 전부"),
-  marketIntelligence: z.object({
-    overview: z.string().describe("과거 발행 주제와 연결한 기술 흐름 점검 2~3문장"),
-    connections: z
+    .describe("1분 냥스: quickNews 역할 기사 전부, 제공 순서대로"),
+  mainReport: z.object({
+    articleId: z.string(),
+    kicker: z.string().describe("제목 위 작은 회색 문구. 예: 'AutoStore 신형 포트가 바꿀 피킹 현장'"),
+    title: z.string().describe("메인 리포트 제목"),
+    source: z.string(),
+    url: z.string(),
+    paragraphs: z.array(z.string()).describe("본문 문단 3~5개. 배경 → 무슨 일 → 왜 중요한가 흐름"),
+    keyPoints: z.array(z.string()).describe("핵심만 쏙: 수치·사실 중심 3~4개"),
+    forUs: z.array(z.string()).describe("우리 회사엔?: 사내 물류센터·자동화 검토에 주는 시사점 2~3개"),
+  }),
+  churuStation: z.object({
+    articleId: z.string().describe("츄르 기사 articleId. 지정 기사가 없으면 빈 문자열"),
+    title: z.string().describe("'띵동!'처럼 가볍게 시작하는 한 줄 제목"),
+    body: z.string().describe("따끈한 소식 한 조각 2~3문장"),
+    question: z.string().describe("구독자에게 던지는 질문 1개 (답장을 부르는 구체적인 질문)"),
+    source: z.string(),
+    url: z.string(),
+  }),
+  tailNews: z.object({
+    intro: z.string().describe("이번 호 소식이 지난 호와 어떻게 이어지는지 1~2문장"),
+    items: z
       .array(
         z.object({
-          pastIssueLabel: z.string().describe("예: '2호(05/10)'. 과거 이력이 없으면 '신규 관측'"),
+          pastIssueLabel: z.string().describe("예: '3호 · 09/08'. 이력이 없으면 '첫 등장'"),
           topic: z.string(),
-          insight: z.string(),
+          story: z.string().describe("그때와 지금 무엇이 달라졌는지 1~2문장"),
         }),
       )
-      .describe("과거 호수와의 연결 1~4개"),
-    watchList: z.array(z.string()).describe("다음 호까지 지켜볼 관전 포인트 2~3개"),
+      .describe("1~3개"),
+    watchList: z.array(z.string()).describe("다음 호까지 지켜볼 것 2개"),
   }),
-  closingTip: z.string().describe("로지봇의 마무리 한마디 (1~2문장)"),
-  keywords: z.array(z.string()).describe("이번 호 핵심 키워드 3~7개"),
+  closing: z.string().describe("레포냥의 마무리 인사 1~2문장"),
+  keywords: z.array(z.string()).describe("이번 호 핵심 키워드 3~6개"),
 });
 
 export type NewsletterDraft = z.infer<typeof NewsletterSchema>;

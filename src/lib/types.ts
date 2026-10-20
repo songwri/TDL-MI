@@ -44,34 +44,50 @@ export interface NewsletterIssue {
   createdAt: string;
 }
 
+/** 레포냥 레터 구조화 콘텐츠 (섹션 순서 = 메일 렌더링 순서) */
 export interface NewsletterContent {
+  /** 메일 제목 */
   headline: string;
-  conceptBriefing: string;
-  editorNote: string;
-  deepDive: {
+  /** 오프닝: 이번 호에 무엇을 정리했는지 짧은 메시지 */
+  intro: string;
+  /** 1분 냥스: 짧은 뉴스 여러 건 */
+  quickNews: {
     articleId: string;
+    tag: string;
     title: string;
+    emoji: string;
+    body: string;
     source: string;
     url: string;
-    summary: string;
-    analysis: string[];
-    keyPoints: string[];
-    implications: string[];
-  };
-  briefs: {
-    articleId: string;
-    title: string;
-    source: string;
-    url: string;
-    summary: string;
-    keyPoint: string;
   }[];
-  marketIntelligence: {
-    overview: string;
-    connections: { pastIssueLabel: string; topic: string; insight: string }[];
+  /** 오늘의 메인 리포트 */
+  mainReport: {
+    articleId: string;
+    kicker: string;
+    title: string;
+    source: string;
+    url: string;
+    paragraphs: string[];
+    keyPoints: string[];
+    forUs: string[];
+  };
+  /** 츄르 스테이션: 따끈한 소식 한 조각 + 구독자 소통 */
+  churuStation: {
+    articleId: string;
+    title: string;
+    body: string;
+    question: string;
+    source: string;
+    url: string;
+  };
+  /** 꼬리 뉴스: 지난 호와 이어지는 이야기 (Market Intelligence) */
+  tailNews: {
+    intro: string;
+    items: { pastIssueLabel: string; topic: string; story: string }[];
     watchList: string[];
   };
-  closingTip: string;
+  /** 마무리 한마디 */
+  closing: string;
   keywords: string[];
 }
 

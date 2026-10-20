@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "collect": "tsx scripts/collect.ts"
+    "collect": "tsx scripts/collect.ts",
+    "render:sample": "tsx scripts/render-sample.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

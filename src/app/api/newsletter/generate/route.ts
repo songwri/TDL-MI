@@ -12,6 +12,7 @@ interface Body {
   concept: string;
   articleIds: string[];
   mainArticleId?: string;
+  churuArticleId?: string;
 }
 
 /** POST /api/newsletter/generate — 선택 기사 + 기획 콘셉트 → 구조화 콘텐츠 + 아웃룩 HTML */

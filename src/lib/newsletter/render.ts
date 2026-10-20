@@ -7,7 +7,12 @@ export function renderAll(content: NewsletterContent, issueNo: number, publishDa
     issueNo,
     publishDate,
     newsletterName: config.newsletterName,
+    tagline: config.tagline,
     feedbackContact: config.feedbackContact,
+    feedbackEmail: config.feedbackEmail || undefined,
+    surveyUrl: config.surveyUrl || undefined,
+    archiveUrl: config.archiveUrl || undefined,
+    assetBaseUrl: config.assetBaseUrl || undefined,
     thumbnails: Object.fromEntries(articles.map((a) => [a.id, a.thumbnail])),
     dates: Object.fromEntries(articles.map((a) => [a.id, a.publishedAt.slice(0, 10)])),
   };

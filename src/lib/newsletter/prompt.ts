@@ -1,34 +1,37 @@
-import { ICONS, PERSONA } from "@/config/brand";
+import { PERSONA, SECTIONS } from "@/config/brand";
+import type { keywordTimeline } from "@/lib/mi";
 import type { Article, ArticleIntel, NewsletterIssue } from "@/lib/types";
 import { shortDate, truncate } from "@/lib/utils/text";
-import type { keywordTimeline } from "@/lib/mi";
 
-export const systemPrompt = (newsletterName: string) => `당신은 사내 바이위클리 뉴스레터 "${newsletterName}"의 편집자이자 캐릭터 "${PERSONA.name}"(${PERSONA.emoji})입니다.
-${PERSONA.intro}로서, 물류센터 자동화·로봇 도입을 검토하는 사내 실무자와 의사결정자를 위해 글을 씁니다.
+export const systemPrompt = (newsletterName: string) => `당신은 사내 격주 뉴스레터 "${newsletterName}"를 쓰는 캐릭터 "${PERSONA.name}"입니다.
+${PERSONA.intro}. 독자는 물류센터 운영·자동화 도입을 고민하는 사내 동료들이에요.
 
 [톤앤매너]
 - ${PERSONA.voice}
-- 기사 내용을 단순 번역·요약하지 말고 "그래서 우리에게 무슨 의미인가"를 분석합니다.
-- 기사에 없는 수치나 사실을 만들어내지 않습니다. 추정이나 의견은 "~로 보입니다", "~가능성이 있습니다"처럼 구분합니다.
-- 해외 기사는 한국어로 작성하되 고유명사(기업·제품명)는 원문 표기를 유지합니다.
+- 딱딱한 비즈니스 보고서 문체(~함, ~임, 개조식 나열)는 쓰지 않습니다. 독자에게 말을 거는 문장으로 씁니다.
+- 기사를 번역·요약하는 데서 멈추지 말고 "그래서 이게 왜 재밌고, 우리한테 무슨 의미인지"를 짚습니다.
+- 기사에 없는 수치나 사실은 만들지 않습니다. 추정은 "~로 보여요", "~일 수도 있어요"처럼 구분합니다.
+- 해외 기사도 한국어로 쓰되, 기업·제품명은 원문 표기를 유지합니다.
+- 전문용어는 처음 나올 때 괄호로 한 번 풀어 줍니다. 예: AMR(자율주행 이동로봇)
+- 마크다운·HTML 태그는 쓰지 않습니다. 이모지는 1분 냥스 emoji 필드와 문장 강조에 가끔만.
 
-[아이콘 규칙] 템플릿이 섹션 아이콘(${Object.values(ICONS).join(" ")})을 자동 배치하므로, 본문 문자열에는 이모지를 문장당 최대 1개, 꼭 필요한 곳(예: ${ICONS.insight} 인사이트 강조, ${ICONS.tip} 팁)에만 씁니다. 마크다운·HTML 태그는 쓰지 않습니다.
+[섹션]
+1. headline / intro: 작업자가 준 기획 콘셉트를 레포냥의 말로 풀어 이번 호를 소개
+2. ${SECTIONS.quickNews.label}: role="quickNews" 기사 각각을 짧고 가볍게
+3. ${SECTIONS.mainReport.label}: role="main" 기사 1건을 깊게. keyPoints(핵심만 쏙), forUs(우리 회사엔?) 포함
+4. ${SECTIONS.churuStation.label}: role="churu" 기사가 있으면 그 기사로, 없으면 기획 콘셉트와 이번 호 흐름에서 가벼운 화제 한 조각을 골라 쓰고, 구독자에게 답장을 부르는 질문을 던집니다
+5. ${SECTIONS.tailNews.label}: 제공된 과거 발행 이력과 이번 호 기사를 연결합니다. 제공되지 않은 과거 연결은 만들지 말고, 없으면 '첫 등장'으로 표기합니다
+6. closing: 다음 호를 기다리게 하는 짧은 마무리
 
-[섹션 구성]
-1. 헤더: headline(메일 제목), conceptBriefing(작업자가 입력한 기획 콘셉트를 한 줄로 정제)
-2. 메인 딥다이브: 지정된 핵심 기사 1건 심층 분석 + 사내 도입 시사점
-3. 테크 & 인더스트리 브리프: 나머지 선택 기사 각각 요약 + 핵심 포인트
-4. Market Intelligence 코너: 제공된 과거 발행 이력과 연결해 기술 흐름을 점검. 과거 이력에 없는 연결은 만들지 말고 "신규 관측"으로 표기
-5. 마무리: closingTip
-
-articleId, source, url 필드는 제공된 값을 그대로 복사합니다.`;
+articleId, source, url 은 제공된 값을 그대로 복사합니다.`;
 
 export function buildUserPrompt(input: {
   issueNo: number;
   publishDate: string;
   concept: string;
   mainArticle: Article;
-  briefArticles: Article[];
+  quickArticles: Article[];
+  churuArticle?: Article;
   intel: ArticleIntel[];
   issues: NewsletterIssue[];
   timeline: ReturnType<typeof keywordTimeline>;
@@ -69,17 +72,18 @@ pastIssueLinks: ${rel.length ? rel.map((r) => r.label).join(" | ") : "없음"}
 ${input.concept}
 """
 
-[메인 딥다이브 기사]
-${fmtArticle(input.mainArticle, "deepDive")}
+[기사]
+${fmtArticle(input.mainArticle, "main")}
 
-[브리프 기사]
-${input.briefArticles.map((a) => fmtArticle(a, "brief")).join("\n\n") || "없음"}
+${input.quickArticles.map((a) => fmtArticle(a, "quickNews")).join("\n\n")}
+
+${input.churuArticle ? fmtArticle(input.churuArticle, "churu") : "(churu 역할 기사 없음: churuStation.articleId/source/url 은 빈 문자열)"}
 
 [과거 발행 이력 (최근 12개 호)]
-${recent || "아직 발행 이력이 없습니다 (창간호)."}
+${recent || "아직 발행 이력이 없어요 (창간호)."}
 
 [핵심 키워드의 과거 등장 이력]
 ${timeline || "없음"}
 
-위 자료로 이번 호 뉴스레터 콘텐츠를 JSON 스키마에 맞춰 작성하세요. briefs 에는 브리프 기사 ${input.briefArticles.length}건을 모두 순서대로 포함합니다.`;
+위 자료로 이번 호 레터를 JSON 스키마에 맞춰 작성하세요. quickNews 에는 quickNews 역할 기사 ${input.quickArticles.length}건을 모두 순서대로 넣습니다.`;
 }

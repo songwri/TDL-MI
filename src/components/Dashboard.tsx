@@ -74,6 +74,7 @@ export function Dashboard() {
   // composer
   const [order, setOrder] = useState<string[]>([]); // 선택 순서
   const [mainId, setMainId] = useState<string | null>(null);
+  const [churuId, setChuruId] = useState<string | null>(null);
   const [issueNo, setIssueNo] = useState(1);
   const [publishDate, setPublishDate] = useState(today());
   const [concept, setConcept] = useState("");
@@ -121,6 +122,18 @@ export function Dashboard() {
   const byId = useMemo(() => new Map(articles.map((a) => [a.id, a])), [articles]);
   const selected = order.map((id) => byId.get(id)).filter((a): a is ArticleView => !!a);
   const effectiveMain = mainId && order.includes(mainId) ? mainId : order[0] ?? null;
+  const effectiveChuru = churuId && order.includes(churuId) && churuId !== effectiveMain ? churuId : null;
+  const roleOf = (id: string) => (id === effectiveMain ? "main" : id === effectiveChuru ? "churu" : "quick");
+  const setRole = (id: string, role: string) => {
+    if (role === "main") {
+      setMainId(id);
+      if (churuId === id) setChuruId(null);
+    } else if (role === "churu") {
+      if (id === effectiveMain) setMainId(order.find((x) => x !== id) ?? null);
+      setChuruId(id);
+    } else if (id === effectiveChuru) setChuruId(null);
+    else if (id === effectiveMain) setMainId(order.find((x) => x !== id && x !== effectiveChuru) ?? null);
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -188,7 +201,7 @@ export function Dashboard() {
     try {
       const articleIds = [effectiveMain!, ...order.filter((x) => x !== effectiveMain)];
       const r = await api<Omit<Generated, "issueNo" | "publishDate" | "articleIds" | "concept">>("/api/newsletter/generate", {
-        json: { issueNo, publishDate, concept, articleIds, mainArticleId: effectiveMain },
+        json: { issueNo, publishDate, concept, articleIds, mainArticleId: effectiveMain, churuArticleId: effectiveChuru },
       });
       const g: Generated = { ...r, issueNo, publishDate, articleIds, concept };
       setGen(g);
@@ -235,6 +248,7 @@ export function Dashboard() {
       saveDraft(null);
       setOrder([]);
       setMainId(null);
+      setChuruId(null);
       setIssueNo(r.issueNo + 1);
       await load();
     } catch (e) {
@@ -350,16 +364,25 @@ export function Dashboard() {
             <div>
               <div className="mb-1 flex items-center justify-between text-xs font-semibold text-slate-600">
                 <span>선택 기사 ({selected.length}/{MAX_SELECT}) · 권장 3~5개</span>
-                {selected.length > 0 && <span className="font-normal text-slate-400">◉ = 메인 딥다이브</span>}
+                {selected.length > 0 && <span className="font-normal text-slate-400">기사마다 들어갈 섹션 지정</span>}
               </div>
               {selected.length === 0 ? (
                 <p className="rounded border border-dashed border-slate-300 p-3 text-center text-xs text-slate-500">왼쪽 목록에서 기사를 체크하세요.</p>
               ) : (
                 <ol className="space-y-1.5">
                   {selected.map((a, i) => (
-                    <li key={a.id} className={cx("rounded border p-2 text-xs", a.id === effectiveMain ? "border-brand bg-blue-50/50" : "border-slate-200")}>
+                    <li key={a.id} className={cx("rounded border p-2 text-xs", a.id === effectiveMain ? "border-brand bg-brand/5" : "border-slate-200")}>
                       <div className="flex items-start gap-2">
-                        <input type="radio" name="main" className="mt-0.5 accent-[#0b3d91]" checked={a.id === effectiveMain} onChange={() => setMainId(a.id)} title="메인 딥다이브로 지정" />
+                        <select
+                          aria-label="섹션"
+                          className="mt-0.5 rounded border border-slate-300 bg-white px-1 py-0.5 text-[11px]"
+                          value={roleOf(a.id)}
+                          onChange={(e) => setRole(a.id, e.target.value)}
+                        >
+                          <option value="main">메인 리포트</option>
+                          <option value="quick">1분 냥스</option>
+                          <option value="churu">츄르 스테이션</option>
+                        </select>
                         <div className="min-w-0 flex-1">
                           <div className="line-clamp-2 font-medium text-slate-800">{a.title}</div>
                           <div className="text-slate-500">{a.source} · {a.category}</div>
@@ -385,13 +408,13 @@ export function Dashboard() {
               <textarea
                 rows={5}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm leading-relaxed"
-                placeholder={"예) 피지컬 AI가 물류센터 피킹 현장으로 들어오는 속도 점검.\n당사 ○○센터 피킹 자동화 검토에 참고할 포인트 중심으로."}
+                placeholder={"예) 로봇 팔이 드디어 피킹 현장에 들어온다는데, 진짜일까?\n우리 센터 피킹 자동화 검토에 참고할 포인트 위주로 가볍게."}
                 value={concept}
                 onChange={(e) => setConcept(e.target.value)}
               />
             </label>
             <Button variant="primary" className="w-full py-2" onClick={generate} disabled={generating || !selected.length}>
-              {generating ? "⏳ 로지봇이 작성 중… (최대 1~2분)" : "🤖 뉴스레터 생성"}
+              {generating ? "⏳ 레포냥이 소식 물어 오는 중… (1~2분)" : "🐾 레포냥 레터 생성"}
             </Button>
           </div>
           <p className="px-1 text-xs text-slate-500">

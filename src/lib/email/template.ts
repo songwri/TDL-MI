@@ -1,4 +1,4 @@
-import { COLORS as C, ICONS, PERSONA } from "@/config/brand";
+import { CHARACTER, COLORS as C, PERSONA, SECTIONS, type Pose } from "@/config/brand";
 import type { NewsletterContent } from "@/lib/types";
 import { FONT, css, link, row, spacer, t, table, td, tr } from "./inline";
 
@@ -6,244 +6,326 @@ export interface RenderMeta {
   issueNo: number;
   publishDate: string; // YYYY-MM-DD
   newsletterName: string;
+  tagline: string;
   feedbackContact: string;
-  /** articleId -> 썸네일 URL */
+  /** 답장·설문을 받을 메일 주소 */
+  feedbackEmail?: string;
+  /** 설문 폼 URL (있으면 mailto 대신 사용, ?answer=good|bad 추가) */
+  surveyUrl?: string;
+  /** 지난 레터 보기 링크 */
+  archiveUrl?: string;
+  /** 캐릭터 이미지 기준 URL (예: https://mi.example.com). 비우면 상대경로 */
+  assetBaseUrl?: string;
   thumbnails?: Record<string, string | undefined>;
-  /** articleId -> 발행일 YYYY-MM-DD */
   dates?: Record<string, string | undefined>;
 }
 
-const WIDTH = 640;
-const INNER = WIDTH - 48;
+/** 슬림한 레터: 600px 프레임, 본문 520px */
+const WIDTH = 600;
+/** 영문 워드마크: 윈도우 기본 Arial Black → 굵은 대체 서체 */
+const WORDMARK = "'Arial Black','Segoe UI Black','Helvetica Neue',Arial,sans-serif";
+const PAD = 40;
+const INNER = WIDTH - PAD * 2;
 
-const text = (size: number, color: string = C.text, extra: Record<string, string | number> = {}) => ({
+const txt = (size: number, color: string = C.ink, extra: Record<string, string | number> = {}) => ({
   fontSize: size,
-  lineHeight: `${Math.round(size * 1.65)}px`,
+  lineHeight: `${Math.round(size * 1.75)}px`,
   color,
   ...extra,
 });
 
-const dotDate = (d: string) => d.replaceAll("-", ".");
+const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+function letterDate(d: string) {
+  const [y, m, day] = d.split("-").map(Number);
+  const wd = WEEKDAY[new Date(Date.UTC(y, m - 1, day)).getUTCDay()];
+  return `${y}.${String(m).padStart(2, "0")}.${String(day).padStart(2, "0")}. ${wd}요일`;
+}
 
-function sectionTitle(icon: string, title: string, sub?: string): string {
+function assetUrl(m: RenderMeta, path: string) {
+  return `${(m.assetBaseUrl ?? "").replace(/\/$/, "")}/${path}`;
+}
+
+function character(m: RenderMeta, pose: Pose, height: number, alt: string) {
+  const c = CHARACTER[pose];
+  const w = Math.round((c.w * height) / c.h);
+  return `<img src="${t(assetUrl(m, c.src))}" width="${w}" height="${height}" alt="${t(alt)}" style="${css({
+    display: "block",
+    width: w,
+    height,
+    border: 0,
+    margin: "0 auto",
+  })}">`;
+}
+
+function mailto(m: RenderMeta, subject: string) {
+  return m.feedbackEmail ? `mailto:${m.feedbackEmail}?subject=${encodeURIComponent(subject)}` : "";
+}
+
+/** 짧은 진한 선 + 옅은 긴 선 (레터의 시그니처 구분선) */
+function progressRule(): string {
   return table(
-    row(
-      `<span style="${css({ fontSize: 18 })}">${icon}</span>&nbsp;<span style="${css(text(17, C.primaryDark, { fontWeight: "bold" }))}">${t(title)}</span>` +
-        (sub ? `&nbsp;&nbsp;<span style="${css(text(12, C.subtext))}">${t(sub)}</span>` : ""),
-      { style: { paddingBottom: 8, borderBottom: `2px solid ${C.primary}` } },
+    tr(
+      td("&nbsp;", { width: 48, bgcolor: C.brand, style: { height: 3, fontSize: 1, lineHeight: "3px" } }) +
+        td("&nbsp;", { bgcolor: C.brandLine, style: { height: 3, fontSize: 1, lineHeight: "3px" } }),
     ),
   );
 }
 
-function bulletList(items: string[], bullet: string, color: string = C.text): string {
+function lineCell(color: string) {
+  return td(table(row("&nbsp;", { bgcolor: color, style: { height: 2, fontSize: 1, lineHeight: "2px" } })), { valign: "middle" });
+}
+
+/** 섹션 머리: (캐릭터) + 양쪽 선 사이 알약 라벨 + 보조 문구 */
+function sectionHead(m: RenderMeta, label: string, pose?: Pose, sub?: string): string {
+  return table(
+    (pose ? row(character(m, pose, 96, `${PERSONA.name}`), { align: "center" }) : "") +
+      row(
+        table(
+          tr(
+            lineCell(C.brand) +
+              td(
+                table(
+                  row(t(label), {
+                    bgcolor: C.brand,
+                    align: "center",
+                    style: { ...txt(15, "#FFFFFF", { fontWeight: "bold", lineHeight: "20px" }), padding: "7px 20px", borderRadius: 18, whiteSpace: "nowrap" },
+                  }),
+                  { width: "auto", style: { borderCollapse: "separate" } },
+                ),
+                { width: 1, valign: "middle", align: "center" },
+              ) +
+              lineCell(C.brandLine),
+          ),
+        ),
+      ) +
+      (sub ? row(t(sub), { align: "center", style: { ...txt(12, C.mute), paddingTop: 8 } }) : ""),
+  );
+}
+
+function bullets(items: string[], mark: string, color: string = C.ink): string {
   return table(
     items
       .map((it) =>
         tr(
-          td(`<span style="${css(text(14, C.accent, { fontWeight: "bold" }))}">${bullet}</span>`, { width: 22, style: { paddingTop: 4 } }) +
-            td(t(it), { style: { ...text(14, color), paddingTop: 4 } }),
+          td(`<span style="${css(txt(14, C.brand, { fontWeight: "bold" }))}">${mark}</span>`, { width: 18, style: { paddingTop: 6 } }) +
+            td(t(it), { style: { ...txt(14, color), paddingTop: 6 } }),
         ),
       )
       .join(""),
   );
 }
 
-function button(label: string, href: string): string {
+function button(label: string, href: string, bg: string, width?: number): string {
+  if (!href) return "";
   return table(
-    tr(
-      td(link(t(label), href, { color: "#FFFFFF", fontWeight: "bold", fontSize: 13, display: "inline-block", fontFamily: FONT }), {
-        bgcolor: C.primary,
-        align: "center",
-        style: { padding: "9px 18px", borderRadius: 4, border: `1px solid ${C.primary}` },
-      }),
-    ),
-    { width: "auto", style: { borderCollapse: "separate" } },
+    row(link(label, href, { color: "#FFFFFF", fontWeight: "bold", fontSize: 14, fontFamily: FONT, display: "block" }), {
+      bgcolor: bg,
+      align: "center",
+      style: { padding: "12px 22px", borderRadius: 4, ...(width ? { width } : {}) },
+    }),
+    { width: width ?? "auto", align: "center", style: { borderCollapse: "separate" } },
   );
 }
+
+/* ── 섹션 ─────────────────────────────────────────────── */
 
 function header(c: NewsletterContent, m: RenderMeta): string {
+  const archive = m.archiveUrl ? ` &nbsp;|&nbsp; ${link("지난 레터 보기", m.archiveUrl, { color: C.inkSoft, textDecoration: "underline" })}` : "";
   return table(
-    row(
-      table(
-        row(`${ICONS.robot}&nbsp; ${t(m.newsletterName)} &nbsp;|&nbsp; Bi-weekly Logistics &amp; Robotics`, {
-          style: text(12, "#BFD3F2", { letterSpacing: "0.5px" }),
-        }) +
-          row(`No.${m.issueNo} &nbsp;·&nbsp; ${ICONS.calendar} ${dotDate(m.publishDate)}`, {
-            style: { ...text(13, "#FFFFFF"), paddingTop: 6 },
-          }) +
-          row(t(c.headline), { style: { ...text(24, "#FFFFFF", { fontWeight: "bold", lineHeight: "34px" }), paddingTop: 10 } }) +
-          spacer(14) +
-          row(
-            table(
-              row(
-                `<span style="${css(text(12, C.highlight, { fontWeight: "bold" }))}">${ICONS.tip} 이번 호 기획 콘셉트</span><br>` +
-                  `<span style="${css(text(14, "#FFFFFF"))}">${t(c.conceptBriefing)}</span>`,
-                { bgcolor: C.primaryDark, style: { padding: "12px 14px", borderLeft: `4px solid ${C.highlight}` } },
-              ),
-            ),
-          ),
-        { width: INNER },
-      ),
-      { bgcolor: C.primary, style: { padding: "28px 24px 24px" } },
-    ),
+    row(character(m, "wave", 112, `${PERSONA.name} 인사`), { align: "center" }) +
+      spacer(10) +
+      row(t(m.newsletterName), {
+        align: "center",
+        style: { fontFamily: WORDMARK, fontSize: 36, lineHeight: "42px", fontWeight: 900, letterSpacing: "-1px", color: C.brand },
+      }) +
+      row(t(m.tagline), { align: "center", style: { ...txt(12, C.mute), paddingTop: 6 } }) +
+      spacer(18) +
+      row(`${t(PERSONA.name)} 레터 제${m.issueNo}호`, { align: "center", style: txt(13, C.ink, { fontWeight: "bold" }) }) +
+      row(`${letterDate(m.publishDate)}${archive}`, { align: "center", style: txt(13, C.inkSoft) }) +
+      spacer(26) +
+      row(t(c.intro), { style: txt(15, C.ink) }) +
+      spacer(30) +
+      row(progressRule()),
   );
 }
 
-function editorNote(c: NewsletterContent): string {
-  return table(
-    tr(
-      td(`<span style="${css({ fontSize: 30, lineHeight: "36px" })}">${PERSONA.emoji}</span>`, { width: 46, align: "center" }) +
-        td(
-          `<span style="${css(text(12, C.accent, { fontWeight: "bold" }))}">${t(PERSONA.name)}의 인사</span><br>` +
-            `<span style="${css(text(14, C.text))}">${t(c.editorNote)}</span>`,
-          { style: { paddingLeft: 8 } },
-        ),
-    ),
-  );
-}
-
-function deepDive(c: NewsletterContent, m: RenderMeta): string {
-  const d = c.deepDive;
-  const thumb = m.thumbnails?.[d.articleId];
-  const date = m.dates?.[d.articleId];
-  const rows = [
-    row(sectionTitle(ICONS.deepDive, "메인 딥다이브", "Deep Dive")),
-    spacer(16),
-    thumb
-      ? row(
-          link(
-            `<img src="${t(thumb)}" width="${INNER}" alt="${t(d.title)}" style="${css({ display: "block", width: INNER, maxWidth: "100%", height: "auto", border: 0 })}">`,
-            d.url,
-          ),
-        ) + spacer(14)
-      : "",
-    row(link(t(d.title), d.url, { ...text(19, C.text, { fontWeight: "bold", lineHeight: "28px" }) })),
-    row(`${t(d.source)}${date ? ` · ${dotDate(date)}` : ""}`, { style: { ...text(12, C.subtext), paddingTop: 4 } }),
-    spacer(12),
-    row(t(d.summary), { bgcolor: C.bg, style: { ...text(14, C.text), padding: "12px 14px", borderLeft: `4px solid ${C.accent}` } }),
-    spacer(6),
-    ...d.analysis.map((p) => row(t(p), { style: { ...text(14), paddingTop: 10 } })),
-    spacer(14),
-    row(`<span style="${css(text(14, C.primaryDark, { fontWeight: "bold" }))}">${ICONS.data} 핵심 포인트</span>`),
-    row(bulletList(d.keyPoints, "▪"), { style: { paddingTop: 4 } }),
-    spacer(14),
-    row(
-      `<span style="${css(text(14, "#8A5A00", { fontWeight: "bold" }))}">${ICONS.implication} 사내 도입 시사점</span>` +
-        bulletList(d.implications, "→"),
-      { bgcolor: C.highlightSoft, style: { padding: "14px 16px", border: `1px solid #F5DFA6` } },
-    ),
-    spacer(16),
-    row(button(`${ICONS.link} 원문 보기`, d.url)),
-  ];
-  return table(rows.join(""));
-}
-
-function briefs(c: NewsletterContent, m: RenderMeta): string {
-  if (!c.briefs.length) return "";
-  const items = c.briefs.map((b, i) => {
-    const date = m.dates?.[b.articleId];
-    return (
-      spacer(14) +
+function quickNews(c: NewsletterContent, m: RenderMeta): string {
+  if (!c.quickNews.length) return "";
+  const items = c.quickNews.map(
+    (q) =>
+      spacer(26) +
+      row(`${t(q.tag)} | ${t(q.title)} ${t(q.emoji)}`, { style: txt(16, C.ink, { fontWeight: "bold", lineHeight: "26px" }) }) +
       row(
-        table(
-          tr(
-            td(`<span style="${css(text(15, "#FFFFFF", { fontWeight: "bold" }))}">${i + 1}</span>`, {
-              width: 30,
-              bgcolor: C.accent,
-              align: "center",
-              valign: "middle",
-              style: { height: 30 },
-            }) +
-              td(
-                link(t(b.title), b.url, text(15, C.text, { fontWeight: "bold", lineHeight: "23px" })) +
-                  `<br><span style="${css(text(12, C.subtext))}">${t(b.source)}${date ? ` · ${dotDate(date)}` : ""}</span>`,
-                { style: { paddingLeft: 12 } },
-              ),
-          ) +
-            tr(td("", { width: 30 }) + td(t(b.summary), { style: { ...text(14), paddingLeft: 12, paddingTop: 8 } })) +
-            tr(
-              td("", { width: 30 }) +
-                td(`${ICONS.insight} <b>핵심:</b> ${t(b.keyPoint)}`, {
-                  style: { ...text(13, C.primaryDark), paddingLeft: 12, paddingTop: 6 },
-                }),
-            ),
-        ),
-        { style: { paddingBottom: 14, borderBottom: `1px solid ${C.border}` } },
-      )
-    );
-  });
-  return table(row(sectionTitle(ICONS.brief, "테크 & 인더스트리 브리프", "Tech & Industry Brief")) + items.join(""));
+        `${t(q.body)} ${link("자세히 보기", q.url, { color: C.brand, fontWeight: "bold", textDecoration: "underline" })}`,
+        { style: { ...txt(14, C.inkSoft), paddingTop: 8 } },
+      ),
+  );
+  return table(row(sectionHead(m, SECTIONS.quickNews.label, undefined, SECTIONS.quickNews.sub)) + items.join(""));
 }
 
-function marketIntel(c: NewsletterContent): string {
-  const mi = c.marketIntelligence;
-  const conn = mi.connections.map((x) =>
+function mainReport(c: NewsletterContent, m: RenderMeta): string {
+  const r = c.mainReport;
+  const thumb = m.thumbnails?.[r.articleId];
+  const date = m.dates?.[r.articleId];
+  return table(
+    row(sectionHead(m, SECTIONS.mainReport.label, "stand")) +
+      spacer(22) +
+      (thumb
+        ? row(
+            link(
+              `<img src="${t(thumb)}" width="${INNER}" alt="${t(r.title)}" style="${css({ display: "block", width: INNER, maxWidth: "100%", height: "auto", border: 0 })}">`,
+              r.url,
+            ),
+          ) + spacer(18)
+        : "") +
+      row(t(r.kicker), { style: txt(12, C.mute, { fontWeight: "bold" }) }) +
+      row(t(r.title), { style: { ...txt(19, C.ink, { fontWeight: "bold", lineHeight: "30px" }), paddingTop: 2 } }) +
+      row(`${t(r.source)}${date ? ` · ${date.replaceAll("-", ".")}` : ""}`, { style: { ...txt(12, C.mute), paddingTop: 2 } }) +
+      r.paragraphs.map((p) => row(t(p), { style: { ...txt(15, C.ink), paddingTop: 14 } })).join("") +
+      spacer(22) +
+      row(
+        `<span style="${css(txt(14, C.brand, { fontWeight: "bold" }))}">📌 핵심만 쏙</span>` + bullets(r.keyPoints, "•"),
+        { bgcolor: C.brandTint, style: { padding: "16px 18px" } },
+      ) +
+      spacer(12) +
+      row(
+        `<span style="${css(txt(14, C.ink, { fontWeight: "bold" }))}">🏭 우리 회사엔?</span>` + bullets(r.forUs, "→", C.inkSoft),
+        { style: { padding: "16px 18px", border: `1px solid ${C.brandLine}` } },
+      ) +
+      spacer(22) +
+      row(button("원문 읽어 보기 →", r.url, C.brand), { align: "center" }),
+  );
+}
+
+function churuStation(c: NewsletterContent, m: RenderMeta): string {
+  const s = c.churuStation;
+  const reply = mailto(m, `[${PERSONA.name} 레터 ${m.issueNo}호] 츄르 스테이션 답장`);
+  return table(
+    row(sectionHead(m, SECTIONS.churuStation.label, "letter", SECTIONS.churuStation.sub)) +
+      spacer(18) +
+      row(t(s.title), { align: "center", style: txt(17, C.ink, { fontWeight: "bold", lineHeight: "27px" }) }) +
+      row(
+        t(s.body) + (s.url ? ` ${link("원문 보기", s.url, { color: C.brand, fontWeight: "bold", textDecoration: "underline" })}` : ""),
+        { style: { ...txt(15, C.ink), paddingTop: 12 } },
+      ) +
+      spacer(16) +
+      row(
+        `<span style="${css(txt(13, C.brand, { fontWeight: "bold" }))}">💬 ${t(PERSONA.name)}의 질문</span><br>` +
+          `<span style="${css(txt(15, C.ink, { fontWeight: "bold" }))}">${t(s.question)}</span>`,
+        { bgcolor: C.brandTint, align: "center", style: { padding: "18px 20px" } },
+      ) +
+      (reply ? spacer(18) + row(button("답장으로 생각 보내기", reply, C.button), { align: "center" }) : ""),
+  );
+}
+
+function tailNews(c: NewsletterContent, m: RenderMeta): string {
+  const tn = c.tailNews;
+  const items = tn.items.map((x) =>
     tr(
       td(
         table(
           row(t(x.pastIssueLabel), {
-            bgcolor: C.primary,
             align: "center",
-            style: { ...text(12, "#FFFFFF", { fontWeight: "bold" }), padding: "3px 6px" },
+            bgcolor: C.paper,
+            style: { ...txt(12, C.brand, { fontWeight: "bold", lineHeight: "18px" }), padding: "3px 6px", border: `1px solid ${C.brand}`, whiteSpace: "nowrap" },
           }),
         ),
-        { width: 96, style: { paddingTop: 10 } },
+        { width: 92, style: { paddingTop: 14 } },
       ) +
-        td(`<b style="${css({ color: C.primaryDark })}">${t(x.topic)}</b><br>${t(x.insight)}`, {
-          style: { ...text(13), paddingTop: 10, paddingLeft: 12 },
+        td(`<b style="${css({ color: C.ink })}">${t(x.topic)}</b><br>${t(x.story)}`, {
+          style: { ...txt(14, C.inkSoft), paddingTop: 12, paddingLeft: 12 },
         }),
     ),
   );
   return table(
-    row(
-      table(
-        row(sectionTitle(ICONS.mi, "Market Intelligence 코너", "기술 흐름 점검")) +
-          row(t(mi.overview), { style: { ...text(14), paddingTop: 12 } }) +
-          row(table(conn.join("")), { style: { paddingTop: 4 } }) +
-          (mi.watchList.length
-            ? spacer(12) +
-              row(`<span style="${css(text(14, C.primaryDark, { fontWeight: "bold" }))}">${ICONS.watch} 다음 호까지의 관전 포인트</span>`) +
-              row(bulletList(mi.watchList, "◦"))
-            : ""),
+    row(sectionHead(m, SECTIONS.tailNews.label, "peek", SECTIONS.tailNews.sub)) +
+      spacer(18) +
+      row(
+        table(
+          row(t(tn.intro), { style: txt(14, C.ink) }) +
+            row(table(items.join("")), { style: { paddingTop: 2 } }) +
+            (tn.watchList.length
+              ? spacer(16) +
+                row(`<span style="${css(txt(13, C.ink, { fontWeight: "bold" }))}">👀 다음 호까지 지켜볼 것</span>`) +
+                row(bullets(tn.watchList, "◦", C.inkSoft))
+              : ""),
+        ),
+        { bgcolor: C.sand, style: { padding: "20px 22px", border: `1px dashed #DDD3D1` } },
       ),
-      { bgcolor: C.accentSoft, style: { padding: "20px 20px 22px", border: `1px solid #BFE6E5` } },
-    ),
+  );
+}
+
+function survey(m: RenderMeta): string {
+  const href = (answer: "good" | "bad", label: string) =>
+    m.surveyUrl
+      ? `${m.surveyUrl}${m.surveyUrl.includes("?") ? "&" : "?"}issue=${m.issueNo}&answer=${answer}`
+      : mailto(m, `[${PERSONA.name} 레터 ${m.issueNo}호] ${label}`);
+  const good = href("good", "좋았다냥");
+  const bad = href("bad", "아쉬웠다냥");
+  return table(
+    row(character(m, "sit", 104, `${PERSONA.name}`), { align: "center" }) +
+      spacer(14) +
+      row(t(SECTIONS.survey.label), { align: "center", style: txt(17, C.ink, { fontWeight: "bold" }) }) +
+      row("버튼을 눌러 이번 호 의견을 남겨 주세요.<br>피드백 하나하나가 다음 레터의 재료가 돼요.", {
+        align: "center",
+        style: { ...txt(13, C.inkSoft), paddingTop: 4 },
+      }) +
+      (good
+        ? spacer(18) +
+          row(
+            table(
+              tr(
+                td(button("좋았다냥 😺", good, C.button, 170), { align: "center", width: "50%" }) +
+                  td(button("아쉬웠다냥 😿", bad, C.button, 170), { align: "center", width: "50%" }),
+              ),
+            ),
+          )
+        : row(`의견은 <b>${t(m.feedbackContact)}</b>(으)로 보내 주세요.`, { align: "center", style: { ...txt(13, C.inkSoft), paddingTop: 10 } })),
   );
 }
 
 function footer(c: NewsletterContent, m: RenderMeta): string {
   return table(
-    row(`${PERSONA.emoji} <b>${t(PERSONA.name)}</b>: ${t(c.closingTip)}`, { style: { ...text(14), paddingBottom: 14 } }) +
-      row(
-        `${ICONS.feedback} <b>피드백 안내</b><br>이번 호에 대한 의견, 다뤄 주었으면 하는 기술·기업, 사내 적용 사례 제보는 이 메일에 회신하시거나 <b>${t(m.feedbackContact)}</b>(으)로 보내 주세요.`,
-        { bgcolor: C.bg, style: { ...text(13, C.subtext), padding: "14px 16px" } },
-      ) +
-      (c.keywords.length
-        ? row(`# ${c.keywords.map(t).join("&nbsp;&nbsp;# ")}`, { style: { ...text(12, C.accent), paddingTop: 12 } })
-        : "") +
-      row(`${t(m.newsletterName)} No.${m.issueNo} · 본 메일은 사내 공유용이며 기사 저작권은 각 언론사에 있습니다.`, {
-        style: { ...text(11, "#98A2B3"), paddingTop: 10 },
-      }),
+    row(`${t(PERSONA.name)}의 한마디 &nbsp;<span style="${css({ color: C.inkSoft, fontWeight: "normal" })}">${t(c.closing)}</span>`, {
+      align: "center",
+      style: txt(14, C.ink, { fontWeight: "bold" }),
+    }) +
+      spacer(26) +
+      row("&nbsp;", { style: { borderTop: `1px solid ${C.brandLine}`, fontSize: 1, lineHeight: "1px", height: 1 } }) +
+      spacer(18) +
+      row(t(m.newsletterName), { align: "center", style: { fontFamily: WORDMARK, fontSize: 22, lineHeight: "28px", fontWeight: 900, color: "#B9AEAF", letterSpacing: "-0.5px" } }) +
+      row(`${t(m.tagline)}<br>문의·제보 ${t(m.feedbackContact)}${m.feedbackEmail ? ` · ${t(m.feedbackEmail)}` : ""}`, {
+        align: "center",
+        style: { ...txt(12, C.mute), paddingTop: 6 },
+      }) +
+      (c.keywords.length ? row(`#${c.keywords.map(t).join("&nbsp; #")}`, { align: "center", style: { ...txt(12, C.brand), paddingTop: 8 } }) : "") +
+      row("사내 공유용 레터입니다. 기사 저작권은 각 언론사에 있어요.", { align: "center", style: { ...txt(11, "#B9AEAF"), paddingTop: 8 } }),
   );
 }
 
 /** 아웃룩 붙여넣기용 본문 (단일 테이블) */
 export function renderFragment(c: NewsletterContent, m: RenderMeta): string {
-  const card = (content: string, pad = "24px") => row(content, { bgcolor: C.card, style: { padding: pad } });
+  const block = (content: string, top: number) => (content ? spacer(top) + row(content) : "");
   return table(
     row(
       table(
-        row(header(c, m)) +
-          card(editorNote(c), "22px 24px 6px") +
-          card(deepDive(c, m)) +
-          card(briefs(c, m), "8px 24px 24px") +
-          card(marketIntel(c), "4px 24px 24px") +
-          card(footer(c, m), "8px 24px 28px"),
-        { width: WIDTH, bgcolor: C.card, align: "center", style: { width: WIDTH, maxWidth: "100%" } },
+        row(
+          table(
+            row(header(c, m)) +
+              block(quickNews(c, m), 34) +
+              block(mainReport(c, m), 52) +
+              block(churuStation(c, m), 56) +
+              block(tailNews(c, m), 56) +
+              block(survey(m), 56) +
+              block(footer(c, m), 44),
+          ),
+          { style: { padding: `36px ${PAD}px 40px` } },
+        ),
+        { width: WIDTH, bgcolor: C.paper, align: "center", style: { width: WIDTH, maxWidth: "100%" } },
       ),
-      { align: "center", bgcolor: C.bg, style: { padding: "20px 0" } },
+      { align: "center", bgcolor: C.paper },
     ),
-    { bgcolor: C.bg },
+    { bgcolor: C.paper },
   );
 }
 
@@ -256,9 +338,17 @@ export function renderEmailHtml(c: NewsletterContent, m: RenderMeta): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <title>${t(c.headline)}</title>
+<style>
+/* 모바일 메일 앱 전용. 아웃룩 데스크톱은 무시하고 인라인 스타일(600px)로 렌더링 */
+@media screen and (max-width: 620px) {
+  table[width="${WIDTH}"] { width: 100% !important; }
+  table[width="${WIDTH}"] > tbody > tr > td { padding-left: 20px !important; padding-right: 20px !important; }
+  img[width="${INNER}"] { width: 100% !important; height: auto !important; }
+}
+</style>
 <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
 </head>
-<body style="${css({ margin: 0, padding: 0, backgroundColor: C.bg, fontFamily: FONT })}">
+<body style="${css({ margin: 0, padding: 0, backgroundColor: C.paper, fontFamily: FONT })}">
 ${renderFragment(c, m)}
 </body>
 </html>`;
@@ -267,16 +357,18 @@ ${renderFragment(c, m)}
 /** text/plain 클립보드용 */
 export function renderPlainText(c: NewsletterContent, m: RenderMeta): string {
   const L: string[] = [];
-  L.push(`${m.newsletterName} No.${m.issueNo} (${dotDate(m.publishDate)})`, c.headline, "", `${ICONS.tip} 이번 호 기획 콘셉트: ${c.conceptBriefing}`, "", `${PERSONA.emoji} ${c.editorNote}`, "");
-  L.push(`${ICONS.deepDive} 메인 딥다이브`, c.deepDive.title, `${c.deepDive.source} | ${c.deepDive.url}`, c.deepDive.summary, ...c.deepDive.analysis, "");
-  L.push(`${ICONS.data} 핵심 포인트`, ...c.deepDive.keyPoints.map((x) => ` - ${x}`), `${ICONS.implication} 사내 도입 시사점`, ...c.deepDive.implications.map((x) => ` → ${x}`), "");
-  if (c.briefs.length) {
-    L.push(`${ICONS.brief} 테크 & 인더스트리 브리프`);
-    c.briefs.forEach((b, i) => L.push(`${i + 1}. ${b.title} (${b.source})`, `   ${b.summary}`, `   ${ICONS.insight} ${b.keyPoint}`, `   ${b.url}`));
-    L.push("");
+  L.push(m.newsletterName, `${PERSONA.name} 레터 제${m.issueNo}호 · ${letterDate(m.publishDate)}`, "", c.intro, "");
+  if (c.quickNews.length) {
+    L.push(`[${SECTIONS.quickNews.label}]`);
+    for (const q of c.quickNews) L.push(`${q.tag} | ${q.title} ${q.emoji}`, q.body, q.url, "");
   }
-  L.push(`${ICONS.mi} Market Intelligence 코너`, c.marketIntelligence.overview, ...c.marketIntelligence.connections.map((x) => ` [${x.pastIssueLabel}] ${x.topic}: ${x.insight}`));
-  if (c.marketIntelligence.watchList.length) L.push(`${ICONS.watch} 관전 포인트`, ...c.marketIntelligence.watchList.map((x) => ` - ${x}`));
-  L.push("", `${PERSONA.emoji} ${c.closingTip}`, `${ICONS.feedback} 피드백: ${m.feedbackContact}`);
+  const r = c.mainReport;
+  L.push(`[${SECTIONS.mainReport.label}]`, r.kicker, r.title, `${r.source} | ${r.url}`, ...r.paragraphs, "");
+  L.push("📌 핵심만 쏙", ...r.keyPoints.map((x) => ` • ${x}`), "🏭 우리 회사엔?", ...r.forUs.map((x) => ` → ${x}`), "");
+  const s = c.churuStation;
+  L.push(`[${SECTIONS.churuStation.label}]`, s.title, s.body, ...(s.url ? [s.url] : []), `💬 ${s.question}`, "");
+  L.push(`[${SECTIONS.tailNews.label}]`, c.tailNews.intro, ...c.tailNews.items.map((x) => ` [${x.pastIssueLabel}] ${x.topic}: ${x.story}`));
+  if (c.tailNews.watchList.length) L.push("👀 다음 호까지 지켜볼 것", ...c.tailNews.watchList.map((x) => ` ◦ ${x}`));
+  L.push("", `[${SECTIONS.survey.label}] 의견: ${m.feedbackEmail ?? m.feedbackContact}`, "", `${PERSONA.name}의 한마디: ${c.closing}`);
   return L.join("\n");
 }

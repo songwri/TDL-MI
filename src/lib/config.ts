@@ -10,8 +10,14 @@ export const config = {
   dataDir: process.env.DATA_DIR || path.join(process.cwd(), "data"),
   lookbackDays: Number(process.env.COLLECT_LOOKBACK_DAYS || 14),
   miLookbackDays: Number(process.env.MI_LOOKBACK_DAYS || 180),
-  newsletterName: process.env.NEWSLETTER_NAME || "TDL Market Intelligence",
+  newsletterName: process.env.NEWSLETTER_NAME || "REPONYANG",
+  tagline: process.env.NEWSLETTER_TAGLINE || "2주마다 물어 오는 물류·로봇 트렌드 레터",
   feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "물류혁신팀",
+  feedbackEmail: process.env.NEWSLETTER_FEEDBACK_EMAIL || "",
+  surveyUrl: process.env.NEWSLETTER_SURVEY_URL || "",
+  archiveUrl: process.env.NEWSLETTER_ARCHIVE_URL || "",
+  /** 메일에 들어갈 캐릭터 이미지의 공개 기준 URL. 비우면 복사 시 현재 접속 주소로 변환 */
+  assetBaseUrl: process.env.PUBLIC_ASSET_BASE_URL || "",
 };
 
 export const sheetsEnabled = () =>

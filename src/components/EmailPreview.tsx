@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { copyRichHtml, copyText, downloadFile } from "@/lib/clipboard";
+import { absolutizeAssets, copyRichHtml, copyText, downloadFile } from "@/lib/clipboard";
 import { Button, cx } from "./ui";
 
 export function EmailPreview({
@@ -34,7 +34,7 @@ export function EmailPreview({
 
   const copyOutlook = async () => {
     try {
-      const how = await copyRichHtml(fragment, text);
+      const how = await copyRichHtml(absolutizeAssets(fragment), text);
       onToast(
         how === "clipboard-api"
           ? "아웃룩용 본문을 복사했습니다. 메일 작성창에 Ctrl+V 하세요."
@@ -47,7 +47,7 @@ export function EmailPreview({
   };
   const copyCode = async () => {
     try {
-      await copyText(html);
+      await copyText(absolutizeAssets(html));
       onToast("HTML 코드를 복사했습니다.", "success");
     } catch (e) {
       onToast((e as Error).message, "error");
@@ -73,7 +73,7 @@ export function EmailPreview({
             📋 아웃룩용 본문 복사
           </Button>
           <Button onClick={copyCode}>{"</>"} HTML 코드 복사</Button>
-          <Button onClick={() => downloadFile(fileName, html)}>⬇ .html</Button>
+          <Button onClick={() => downloadFile(fileName, absolutizeAssets(html))}>⬇ .html</Button>
           {extraActions}
         </div>
       </div>
@@ -84,7 +84,7 @@ export function EmailPreview({
           srcDoc={html}
           onLoad={measure}
           sandbox="allow-same-origin allow-popups"
-          style={{ width: device === "desktop" ? 680 : 375, height }}
+          style={{ width: device === "desktop" ? 640 : 375, height }}
           className="rounded bg-white shadow-md transition-[width]"
         />
       </div>
