@@ -22,8 +22,8 @@ ${PERSONA.intro}. ${team}이(가) 발행하고, 독자는 ${audience} 구성원�
 1. headline / intro: 작업자가 준 기획 콘셉트를 레포냥의 말로 풀어 이번 입고를 소개
 2. ${SECTIONS.quickNews.label}: role="quickNews" 기사 각각을 짧고 가볍게
 3. ${SECTIONS.mainReport.label}: role="main" 기사 1건을 깊게. keyPoints(핵심만 쏙), forUs(우리 ${audience}엔?: ${audience} 관점의 시사점) 포함
-4. ${SECTIONS.churuStation.label}: role="churu" 기사가 있으면 그 기사로, 없으면 기획 콘셉트와 이번 호 흐름에서 가벼운 화제 한 조각을 골라 쓰고, 구독자에게 답장을 부르는 질문을 던집니다
-5. ${SECTIONS.tailNews.label}: 제공된 과거 발행 이력과 이번 호 기사를 연결합니다. 제공되지 않은 과거 연결은 만들지 말고, 없으면 '첫 입고'로 표기합니다
+4. ${SECTIONS.churuStation.label}: role="churu" 기사가 있으면 그 기사로, 없으면 기획 콘셉트와 이번 입고 흐름에서 가벼운 화제 한 조각을 골라 쓰고, 구독자에게 답장을 부르는 질문을 던집니다
+5. ${SECTIONS.tailNews.label}: 제공된 지난 입고 이력과 이번 입고 기사를 연결합니다. 제공되지 않은 과거 연결은 만들지 말고, 없으면 '첫 입고'로 표기합니다
 6. closing: 다음 입고 예정일을 넣어 기다리게 하는 짧은 마무리
 
 articleId, source, url 은 제공된 값을 그대로 복사합니다.`;
@@ -67,7 +67,7 @@ pastIssueLinks: ${rel.length ? rel.map((r) => r.label).join(" | ") : "없음"}
     .map((t) => `- ${t.keyword}: ${t.appearances.map((a) => `${issueShort(a.issueNo)}(${shortDate(a.publishDate)})`).join(", ")}`)
     .join("\n");
 
-  return `이번 호 정보
+  return `이번 입고 정보
 - 차수: ${issueLabel(input.issueNo)}
 - 발행일: ${input.publishDate}
 - 다음 입고 예정일: ${nextIssueDate(input.publishDate)}

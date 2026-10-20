@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORIES, type NewsletterContent, type RefreshResult } from "@/lib/types";
+import { copyText } from "@/lib/clipboard";
 import { ArticleCard, type ArticleView } from "./ArticleCard";
 import { ContentEditor } from "./ContentEditor";
 import { EmailPreview } from "./EmailPreview";
@@ -11,6 +12,7 @@ import { Badge, Button, api, cx, useToasts } from "./ui";
 
 interface Status {
   llm: string | null;
+  writer: "claude-code" | "api";
   sheets: boolean;
   lookbackDays: number;
   lastRefreshAt?: string;
@@ -20,9 +22,21 @@ interface Status {
   sources: { id: string; name: string; region: string; enabled: boolean }[];
 }
 
+interface HandoffSummary {
+  issueNo: number;
+  publishDate: string;
+  concept: string;
+  articleIds: string[];
+  mainArticleId?: string;
+  churuArticleId?: string;
+  createdAt: string;
+  hasContent: boolean;
+  contentSavedAt?: string;
+}
+
 interface Generated {
   content: NewsletterContent;
-  mode: "llm" | "draft";
+  mode: "llm" | "draft" | "claude-code";
   model?: string;
   notice?: string;
   html: string;
@@ -83,15 +97,21 @@ export function Dashboard() {
   const [tab, setTab] = useState<"preview" | "edit">("preview");
   const [rendering, setRendering] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [handoffs, setHandoffs] = useState<HandoffSummary[]>([]);
+  const [savingHandoff, setSavingHandoff] = useState(false);
+  const [pasteFor, setPasteFor] = useState<number | null>(null);
+  const [pasteText, setPasteText] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, a] = await Promise.all([
+      const [s, a, h] = await Promise.all([
         api<Status>("/api/status"),
         api<{ articles: ArticleView[]; nextIssueNo: number }>(`/api/articles?days=${days}`),
+        api<{ handoffs: HandoffSummary[] }>("/api/handoff"),
       ]);
       setStatus(s);
+      setHandoffs(h.handoffs);
       setArticles(a.articles);
       setIssueNo((n) => (n <= 1 ? a.nextIssueNo : n));
       setOrder((prev) => {
@@ -156,7 +176,7 @@ export function Dashboard() {
   const toggle = async (id: string) => {
     const next = !order.includes(id);
     if (next && order.length >= MAX_SELECT) {
-      push(`이번 호 기사는 최대 ${MAX_SELECT}개까지 선택할 수 있습니다.`, "error");
+      push(`이번 입고 기사는 최대 ${MAX_SELECT}개까지 선택할 수 있습니다.`, "error");
       return;
     }
     setOrder((o) => (next ? [...o, id] : o.filter((x) => x !== id)));
@@ -196,10 +216,10 @@ export function Dashboard() {
 
   const generate = async () => {
     if (!order.length) return push("기사를 선택하세요.", "error");
-    if (!concept.trim()) return push("이번 호 기획 콘셉트를 입력하세요.", "error");
+    if (!concept.trim()) return push("이번 입고 기획 콘셉트를 입력하세요.", "error");
     setGenerating(true);
     try {
-      const articleIds = [effectiveMain!, ...order.filter((x) => x !== effectiveMain)];
+      const articleIds = orderedIds();
       const r = await api<Omit<Generated, "issueNo" | "publishDate" | "articleIds" | "concept">>("/api/newsletter/generate", {
         json: { issueNo, publishDate, concept, articleIds, mainArticleId: effectiveMain, churuArticleId: effectiveChuru },
       });
@@ -213,6 +233,91 @@ export function Dashboard() {
       push((e as Error).message, "error");
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const orderedIds = () => [effectiveMain!, ...order.filter((x) => x !== effectiveMain)];
+
+  /** 토큰 없이 쓰는 기본 흐름: 선정 결과를 서버에 의뢰서로 저장 → Claude Code 에서 작성 */
+  const saveHandoff = async () => {
+    if (!order.length) return push("기사를 선택하세요.", "error");
+    if (!concept.trim()) return push("이번 입고 기획 콘셉트를 입력하세요.", "error");
+    setSavingHandoff(true);
+    try {
+      await api("/api/handoff", {
+        json: { issueNo, publishDate, concept, articleIds: orderedIds(), mainArticleId: effectiveMain, churuArticleId: effectiveChuru },
+      });
+      push(`${issueNo}차 입고 작성 의뢰서를 저장했어요. Claude Code에서 /write-letter ${issueNo} 를 실행하세요.`, "success");
+      const h = await api<{ handoffs: HandoffSummary[] }>("/api/handoff");
+      setHandoffs(h.handoffs);
+    } catch (e) {
+      push((e as Error).message, "error");
+    } finally {
+      setSavingHandoff(false);
+    }
+  };
+
+  const copyHandoffPrompt = async (n: number) => {
+    try {
+      const h = await api<{ prompt: string }>(`/api/handoff/${n}`);
+      await copyText(h.prompt);
+      push("의뢰서를 복사했어요. Claude 대화창에 붙여넣고, 받은 JSON 을 '작성본 붙여넣기'에 넣으세요.", "success");
+    } catch (e) {
+      push((e as Error).message, "error");
+    }
+  };
+
+  const showHandoffResult = (r: { request: HandoffSummary; content: NewsletterContent; html: string; fragment: string; text: string }) => {
+    const g: Generated = {
+      content: r.content,
+      mode: "claude-code",
+      html: r.html,
+      fragment: r.fragment,
+      text: r.text,
+      issueNo: r.request.issueNo,
+      publishDate: r.request.publishDate,
+      articleIds: r.request.articleIds,
+      concept: r.request.concept,
+    };
+    setGen(g);
+    saveDraft(g);
+    setTab("preview");
+    // 작성 패널도 의뢰서 기준으로 맞춘다 (CLI 에서 만든 의뢰서 포함)
+    setIssueNo(r.request.issueNo);
+    setPublishDate(r.request.publishDate);
+    setConcept(r.request.concept);
+    setOrder(r.request.articleIds);
+    setMainId(r.request.mainArticleId ?? r.request.articleIds[0] ?? null);
+    setChuruId(r.request.churuArticleId ?? null);
+    setTimeout(() => document.getElementById("preview")?.scrollIntoView({ behavior: "smooth" }), 100);
+  };
+
+  const loadHandoff = async (n: number) => {
+    try {
+      const r = await api<{ request: HandoffSummary; content: NewsletterContent | null; html: string; fragment: string; text: string }>(`/api/handoff/${n}`);
+      if (!r.content) return push(`${n}차 입고 작성본이 아직 없어요. Claude Code에서 /write-letter ${n} 를 실행하세요.`, "error");
+      showHandoffResult({ ...r, content: r.content });
+      push(`${n}차 입고 작성본을 불러왔어요.`, "success");
+    } catch (e) {
+      push((e as Error).message, "error");
+    }
+  };
+
+  const submitPaste = async () => {
+    if (pasteFor === null) return;
+    try {
+      const r = await api<{ request: HandoffSummary; content: NewsletterContent; html: string; fragment: string; text: string }>(
+        `/api/handoff/${pasteFor}/content`,
+        { json: { json: pasteText } },
+      );
+      showHandoffResult(r);
+      setPasteFor(null);
+      setPasteText("");
+      push("작성본을 저장하고 미리보기에 띄웠어요.", "success");
+      const h = await api<{ handoffs: HandoffSummary[] }>("/api/handoff");
+      setHandoffs(h.handoffs);
+    } catch (e) {
+      push((e as Error).message, "error");
     }
   };
 
@@ -263,7 +368,7 @@ export function Dashboard() {
       {toasts}
       {/* 상태 바 */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge tone={status?.llm ? "green" : "amber"}>{status?.llm ? `🧠 Claude 연결됨 · ${status.llm}` : "🧠 LLM 미설정 (기본 초안 모드)"}</Badge>
+        <Badge tone="green">{status?.writer === "api" ? `⚡ API 작성 모드 · ${status.llm}` : "📝 Claude Code 작성 모드 (API 토큰 사용 없음)"}</Badge>
         <Badge tone={status?.sheets ? "green" : "amber"}>{status?.sheets ? "📗 Google Sheets 연동" : "📗 Sheets 미설정 (로컬 캐시만 사용)"}</Badge>
         <Badge>기사 {status?.articleCount ?? 0}건 · 입고 {status?.issueCount ?? 0}차</Badge>
         {status?.lastRefreshAt && <Badge>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR")}</Badge>}
@@ -349,7 +454,7 @@ export function Dashboard() {
         {/* ── 작성 패널 ── */}
         <aside className="space-y-4 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto">
           <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="font-bold text-brand">✍️ 이번 호 작성</h2>
+            <h2 className="font-bold text-brand">✍️ 이번 입고 작성</h2>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <label className="space-y-1">
                 <span className="text-xs font-semibold text-slate-600">입고 차수</span>
@@ -404,7 +509,7 @@ export function Dashboard() {
             </div>
 
             <label className="block space-y-1">
-              <span className="text-xs font-semibold text-slate-600">이번 호 기획 콘셉트 및 메시지</span>
+              <span className="text-xs font-semibold text-slate-600">이번 입고 기획 콘셉트 및 메시지</span>
               <textarea
                 rows={5}
                 className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm leading-relaxed"
@@ -413,9 +518,68 @@ export function Dashboard() {
                 onChange={(e) => setConcept(e.target.value)}
               />
             </label>
-            <Button variant="primary" className="w-full py-2" onClick={generate} disabled={generating || !selected.length}>
-              {generating ? "⏳ 레포냥이 소식 물어 오는 중… (1~2분)" : "📦 이번 차수 입고하기"}
+            <Button variant="primary" className="w-full py-2" onClick={saveHandoff} disabled={savingHandoff || !selected.length}>
+              {savingHandoff ? "저장 중…" : "📝 작성 의뢰 저장"}
             </Button>
+            <div className="flex gap-2">
+              {status?.writer === "api" && (
+                <Button className="flex-1" onClick={generate} disabled={generating || !selected.length}>
+                  {generating ? "⏳ 작성 중…" : "⚡ API로 바로 작성"}
+                </Button>
+              )}
+              <Button variant="ghost" className="flex-1" onClick={generate} disabled={generating || !selected.length} title="본문은 기사 원문으로 채운 레이아웃 확인용 초안">
+                {generating ? "⏳" : "👀 규칙 초안으로 레이아웃 보기"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="font-bold text-brand">📦 작성 의뢰서</h2>
+            <p className="text-xs leading-relaxed text-slate-500">
+              선정 결과는 서버에 의뢰서로 저장돼요. Claude Code에서 <code className="rounded bg-slate-100 px-1">/write-letter 차수</code> 를 실행하면
+              레포냥이 작성하고, 여기서 <b>작성본 불러오기</b>로 확인합니다. Claude 대화창을 쓴다면 의뢰서를 복사해 붙여넣고, 받은 JSON 을 붙여넣으세요.
+            </p>
+            {handoffs.length === 0 ? (
+              <p className="rounded border border-dashed border-slate-300 p-3 text-center text-xs text-slate-500">아직 저장된 의뢰서가 없어요.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {handoffs.slice(0, 4).map((h) => (
+                  <li key={h.issueNo} className="rounded border border-slate-200 p-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <b className="text-slate-800">{h.issueNo}차 입고</b>
+                      <Badge tone={h.hasContent ? "green" : "amber"}>{h.hasContent ? "작성 완료" : "작성 대기"}</Badge>
+                      <span className="text-slate-400">{h.publishDate}</span>
+                    </div>
+                    <div className="mt-0.5 line-clamp-1 text-slate-500">{h.concept}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <Button className="px-2 py-1 text-xs" variant={h.hasContent ? "primary" : "secondary"} onClick={() => loadHandoff(h.issueNo)} disabled={!h.hasContent}>
+                        작성본 불러오기
+                      </Button>
+                      <Button className="px-2 py-1 text-xs" onClick={() => copyHandoffPrompt(h.issueNo)}>의뢰서 복사</Button>
+                      <Button className="px-2 py-1 text-xs" variant="ghost" onClick={() => setPasteFor(pasteFor === h.issueNo ? null : h.issueNo)}>
+                        작성본 붙여넣기
+                      </Button>
+                    </div>
+                    {pasteFor === h.issueNo && (
+                      <div className="mt-2 space-y-1.5">
+                        <textarea
+                          id={`paste-${h.issueNo}`}
+                          rows={6}
+                          className="w-full rounded border border-slate-300 p-2 font-mono text-[11px]"
+                          placeholder="Claude가 답한 JSON 을 그대로 붙여넣으세요"
+                          value={pasteText}
+                          onChange={(e) => setPasteText(e.target.value)}
+                        />
+                        <Button variant="primary" className="px-2 py-1 text-xs" onClick={submitPaste} disabled={!pasteText.trim()}>
+                          검증하고 저장
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button variant="ghost" className="w-full text-xs" onClick={load}>↻ 상태 새로고침</Button>
           </div>
           <p className="px-1 text-xs text-slate-500">
             과거 발행 이력과 비교한 연관 태그는 최근 6개월 내 입고를 기준으로 표시됩니다. 전체 이력은{" "}
@@ -429,7 +593,7 @@ export function Dashboard() {
         <section id="preview" className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-bold text-brand">📦 {gen.issueNo}차 입고 미리보기</h2>
-            <Badge tone={gen.mode === "llm" ? "green" : "amber"}>{gen.mode === "llm" ? `Claude 생성 · ${gen.model ?? ""}` : "기본 초안 (LLM 미사용)"}</Badge>
+            <Badge tone={gen.mode === "draft" ? "amber" : "green"}>{gen.mode === "claude-code" ? "Claude Code 작성본" : gen.mode === "llm" ? `API 작성 · ${gen.model ?? ""}` : "규칙 초안 (레이아웃 확인용)"}</Badge>
             <div className="inline-flex rounded-md border border-slate-300 p-0.5 text-sm">
               {(["preview", "edit"] as const).map((t) => (
                 <button key={t} onClick={() => setTab(t)} className={cx("rounded px-3 py-1", tab === t ? "bg-slate-800 text-white" : "text-slate-600")}>

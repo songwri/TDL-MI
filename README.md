@@ -26,14 +26,15 @@
 
 ```bash
 npm install
-cp .env.example .env.local     # 키 입력 (없어도 로컬 캐시 + 기본 초안 모드로 동작)
+cp .env.example .env.local     # 구글 시트 등 선택 설정 (비워 두면 로컬 캐시 + Claude Code 작성 모드)
 npm run seed:demo              # (선택) 샘플 기사·과거 3개 호 적재 — 실제 운영 전 data/db.json 삭제
 npm run dev                    # http://localhost:3000
 ```
 
 | 환경변수 | 설명 |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API 키. 없으면 기사 원문 기반 규칙 초안으로 생성 |
+| `LETTER_WRITER` | 비우면 Claude Code 작성 모드(토큰 없음). `api` 면 웹에서 API 로 바로 작성 |
+| `ANTHROPIC_API_KEY` | `LETTER_WRITER=api` 일 때만 필요 |
 | `ANTHROPIC_MODEL` | 기본 `claude-opus-5-5` |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | 스프레드시트 ID (`/d/<ID>/edit`) |
 | `GOOGLE_SERVICE_ACCOUNT_KEY_PATH` / `_BASE64` | 서비스 계정 JSON 키 경로 또는 base64 |
@@ -50,17 +51,37 @@ npm run dev                    # http://localhost:3000
 4. 앱의 **발행 이력 → 📗 시트 초기화** 클릭 → `Raw_Articles`, `Newsletter_Issues` 시트와 헤더 자동 생성
    - 기존 로컬 데이터를 올리려면 **⬆ 시트로 업로드**, 다른 작업자의 시트 내용을 받으려면 **⬇ 시트에서 불러오기**
 
-## 사용 흐름
+## 사용 흐름 (API 토큰 없이)
 
-1. **🔄 기사 최신화** — 활성 채널에서 최근 2주 기사를 수집, URL/제목 중복 제거 후 적재
-2. 카테고리(AMR/AGV · 풀필먼트 자동화 · 소팅/보관설비 · 로봇 피킹/매니퓰레이션 · 글로벌 트렌드)·지역·검색어로 필터
-3. 기사 체크(최대 5개) — 각 기사에 과거 호 연관 태그 표시 (꼬리 뉴스 재료)
-   - ⚠️ `3호(09/08)에서 이미 다룬 기사와 중복 가능성`
-   - ↪ `1호(05/23)에서 다룬 AutoStore 솔루션의 후속 기사`
-   - 🔗 `2호(07/12)에서 다룬 휴머노이드 주제와 연관`
-4. 기사별 섹션(메인 리포트/1분 냥스/츄르 스테이션) 지정, 순서 조정, **기획 콘셉트** 입력 → **🐾 레포냥 레터 생성**
-5. 데스크톱/모바일 미리보기 → 필요 시 **섹션 편집** → **📋 아웃룩용 본문 복사** → 아웃룩 새 메일에 `Ctrl+V`
-6. **✅ 발행 확정** — `Newsletter_Issues`에 호수/발행일/콘셉트/기사 ID/완성 HTML/키워드 저장, 기사 선정여부에 `발행(N호)` 기록
+기본 설정(`LETTER_WRITER` 미설정)에서는 웹 앱이 Anthropic API 를 호출하지 않습니다. 글쓰기는 Claude Code 가 맡습니다.
+
+```
+[웹 대시보드]                         [Claude Code]                          [웹 대시보드]
+기사 최신화 · 체크                      /write-letter 4                       작성 의뢰서 › 작성본 불러오기
+섹션 지정 · 기획 콘셉트      ──▶      의뢰서 읽기 → content.json 작성   ──▶   미리보기 · 섹션 편집
+📝 작성 의뢰 저장                        npm run letter -- save 4               📋 아웃룩용 복사 · ✅ 발행 확정
+  └ data/handoff/4/prompt.md            └ 검증 · 링크 고정 · letter.html
+```
+
+1. **🔄 기사 최신화**: 최근 2주 기사 수집 (규칙 기반, 토큰 없음)
+2. 기사 체크(최대 5개), 기사별 섹션(메인 리포트 / 1분 냥스 / 츄르 스테이션) 지정, 기획 콘셉트 입력
+3. **📝 작성 의뢰 저장**: 선정 결과·기사 원문·지난 입고 이력·작성 지침을 `data/handoff/<차수>/prompt.md` 로 저장
+4. 같은 폴더에서 Claude Code 를 열고 `/write-letter 4` (스킬: `.claude/skills/write-letter/SKILL.md`)
+   - Claude Code 가 의뢰서를 읽고 `content.json` 을 쓴 뒤 `npm run letter -- save 4` 로 검증·저장
+   - Claude Code 에서 기사 선정부터 하고 싶으면 “이번 입고 기사 골라줘”라고 하면 `npm run letter -- candidates` → `request` 순서로 진행
+5. 웹 **작성 의뢰서 › 작성본 불러오기** → 미리보기·섹션 편집 → **📋 아웃룩용 본문 복사** → **✅ 발행 확정**
+
+Claude Code 가 앱과 다른 컴퓨터(예: 클라우드 세션)에 있으면 `data/` 를 볼 수 없습니다. 이때는 **의뢰서 복사** → Claude 대화창에 붙여넣기 → 받은 JSON 을 **작성본 붙여넣기**로 넣으면 됩니다.
+
+API 로 웹에서 바로 쓰고 싶을 때만 `.env.local` 에 `LETTER_WRITER=api` 와 `ANTHROPIC_API_KEY` 를 넣으세요(사용량만큼 과금).
+
+| CLI | 설명 |
+|---|---|
+| `npm run letter -- list` | 작성 의뢰서 목록 (작성 대기 / 완료) |
+| `npm run letter -- candidates [일수]` | 최근 기사 후보와 지난 입고 연관 태그 |
+| `npm run letter -- request <N> --date … --concept … --main ID [--quick ID,ID] [--churu ID]` | CLI 로 의뢰서 만들기 |
+| `npm run letter -- save <N> [file]` | 작성본 검증·저장, 미리보기 HTML 생성 |
+| `npm run letter -- publish <N>` | 발행 이력 저장 (웹의 발행 확정과 동일) |
 
 ## 구조
 

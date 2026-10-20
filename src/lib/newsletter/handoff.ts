@@ -1,0 +1,156 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { config } from "@/lib/config";
+import { getAllArticles, getArticles, listIssues } from "@/lib/store";
+import type { NewsletterContent } from "@/lib/types";
+import { issueLabel } from "@/config/brand";
+import { renderAll } from "./render";
+import { NewsletterSchema } from "./schema";
+import { OUTPUT_SCHEMA, anchorToSources, buildContext } from "./synthesizer";
+
+/**
+ * Claude Code 작성 의뢰서 (API 토큰 없이 레터를 쓰는 흐름)
+ *
+ *   웹: 기사·역할·콘셉트 선정 → createHandoff() → data/handoff/<N>/request.json + prompt.md
+ *   Claude Code: /write-letter → prompt.md 를 읽고 content.json 작성 → `npm run letter -- save N`
+ *   웹: 작성본 불러오기 → 미리보기 → 발행 확정
+ */
+
+export interface HandoffRequest {
+  issueNo: number;
+  publishDate: string;
+  concept: string;
+  articleIds: string[];
+  mainArticleId?: string;
+  churuArticleId?: string;
+  createdAt: string;
+}
+
+export interface HandoffSummary extends HandoffRequest {
+  hasContent: boolean;
+  contentSavedAt?: string;
+}
+
+const root = () => path.join(config.dataDir, "handoff");
+const dirOf = (n: number) => path.join(root(), String(n));
+export const handoffPaths = (n: number) => ({
+  dir: dirOf(n),
+  request: path.join(dirOf(n), "request.json"),
+  prompt: path.join(dirOf(n), "prompt.md"),
+  content: path.join(dirOf(n), "content.json"),
+  preview: path.join(dirOf(n), "letter.html"),
+});
+
+async function readJson<T>(file: string): Promise<T | null> {
+  try {
+    return JSON.parse(await fs.readFile(file, "utf8")) as T;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+async function context(req: HandoffRequest) {
+  const [articles, issues, all] = await Promise.all([getArticles(req.articleIds), listIssues(), getAllArticles()]);
+  if (articles.length !== req.articleIds.length) throw new Error("의뢰서의 기사 중 저장소에 없는 기사가 있습니다.");
+  return { articles, ...buildContext({ ...req, articles, issues, allArticles: all }) };
+}
+
+function promptDocument(req: HandoffRequest, system: string, user: string): string {
+  const p = handoffPaths(req.issueNo);
+  const rel = (f: string) => path.relative(process.cwd(), f) || f;
+  return `# ${config.newsletterName} ${issueLabel(req.issueNo)} 작성 의뢰서
+
+- 발행일: ${req.publishDate}
+- 의뢰서 생성: ${req.createdAt}
+
+## 작업 방법
+
+**Claude Code에서** (\`/write-letter ${req.issueNo}\`)
+1. 아래 [작성 지침]과 [자료]를 읽고, [출력 형식]에 맞는 JSON 하나를 작성합니다.
+2. \`${rel(p.content)}\` 에 JSON만 저장합니다 (코드블록 표시 없이).
+3. \`npm run letter -- save ${req.issueNo}\` 를 실행해 형식 검증·링크 고정·미리보기 생성을 합니다.
+4. 오류가 나오면 메시지대로 고쳐 다시 저장합니다.
+
+**Claude 대화창에서** 이 문서를 붙여넣은 경우: JSON만 답해 주세요. 작업자가 웹 화면의 '작성본 붙여넣기'에 넣습니다.
+
+## 작성 지침
+
+${system}
+
+## 자료
+
+${user}
+
+## 출력 형식 (JSON Schema)
+
+\`\`\`json
+${JSON.stringify(OUTPUT_SCHEMA, null, 2)}
+\`\`\`
+`;
+}
+
+export async function createHandoff(input: Omit<HandoffRequest, "createdAt">) {
+  const req: HandoffRequest = { ...input, createdAt: new Date().toISOString() };
+  const { system, user } = await context(req);
+  const p = handoffPaths(req.issueNo);
+  await fs.mkdir(p.dir, { recursive: true });
+  const prompt = promptDocument(req, system, user);
+  await fs.writeFile(p.request, JSON.stringify(req, null, 2));
+  await fs.writeFile(p.prompt, prompt);
+  // 선정이 바뀌었으면 이전 작성본은 맞지 않으므로 보관만 하고 비운다
+  await fs.rename(p.content, `${p.content}.${Date.now()}.bak`).catch(() => undefined);
+  return { request: req, prompt, promptPath: p.prompt };
+}
+
+export async function listHandoffs(): Promise<HandoffSummary[]> {
+  const dirs = await fs.readdir(root()).catch(() => [] as string[]);
+  const out: HandoffSummary[] = [];
+  for (const d of dirs) {
+    const n = Number(d);
+    if (!n) continue;
+    const req = await readJson<HandoffRequest>(handoffPaths(n).request);
+    if (!req) continue;
+    const stat = await fs.stat(handoffPaths(n).content).catch(() => null);
+    out.push({ ...req, hasContent: !!stat, contentSavedAt: stat?.mtime.toISOString() });
+  }
+  return out.sort((a, b) => b.issueNo - a.issueNo);
+}
+
+export async function getHandoff(n: number) {
+  const p = handoffPaths(n);
+  const request = await readJson<HandoffRequest>(p.request);
+  if (!request) return null;
+  const prompt = await fs.readFile(p.prompt, "utf8");
+  const content = await readJson<NewsletterContent>(p.content);
+  if (!content) return { request, prompt, content: null };
+  const articles = await getArticles(request.articleIds);
+  return { request, prompt, content, ...renderAll(content, request.issueNo, request.publishDate, articles) };
+}
+
+/** 작성본 JSON 검증 → 링크·출처 고정 → content.json + 미리보기 HTML 저장 */
+export async function saveHandoffContent(n: number, raw: unknown) {
+  const p = handoffPaths(n);
+  const request = await readJson<HandoffRequest>(p.request);
+  if (!request) throw new Error(`${issueLabel(n)} 작성 의뢰서가 없습니다. 웹에서 먼저 '작성 의뢰 저장'을 하세요.`);
+  let data = raw;
+  if (typeof raw === "string") {
+    const text = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`JSON 을 읽을 수 없습니다: ${(e as Error).message}`);
+    }
+  }
+  const parsed = NewsletterSchema.safeParse(data);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => `- ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
+    throw new Error(`작성본이 출력 형식과 맞지 않습니다.\n${issues}`);
+  }
+  const ctx = await context(request);
+  const content = anchorToSources(parsed.data, ctx.main, ctx.quick, ctx.churu);
+  await fs.writeFile(p.content, JSON.stringify(content, null, 2));
+  const rendered = renderAll(content, request.issueNo, request.publishDate, ctx.articles);
+  await fs.writeFile(p.preview, rendered.html);
+  return { request, content, ...rendered };
+}

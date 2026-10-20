@@ -25,4 +25,12 @@ export const config = {
 export const sheetsEnabled = () =>
   Boolean(config.spreadsheetId && (config.serviceAccountKeyPath || config.serviceAccountKeyBase64));
 
-export const llmEnabled = () => Boolean(config.anthropicApiKey);
+/**
+ * 레터 작성 방식
+ *  - claude-code (기본): 웹에서 작성 의뢰서를 저장 → Claude Code 에서 /write-letter 로 작성. API 토큰을 쓰지 않는다
+ *  - api: 웹에서 Anthropic API 로 바로 생성 (ANTHROPIC_API_KEY 필요, 사용량만큼 과금)
+ */
+export const writerMode = (): "claude-code" | "api" =>
+  process.env.LETTER_WRITER === "api" && config.anthropicApiKey ? "api" : "claude-code";
+
+export const llmEnabled = () => writerMode() === "api";

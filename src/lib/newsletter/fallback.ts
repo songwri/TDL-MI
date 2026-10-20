@@ -65,8 +65,8 @@ export function buildFallbackDraft(input: {
         }
       : {
           articleId: "",
-          title: "띵동! 이번 호 주제, 여러분 생각이 궁금해요",
-          body: `${conceptLine || "이번 호 주제"}에 대해 현장에서 느끼는 점이 있다면 들려주세요.`,
+          title: "띵동! 이번 입고 주제, 여러분 생각이 궁금해요",
+          body: `${conceptLine || "이번 입고 주제"}에 대해 현장에서 느끼는 점이 있다면 들려주세요.`,
           question: "지금 우리 센터에서 가장 먼저 자동화하고 싶은 공정은 어디인가요?",
           source: "",
           url: "",

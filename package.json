@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "collect": "tsx scripts/collect.ts",
-    "render:sample": "tsx scripts/render-sample.ts"
+    "render:sample": "tsx scripts/render-sample.ts",
+    "letter": "tsx scripts/letter.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

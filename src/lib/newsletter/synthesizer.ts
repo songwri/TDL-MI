@@ -28,23 +28,48 @@ export interface SynthesizeOutput {
 let client: Anthropic | null = null;
 const getClient = () => (client ??= new Anthropic({ apiKey: config.anthropicApiKey }));
 
-const OUTPUT_SCHEMA = z.toJSONSchema(NewsletterSchema) as Record<string, unknown>;
+export const OUTPUT_SCHEMA = z.toJSONSchema(NewsletterSchema) as Record<string, unknown>;
 delete OUTPUT_SCHEMA.$schema;
 
-export async function synthesizeNewsletter(input: SynthesizeInput): Promise<SynthesizeOutput> {
+/** 기사 역할 분배 + MI 이력 + 프롬프트. API 호출과 Claude Code 작성 의뢰서가 같은 맥락을 쓴다 */
+export function buildContext(input: SynthesizeInput) {
   const main = input.articles.find((a) => a.id === input.mainArticleId) ?? input.articles[0];
   if (!main) throw new Error("선택된 기사가 없습니다.");
   const churu = input.articles.find((a) => a.id === input.churuArticleId && a.id !== main.id);
   const quick = input.articles.filter((a) => a.id !== main.id && a.id !== churu?.id);
+  const pastIssues = input.issues.filter((i) => i.issueNo !== input.issueNo);
   const intel = analyzeArticles(input.articles, input.issues, input.allArticles, { excludeIssueNo: input.issueNo });
   const keywords = [...new Set(input.articles.flatMap((a) => a.keywords))];
-  const timeline = keywordTimeline(keywords, input.issues.filter((i) => i.issueNo !== input.issueNo), input.allArticles);
+  const timeline = keywordTimeline(keywords, pastIssues, input.allArticles);
+  return {
+    main,
+    quick,
+    churu,
+    intel,
+    system: systemPrompt(config.newsletterName, config.audience, config.feedbackContact),
+    user: buildUserPrompt({
+      issueNo: input.issueNo,
+      publishDate: input.publishDate,
+      concept: input.concept,
+      mainArticle: main,
+      quickArticles: quick,
+      churuArticle: churu,
+      intel,
+      issues: pastIssues,
+      timeline,
+    }),
+  };
+}
+
+export async function synthesizeNewsletter(input: SynthesizeInput): Promise<SynthesizeOutput> {
+  const ctx = buildContext(input);
+  const { main, quick, churu, intel } = ctx;
 
   if (!llmEnabled()) {
     return {
       content: buildFallbackDraft({ ...input, main, quick, churu, intel }),
       mode: "draft",
-      notice: "ANTHROPIC_API_KEY 가 없어 기사 원문 기반 기본 초안으로 생성했습니다.",
+      notice: "규칙 기반 초안입니다. 레이아웃 확인용으로 쓰고, 본문은 Claude Code 작성본으로 바꿔 주세요.",
     };
   }
 
@@ -55,23 +80,8 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
     fallbacks: "default",
     thinking: { type: "adaptive" },
     output_config: { effort: "high", format: { type: "json_schema", schema: OUTPUT_SCHEMA } },
-    system: systemPrompt(config.newsletterName, config.audience, config.feedbackContact),
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt({
-          issueNo: input.issueNo,
-          publishDate: input.publishDate,
-          concept: input.concept,
-          mainArticle: main,
-          quickArticles: quick,
-          churuArticle: churu,
-          intel,
-          issues: input.issues.filter((i) => i.issueNo !== input.issueNo),
-          timeline,
-        }),
-      },
-    ],
+    system: ctx.system,
+    messages: [{ role: "user", content: ctx.user }],
   });
   const message = await stream.finalMessage();
 
@@ -88,8 +98,8 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
   return { content: anchorToSources(parsed.data, main, quick, churu), mode: "llm", model: message.model };
 }
 
-/** 링크/출처는 모델 출력 대신 원본 데이터로 고정 (환각 링크 방지) */
-function anchorToSources(c: NewsletterContent, main: Article, quick: Article[], churu?: Article): NewsletterContent {
+/** 링크/출처는 작성 결과 대신 원본 데이터로 고정 (잘못된 링크 방지) */
+export function anchorToSources(c: NewsletterContent, main: Article, quick: Article[], churu?: Article): NewsletterContent {
   const pick = (id: string, i: number) => quick.find((a) => a.id === id) ?? quick[i];
   return {
     ...c,
