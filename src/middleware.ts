@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * 웹 접속 비밀번호 (APP_PASSWORD 가 설정된 경우에만 동작, HTTP Basic 인증).
  * 사용자 이름은 아무거나, 비밀번호만 맞으면 됩니다.
- * 캐릭터 이미지(/character/*)는 아웃룩이 붙여넣을 때 받아 가야 하므로 잠그지 않습니다.
  */
 export function middleware(req: NextRequest) {
   const password = process.env.APP_PASSWORD;
@@ -26,5 +25,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!character/|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

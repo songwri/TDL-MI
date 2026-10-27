@@ -1,13 +1,13 @@
 /**
- * Claude Code 용 레터 작성 CLI (API 토큰 사용 없음)
- *   npm run letter -- list              작성 의뢰서 목록
- *   npm run letter -- prompt <N>        의뢰서를 data/handoff/N/prompt.md 로 내려받기 (구글 시트 모드에서 필수)
- *   npm run letter -- show <N>          N차 의뢰서 경로와 상태
- *   npm run letter -- save <N> [file]   작성본 검증·저장 (file 생략 시 data/handoff/N/content.json)
- *   npm run letter -- candidates [일수]  최근 기사 후보 + 지난 입고 연관 태그 (Claude Code에서 선정할 때)
- *   npm run letter -- request <N> --date YYYY-MM-DD --concept "..." --main ID [--quick ID,ID] [--churu ID]
+ * Claude Code 용 리포트 작성 CLI (API 토큰 사용 없음)
+ *   npm run report -- list              작성 의뢰서 목록
+ *   npm run report -- prompt <N>        의뢰서를 data/handoff/N/prompt.md 로 내려받기 (구글 시트 모드에서 필수)
+ *   npm run report -- show <N>          제N호 의뢰서 경로와 상태
+ *   npm run report -- save <N> [file]   작성본 검증·저장 (file 생략 시 data/handoff/N/content.json)
+ *   npm run report -- candidates [일수]  최근 기사 후보 + 지난 호 연관 태그 (Claude Code에서 선정할 때)
+ *   npm run report -- request <N> --date YYYY-MM-DD --concept "..." --articles ID,ID,...
  *                                        Claude Code에서 직접 의뢰서 만들기 (웹 '작성 의뢰 저장'과 동일)
- *   npm run letter -- publish <N>        작성본을 발행 이력에 저장 (웹 '발행 확정'과 동일)
+ *   npm run report -- publish <N>        작성본을 발행 이력에 저장 (웹 '발행 확정'과 동일)
  */
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -48,10 +48,10 @@ async function main() {
     return;
   }
   const n = Number(arg);
-  if (!n) throw new Error("차수를 숫자로 지정하세요. 예: npm run letter -- show 4");
+  if (!n) throw new Error("차수를 숫자로 지정하세요. 예: npm run report -- show 4");
   const p = handoffPaths(n);
   if (cmd === "prompt") {
-    console.log(`의뢰서: ${rel(await writePrompt(n))}\n작성본은 ${rel(p.content)} 에 JSON 만 저장한 뒤 'npm run letter -- save ${n}' 을 실행하세요.`);
+    console.log(`의뢰서: ${rel(await writePrompt(n))}\n작성본은 ${rel(p.content)} 에 JSON 만 저장한 뒤 'npm run report -- save ${n}' 을 실행하세요.`);
     return;
   }
   if (cmd === "show") {
@@ -64,21 +64,17 @@ async function main() {
     const raw = await fs.readFile(file ?? p.content, "utf8");
     const r = await saveHandoffContent(n, raw);
     console.log(`${issueLabel(n)} 작성본 저장 완료 (${storeMode() === "sheets" ? "구글 시트 Handoffs" : rel(p.content)})\n- 헤드라인: ${r.content.headline}`);
+    if (r.missing.length) {
+      console.warn(`\n⚠ 어느 테마에도 인용되지 않은 선정 기사 ${r.missing.length}건 (themes[].sourceArticleIds 에 추가하세요):`);
+      for (const a of r.missing) console.warn(`  - ${a.id} ${a.title}`);
+    }
     return;
   }
   if (cmd === "request") {
     const f = flags(process.argv.slice(4));
-    if (!f.main || !f.concept || !f.date) throw new Error("--date, --concept, --main 은 필수입니다.");
-    const quick = (f.quick ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-    const articleIds = [f.main, ...quick, ...(f.churu ? [f.churu] : [])];
-    const { promptPath } = await createHandoff({
-      issueNo: n,
-      publishDate: f.date,
-      concept: f.concept,
-      articleIds,
-      mainArticleId: f.main,
-      churuArticleId: f.churu || undefined,
-    });
+    if (!f.articles || !f.concept || !f.date) throw new Error("--date, --concept, --articles 는 필수입니다. (--articles ID,ID,...)");
+    const articleIds = f.articles.split(",").map((x) => x.trim()).filter(Boolean);
+    const { promptPath } = await createHandoff({ issueNo: n, publishDate: f.date, concept: f.concept, articleIds });
     await setSelection(articleIds, true);
     console.log(`${issueLabel(n)} 작성 의뢰서 저장: ${rel(promptPath)}`);
     return;

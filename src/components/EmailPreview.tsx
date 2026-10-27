@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { absolutizeAssets, copyRichHtml, copyText, downloadFile } from "@/lib/clipboard";
+import { copyRichHtml, copyText, downloadFile } from "@/lib/clipboard";
 import { Button, cx } from "./ui";
 
 export function EmailPreview({
@@ -34,10 +34,10 @@ export function EmailPreview({
 
   const copyOutlook = async () => {
     try {
-      const how = await copyRichHtml(absolutizeAssets(fragment), text);
+      const how = await copyRichHtml(fragment, text);
       onToast(
         how === "clipboard-api"
-          ? "아웃룩용 본문을 복사했습니다. 메일 작성창에 Ctrl+V 하세요."
+          ? "리포트를 복사했습니다. 아웃룩 새 메일 본문에 Ctrl+V 하세요."
           : "본문을 복사했습니다(호환 모드). 메일 작성창에 Ctrl+V 하세요.",
         "success",
       );
@@ -47,7 +47,7 @@ export function EmailPreview({
   };
   const copyCode = async () => {
     try {
-      await copyText(absolutizeAssets(html));
+      await copyText(html);
       onToast("HTML 코드를 복사했습니다.", "success");
     } catch (e) {
       onToast((e as Error).message, "error");
@@ -70,10 +70,10 @@ export function EmailPreview({
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button variant="accent" onClick={copyOutlook} title="text/html + text/plain 동시 복사">
-            📋 아웃룩용 본문 복사
+            📋 메일 본문용 복사
           </Button>
           <Button onClick={copyCode}>{"</>"} HTML 코드 복사</Button>
-          <Button onClick={() => downloadFile(fileName, absolutizeAssets(html))}>⬇ .html</Button>
+          <Button onClick={() => downloadFile(fileName, html)}>⬇ .html</Button>
           {extraActions}
         </div>
       </div>

@@ -1,137 +1,83 @@
-# NEWS/INBOUND — 격주 물류·로봇 트렌드 레터 생성기
+# TDL Trend: 테크이노베이션 Market Intelligence Report
 
-국내외 물류·로봇 자동화 기사를 수집 → 작업자가 3~5개를 선별하고 기획 콘셉트를 입력 → 캐릭터 **레포냥**(리포트+냥)의 말투로 Claude가 레터를 작성 → **아웃룩 데스크톱에 그대로 붙여넣을 수 있는** 테이블/인라인 CSS HTML로 출력합니다.
+CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 도구입니다.
+매일 아침 국내외 뉴스를 수집하고, 2주치 기사에서 후보를 골라 웹에서 선정하면, 선정한 기사 여러 건을 **주제별로 묶어 인사이트를 뽑은 기사형 리포트**(제N호)를 만듭니다. 통계 인포그래픽과 원문 링크가 포함되고, **메일 본문에 그대로 붙여 넣을 수 있는** 형태입니다.
 
-> **웹으로 운영하려면** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고, Vercel에 웹을 올리고, GitHub Actions가 매일 기사를 수집합니다. 내 컴퓨터가 필요 없습니다.
+> **웹으로 운영하려면** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고, Vercel에 웹을 올리고, GitHub Actions가 매일 08:00(한국시간)에 기사를 수집합니다.
 
-## NEWS/INBOUND 구성
-발행: CL사업부 테크이노베이션팀 · 1차 독자: CL사업부 구성원 (`NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE`).
-컨셉·말투·디자인 규칙은 [`docs/concept/concept-sheet.html`](docs/concept/concept-sheet.html)(브라우저로 열기)에 정리되어 있습니다. 재생성: `npx tsx scripts/render-sample.ts /tmp/f.html --fragment && python3 scripts/build-concept-sheet.py /tmp/f.html`
+## 흐름
 
-소식이 물류센터에 입고되듯 2주마다 들어오는 레터. 회차는 **N차 입고**로 부르고, 마무리에 다음 입고 예정일(발행일+14일)을 넣습니다. 가운데 정렬 600px 슬림 레터, 메인 컬러 `#A72B2B`, 고정폭 로고(Consolas), 친근한 해요체.
+```
+[GitHub Actions 매일 08:00]  뉴스 수집 ─▶ 구글 시트 Raw_Articles
+[웹]  최근 2주 기사에서 후보 선정(체크) · 기획 의도 입력 · 📝 작성 의뢰 저장 ─▶ 시트 Handoffs
+[Claude Code]  /write-report N  ─ 의뢰서·통계·지난 호 이력을 읽고 리포트 작성 ─▶ 시트 Handoffs
+[웹]  작성본 불러오기 ─▶ 미리보기·편집 ─▶ 📋 메일 본문용 복사(아웃룩에 Ctrl+V) ─▶ ✅ 발행 확정 ─▶ 시트 Newsletter_Issues
+```
 
-| 순서 | 섹션 | 캐릭터 포즈 | 내용 |
-|---|---|---|---|
-| 1 | 헤더 | 인사(wave) | NEWS/INBOUND 로고, 한 줄 소개, `4차 입고 · 날짜`, 오프닝 |
-| 2 | 1분 냥스 | - | 짧은 소식 3~4건 (태그 \| 제목 이모지 + 2~3문장) |
-| 3 | 오늘의 메인 리포트 | 가방 끈(stand) | 1건 심층: 본문, 핵심만 쏙, 우리 CL사업부엔? |
-| 4 | 츄르 스테이션 | 편지(letter) | 따끈한 소식 한 입 + 구독자 질문 + 답장 버튼 |
-| 5 | 꼬리 뉴스 | 빼꼼(peek) | 지난 입고와 이어지는 이야기 (MI 이력 매칭) |
-| 6 | 오늘 레터 어땠냥? | 앉음(sit) | 좋았다냥 / 아쉬웠다냥 설문 |
-| 7 | 마무리·푸터 | - | 레포냥의 한마디, 문의처, 키워드 |
+- API 토큰을 쓰지 않습니다. 글쓰기는 Claude Code가 합니다(Claude 대화창에 의뢰서를 붙여넣는 방식도 가능).
+- 발행하면 기사에 `발행(제N호)`가 기록되어, 이후 선정 때 "제2호에서 다룬 AutoStore의 후속 기사" 같은 태그가 붙고 추세 통계에 반영됩니다.
 
-대시보드에서 선택한 기사마다 **메인 리포트 / 1분 냥스 / 츄르 스테이션** 중 들어갈 섹션을 지정합니다. 츄르 기사를 지정하지 않으면 기획 콘셉트에서 질문을 뽑습니다.
+## 리포트 구성 (제N호)
 
-캐릭터 이미지는 `assets/reponyang-sheet.png`(원본 시트)에서 잘라 낸 투명 PNG로 `public/character/`에 있습니다. 아웃룩은 붙여넣을 때 이미지 주소에서 그림을 받아 오므로, 앱을 사내에서 접속 가능한 주소로 띄우거나 `PUBLIC_ASSET_BASE_URL`을 지정하세요. 서버 없이 템플릿만 보려면 `npm run render:sample -- sample.html --inline-assets`. 발행 이력은 Google Sheets에 아카이빙되고, 새 기사를 고를 때마다 과거 호와의 중복·연관 여부를 자동으로 표시합니다.
+| 섹션 | 내용 |
+|---|---|
+| 헤더 | 테크이노베이션팀 · TDL Trend 제N호 · 발행일 · 배포 대상 · 제목 |
+| 핵심 요약 | 결론 먼저, 3~5개 |
+| 이번 호 한눈에 | 인포그래픽: 카테고리 구성, 국내·해외, 지난 호와의 관계(신규/연관/중복), 많이 언급된 기업·기술 |
+| 핵심 인사이트 | 선정 기사를 주제 2~4개로 묶은 기사형 본문 + 핵심 인사이트 + CL사업부 시사점 + **근거 기사 [번호] 원문 링크** |
+| 추세 분석 | 인포그래픽: 호별 카테고리 추이, 키워드 호별 등장 히트맵 + 해석 |
+| 제언 및 향후 과제 | 실행 가능한 제언, 다음 호까지 확인할 사항 |
+| 참고 기사 | 번호·제목(원문 링크)·출처·일자 표 |
 
-## 빠른 시작
+- **인포그래픽은 표(table)로 그립니다.** 이미지·SVG·자바스크립트가 없어서 아웃룩 데스크톱에 붙여 넣어도 깨지지 않고, 받는 사람의 이미지 차단에도 영향이 없습니다. 통계 숫자는 코드가 구글 시트 이력에서 계산하며 Claude가 만들지 않습니다.
+- **생성 규칙은 사전에 정의**되어 있습니다: `src/config/report-rules.ts` (문체: 합니다체·과장 금지, 구성, 사실 처리, 분량). 규칙을 바꾸려면 이 파일만 고칩니다.
+
+## 빠른 시작 (내 PC)
 
 ```bash
 npm install
-cp .env.example .env.local     # 구글 시트 등 선택 설정 (비워 두면 로컬 캐시 + Claude Code 작성 모드)
-npm run seed:demo              # (선택) 샘플 기사·과거 3개 호 적재 — 실제 운영 전 data/db.json 삭제
+cp .env.example .env.local     # 선택 설정 (비워 두면 로컬 캐시 모드)
+npm run seed:demo              # (선택) 샘플 기사·과거 3개 호 (운영 전 data/db.json 삭제)
 npm run dev                    # http://localhost:3000
 ```
 
 | 환경변수 | 설명 |
 |---|---|
 | `STORE_MODE` | `sheets`: 구글 시트가 원본(웹 호스팅 기본값) · `local`: `data/db.json` 이 원본(내 PC 기본값) |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 서비스 계정 키 JSON 내용 (웹 환경변수용) |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | 스프레드시트 ID |
+| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 서비스 계정 키 JSON 내용 (파일 경로 `…_KEY_PATH`, base64 `…_KEY_BASE64` 도 지원) |
 | `APP_PASSWORD` | 웹 접속 비밀번호 (비우면 잠금 없음) |
-| `LETTER_WRITER` | 비우면 Claude Code 작성 모드(토큰 없음). `api` 면 웹에서 API 로 바로 작성 |
-| `ANTHROPIC_API_KEY` | `LETTER_WRITER=api` 일 때만 필요 |
-| `ANTHROPIC_MODEL` | 기본 `claude-opus-5-5` |
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | 스프레드시트 ID (`/d/<ID>/edit`) |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_PATH` / `_BASE64` | 서비스 계정 JSON 키 경로 또는 base64 |
-| `COLLECT_LOOKBACK_DAYS` | 수집 기간 (기본 14일) |
-| `MI_LOOKBACK_DAYS` | 과거 이력 비교 기간 (기본 180일) |
-| `NEWSLETTER_NAME`, `NEWSLETTER_TAGLINE`, `NEWSLETTER_FEEDBACK_CONTACT` | 헤더/푸터 문구 |
-| `NEWSLETTER_FEEDBACK_EMAIL`, `NEWSLETTER_SURVEY_URL`, `NEWSLETTER_ARCHIVE_URL` | 답장·설문 버튼, 지난 레터 링크 |
-| `PUBLIC_ASSET_BASE_URL` | 캐릭터 이미지 공개 기준 URL |
+| `NEWSLETTER_NAME`, `NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE` | 리포트 이름(TDL Trend), 발행 팀(테크이노베이션팀), 배포 대상(CL사업부) |
+| `NEWSLETTER_FEEDBACK_EMAIL` | 푸터에 표시할 문의 메일 |
+| `LETTER_WRITER` | 비우면 Claude Code 작성 모드(토큰 없음). `api` 면 웹에서 API 로 바로 작성(`ANTHROPIC_API_KEY` 필요, 과금) |
+| `COLLECT_LOOKBACK_DAYS`, `MI_LOOKBACK_DAYS` | 수집 기간(기본 14일), 지난 호 비교 기간(기본 180일) |
 
-### Google Sheets 연동
-1. GCP 콘솔에서 서비스 계정 생성 → JSON 키 다운로드 → 프로젝트 루트 `credentials.json` (gitignore 처리됨)
-2. Google Sheets API 활성화
-3. 스프레드시트를 서비스 계정 이메일(`...@...iam.gserviceaccount.com`)에 **편집자**로 공유
-4. 앱의 **발행 이력 → 📗 시트 초기화** 클릭 → `Raw_Articles`, `Newsletter_Issues` 시트와 헤더 자동 생성
-   - 기존 로컬 데이터를 올리려면 **⬆ 시트로 업로드**, 다른 작업자의 시트 내용을 받으려면 **⬇ 시트에서 불러오기**
+### CLI (Claude Code용)
 
-## 사용 흐름 (API 토큰 없이)
-
-기본 설정(`LETTER_WRITER` 미설정)에서는 웹 앱이 Anthropic API 를 호출하지 않습니다. 글쓰기는 Claude Code 가 맡습니다.
-
-```
-[웹 대시보드]                         [Claude Code]                          [웹 대시보드]
-기사 최신화 · 체크                      /write-letter 4                       작성 의뢰서 › 작성본 불러오기
-섹션 지정 · 기획 콘셉트      ──▶      의뢰서 읽기 → content.json 작성   ──▶   미리보기 · 섹션 편집
-📝 작성 의뢰 저장                        npm run letter -- save 4               📋 아웃룩용 복사 · ✅ 발행 확정
-  └ data/handoff/4/prompt.md            └ 검증 · 링크 고정 · letter.html
-```
-
-1. **🔄 기사 최신화**: 최근 2주 기사 수집 (규칙 기반, 토큰 없음)
-2. 기사 체크(최대 5개), 기사별 섹션(메인 리포트 / 1분 냥스 / 츄르 스테이션) 지정, 기획 콘셉트 입력
-3. **📝 작성 의뢰 저장**: 선정 결과·기사 원문·지난 입고 이력·작성 지침을 `data/handoff/<차수>/prompt.md` 로 저장
-4. 같은 폴더에서 Claude Code 를 열고 `/write-letter 4` (스킬: `.claude/skills/write-letter/SKILL.md`)
-   - Claude Code 가 의뢰서를 읽고 `content.json` 을 쓴 뒤 `npm run letter -- save 4` 로 검증·저장
-   - Claude Code 에서 기사 선정부터 하고 싶으면 “이번 입고 기사 골라줘”라고 하면 `npm run letter -- candidates` → `request` 순서로 진행
-5. 웹 **작성 의뢰서 › 작성본 불러오기** → 미리보기·섹션 편집 → **📋 아웃룩용 본문 복사** → **✅ 발행 확정**
-
-Claude Code 가 앱과 다른 컴퓨터(예: 클라우드 세션)에 있으면 `data/` 를 볼 수 없습니다. 이때는 **의뢰서 복사** → Claude 대화창에 붙여넣기 → 받은 JSON 을 **작성본 붙여넣기**로 넣으면 됩니다.
-
-API 로 웹에서 바로 쓰고 싶을 때만 `.env.local` 에 `LETTER_WRITER=api` 와 `ANTHROPIC_API_KEY` 를 넣으세요(사용량만큼 과금).
-
-| CLI | 설명 |
+| 명령 | 설명 |
 |---|---|
-| `npm run letter -- list` | 작성 의뢰서 목록 (작성 대기 / 완료) |
-| `npm run letter -- candidates [일수]` | 최근 기사 후보와 지난 입고 연관 태그 |
-| `npm run letter -- request <N> --date … --concept … --main ID [--quick ID,ID] [--churu ID]` | CLI 로 의뢰서 만들기 |
-| `npm run letter -- save <N> [file]` | 작성본 검증·저장, 미리보기 HTML 생성 |
-| `npm run letter -- publish <N>` | 발행 이력 저장 (웹의 발행 확정과 동일) |
+| `npm run report -- list` | 작성 의뢰서 목록 (작성 대기 / 완료) |
+| `npm run report -- candidates [일수]` | 최근 기사 후보와 지난 호 연관 태그 |
+| `npm run report -- request <N> --date … --concept … --articles ID,ID` | CLI로 의뢰서 만들기 |
+| `npm run report -- prompt <N>` | 의뢰서를 `data/handoff/N/prompt.md` 로 내려받기 |
+| `npm run report -- save <N>` | 작성본 검증·저장 (통계 붙임, 미인용 기사 경고) |
+| `npm run report -- publish <N>` | 발행 이력 저장 |
 
 ## 구조
 
 ```
 src/
-├─ config/
-│  ├─ sources.ts        수집 채널 (RSS / HTML 목록 스크랩) — 여기서 추가·비활성화
-│  ├─ taxonomy.ts       카테고리 규칙, 관련성 키워드, MI 엔티티 사전(기업·솔루션·기술)
-│  └─ brand.ts          레포냥 페르소나·말투, 섹션 명칭, 캐릭터 포즈, 색상
+├─ config/    brand.ts(이름·호수 표기·색)  report-rules.ts(생성 규칙)  sources.ts(수집 채널)  taxonomy.ts(카테고리·기업 사전)
 ├─ lib/
-│  ├─ collector/        http(EUC-KR 대응) · parse(RSS/목록/본문 추출) · index(수집 파이프라인)
-│  ├─ store/            local(JSON 캐시) · sheets(Google Sheets) · index(write-through 파사드)
-│  ├─ mi/               matcher(키워드/분류) · index(과거 호 매칭, 키워드 타임라인)
-│  ├─ newsletter/       schema(zod) · prompt · synthesizer(Claude) · fallback(규칙 초안) · render
-│  ├─ email/            inline(테이블/인라인 CSS 빌더) · template(아웃룩 호환 템플릿)
-│  └─ clipboard.ts      text/html + text/plain 동시 복사
-├─ app/                 대시보드(/), 아카이브(/issues, /issues/[no]), API 라우트
-└─ components/
-scripts/                collect.ts(CLI 수집, 스케줄러용) · seed-demo.ts
-tests/                  vitest (파서·MI·템플릿·시트 직렬화·저장소)
+│  ├─ collector/   수집 (RSS 자동 탐지, HTML 링크 추정, 본문 추출)
+│  ├─ store/       local(JSON 캐시) · sheets(구글 시트) · index(저장소 파사드)
+│  ├─ mi/          지난 호 이력 매칭 (중복·후속·연관)
+│  ├─ report/      stats.ts (카테고리·키워드·호별 추세 통계)
+│  ├─ newsletter/  schema · prompt · handoff(작성 의뢰서) · fallback(규칙 초안)
+│  └─ email/       template.ts(비즈니스 리포트) · charts.ts(표 기반 차트) · inline.ts
+├─ app/ · components/   대시보드, 발행 이력, API
+scripts/   report.ts(CLI) · collect.ts · sources.ts · seed-demo.ts · render-sample.ts
 ```
-
-### 데이터 저장
-- **Google Sheets가 원장**, `data/db.json`은 로컬 캐시(기사 본문·구조화 콘텐츠 보관). 쓰기는 캐시 반영 후 시트에 write-through하며, 시트 오류는 화면에 경고로 표시됩니다.
-- 시트 셀 5만 자 제한 때문에 완성된 HTML은 `완성된 HTML` + `HTML(이어짐1~3)` 열에 나눠 저장되고, 불러올 때 다시 합쳐집니다.
-- 시트에는 `valueInputOption=RAW`로 기록하여 `=`로 시작하는 제목이 수식으로 실행되지 않습니다.
-
-### Market Intelligence 매칭
-`score = 0.6 × min(1, 공통 엔티티 가중치 / 2) + 0.4 × TF-IDF 코사인`
-- 엔티티: `taxonomy.ts`의 기업·솔루션(가중치 1.0), 기술(0.5). 영문 약어는 단어 경계로 매칭(“Camry”≠AMR)
-- 토큰: 영문 단어 + 한글 2-gram (형태소 분석기 없이 한·영 혼용 대응)
-- 같은 URL 또는 코사인 > 0.6 → 중복 / 공통 기업·솔루션 + 이후 발행 → 후속 / 그 외 score ≥ 0.3 → 연관
-- 과거 호의 키워드 등장 이력은 Claude 프롬프트에 함께 전달되어 MI 코너 작성에 사용됩니다.
-
-### Claude 작성 엔진
-- 구조화 출력(`output_config.format` JSON Schema) → zod 검증 → 템플릿 렌더. 모델이 HTML을 직접 만들지 않으므로 아웃룩 깨짐이 없습니다.
-- 링크·출처는 모델 출력이 아니라 원본 기사 데이터로 덮어써 잘못된 링크를 방지합니다.
-- 적응형 사고(adaptive thinking) + effort `high`, 스트리밍, 서버 측 거절 시 폴백(`fallbacks: "default"`)을 사용합니다.
-
-### 아웃룩 호환 규칙 (template.ts)
-- `<table role="presentation">` 레이아웃만 사용, `div/p/ul` 미사용, 클래스·`<style>` 없음
-- 모든 셀에 인라인 `font-family`(맑은 고딕 우선), `width`/`bgcolor` HTML 속성 병행, `mso-line-height-rule`
-- 600px 고정 폭(본문 520px). 전체 HTML 문서에는 모바일 메일 앱용 media query 포함
-- 아웃룩 데스크톱은 border-radius 를 그리지 않아 알약 라벨·버튼이 각지게 보입니다
-- 이모지는 아웃룩 데스크톱의 Segoe UI Emoji로 렌더링됩니다
 
 ## 수집 채널: 사이트 주소만 넣기
 
@@ -159,4 +105,4 @@ npm run sources -- check                            # 설정된 채널 전체 �
 수집은 사내 공유용 요약·링크 목적이며, 각 사이트의 이용약관과 robots.txt 를 확인하고 요청 간격을 과하게 줄이지 마세요(동시 요청 4개로 제한). 정기 수집은 `npm run collect -- 14` 를 작업 스케줄러에 등록합니다.
 
 ## 스크립트
-`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint` · `npm run collect` · `npm run sources` · `npm run letter` · `npm run seed:demo` · `npm run render:sample`
+`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint` · `npm run collect` · `npm run sources` · `npm run report` · `npm run seed:demo` · `npm run render:sample`

@@ -39,57 +39,55 @@ export interface NewsletterIssue {
   html: string;
   keywords: string[];
   headline?: string;
-  /** 생성된 구조화 콘텐츠 (로컬 캐시 전용) */
-  content?: NewsletterContent;
+  /** 생성된 구조화 콘텐츠 */
+  content?: ReportContent;
   createdAt: string;
 }
 
-/** 레포냥 레터 구조화 콘텐츠 (섹션 순서 = 메일 렌더링 순서) */
-export interface NewsletterContent {
-  /** 메일 제목 */
+/**
+ * TDL Trend 리포트 구조화 콘텐츠.
+ * Claude 가 쓰는 부분(ReportDraft)과 서버가 계산해 붙이는 통계(stats)로 이루어진다.
+ */
+export interface ReportDraft {
+  /** 메일 제목 겸 리포트 제목 */
   headline: string;
-  /** 오프닝: 이번 호에 무엇을 정리했는지 짧은 메시지 */
-  intro: string;
-  /** 1분 냥스: 짧은 뉴스 여러 건 */
-  quickNews: {
-    articleId: string;
-    tag: string;
+  /** 핵심 요약 (결론 먼저, 3~5개) */
+  executiveSummary: string[];
+  /** 선정 기사들을 공통 주제로 묶은 기사형 인사이트 */
+  themes: {
     title: string;
-    emoji: string;
-    body: string;
-    source: string;
-    url: string;
+    lead: string;
+    body: string[];
+    insights: string[];
+    implications: string[];
+    /** 근거가 되는 선정 기사 ID (원문 링크로 연결됨) */
+    sourceArticleIds: string[];
   }[];
-  /** 오늘의 메인 리포트 */
-  mainReport: {
-    articleId: string;
-    kicker: string;
-    title: string;
-    source: string;
-    url: string;
-    paragraphs: string[];
-    keyPoints: string[];
-    forUs: string[];
-  };
-  /** 츄르 스테이션: 따끈한 소식 한 조각 + 구독자 소통 */
-  churuStation: {
-    articleId: string;
-    title: string;
-    body: string;
-    question: string;
-    source: string;
-    url: string;
-  };
-  /** 꼬리 뉴스: 지난 호와 이어지는 이야기 (Market Intelligence) */
-  tailNews: {
-    intro: string;
-    items: { pastIssueLabel: string; topic: string; story: string }[];
-    watchList: string[];
-  };
-  /** 마무리 한마디 */
-  closing: string;
+  /** 지난 호 대비 추세 해석 (통계 인용) */
+  trend: { overview: string; notes: string[] };
+  /** 제언 (CL사업부 관점) */
+  recommendations: string[];
+  /** 향후 주목 사항 */
+  watchList: string[];
   keywords: string[];
 }
+
+export interface ReportStats {
+  total: number;
+  byCategory: { label: string; count: number }[];
+  byRegion: { label: string; count: number }[];
+  topKeywords: { label: string; count: number }[];
+  /** 이번 호 기사 중 지난 호와의 관계 */
+  repeat: { fresh: number; followUp: number; duplicate: number };
+  /** 최근 호 + 이번 호 (오래된 순) */
+  trend: {
+    issues: { no: number; date: string; current: boolean }[];
+    category: { label: string; counts: number[] }[];
+    keywords: { label: string; counts: number[] }[];
+  };
+}
+
+export type ReportContent = ReportDraft & { stats?: ReportStats };
 
 export type RelationKind = "duplicate" | "follow-up" | "related";
 

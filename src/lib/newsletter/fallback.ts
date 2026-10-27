@@ -1,92 +1,52 @@
-import { PERSONA, issueLabel, issueShort } from "@/config/brand";
-import type { Article, ArticleIntel, NewsletterContent } from "@/lib/types";
-import { shortDate, truncate } from "@/lib/utils/text";
-import { nextIssueDate } from "./prompt";
+import { issueLabel } from "@/config/brand";
+import type { Article, ReportDraft, ReportStats } from "@/lib/types";
+import { truncate } from "@/lib/utils/text";
 
-const TAG: Record<string, string> = {
-  "AMR/AGV": "AMR",
-  "풀필먼트 자동화": "풀필먼트",
-  "소팅/보관설비": "설비",
-  "로봇 피킹/매니퓰레이션": "로봇",
-  "글로벌 트렌드": "글로벌",
-  기타: "물류",
-};
+const sentences = (s: string) => s.split(/(?<=[.!?다요])\s+/).filter((x) => x.length > 15);
 
-const chunk = <T,>(xs: T[], n: number) =>
-  Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n)).slice(0, 4);
-
-/** LLM 미설정 시 사용하는 규칙 기반 초안 (편집 출발점 용도) */
+/** Claude 작성 없이 만드는 규칙 기반 초안. 레이아웃·통계 확인용이며 [작성 필요] 칸은 직접 채운다 */
 export function buildFallbackDraft(input: {
   issueNo: number;
-  publishDate?: string;
   concept: string;
-  main: Article;
-  quick: Article[];
-  churu?: Article;
-  intel: ArticleIntel[];
-}): NewsletterContent {
-  const { main, quick, churu, intel } = input;
-  const sentences = (s: string) => s.split(/(?<=[.!?다요])\s+/).filter((x) => x.length > 15);
-  const body = sentences(main.content || main.summary);
-  const relations = intel.flatMap((i) => i.relations);
-  const keywords = [...new Set([main, ...quick, ...(churu ? [churu] : [])].flatMap((a) => a.keywords))].slice(0, 6);
-  const conceptLine = input.concept.split("\n")[0].trim();
+  articles: Article[];
+  stats: ReportStats;
+}): ReportDraft {
+  const { articles, stats } = input;
+  const concept = input.concept.split("\n")[0].trim();
+
+  // 카테고리별로 묶어 테마 구성 (기사 수가 많은 순, 최대 3개)
+  const byCat = new Map<string, Article[]>();
+  for (const a of articles) byCat.set(a.category, [...(byCat.get(a.category) ?? []), a]);
+  const groups = [...byCat.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 3);
+  const grouped = new Set(groups.flatMap(([, as]) => as.map((a) => a.id)));
+  const rest = articles.filter((a) => !grouped.has(a.id));
+  if (rest.length) groups[groups.length - 1][1].push(...rest);
+
+  const keywords = [...new Set(articles.flatMap((a) => a.keywords))].slice(0, 6);
+  const hasHistory = stats.trend.issues.length > 1;
 
   return {
-    headline: truncate(conceptLine || main.title, 40),
-    intro: `안녕하세요, ${PERSONA.name}이에요! ${issueLabel(input.issueNo)} 주제는 "${truncate(conceptLine || "최근 2주간의 물류·로봇 소식", 50)}"예요. 메인 리포트에서는 ${main.source}의 "${truncate(main.title, 36)}" 이야기를 깊게 들여다봐요.`,
-    quickNews: quick.map((a) => ({
-      articleId: a.id,
-      tag: TAG[a.category] ?? "물류",
-      title: a.title,
-      emoji: "📦",
-      body: truncate(a.summary, 220),
-      source: a.source,
-      url: a.link,
-    })),
-    mainReport: {
-      articleId: main.id,
-      kicker: `${main.source} · ${main.category}`,
-      title: main.title,
-      source: main.source,
-      url: main.link,
-      paragraphs: body.length > 1 ? chunk(body, 3).map((g) => truncate(g.join(" "), 500)) : [main.summary || "[작성 필요] 본문"],
-      keyPoints: body.length > 1 ? body.slice(0, 3).map((s) => truncate(s, 140)) : ["[작성 필요] 핵심 수치·사실"],
-      forUs: ["[작성 필요] 우리 센터에 적용해 볼 만한 부분", "[작성 필요] 검토할 때 따져 볼 비용·효과"],
+    headline: truncate(concept || `${issueLabel(input.issueNo)} 물류·로봇 자동화 주요 동향`, 45),
+    executiveSummary: articles.slice(0, 5).map((a) => truncate(`${a.title} (${a.source})`, 110)),
+    themes: groups.map(([cat, as]) => {
+      const body = sentences(as.map((a) => a.content || a.summary).join(" "));
+      return {
+        title: `${cat} 분야 동향`,
+        lead: truncate(as[0].summary || as[0].title, 200),
+        body: body.length ? [truncate(body.slice(0, 3).join(" "), 500)] : [as[0].summary || "[작성 필요] 본문"],
+        insights: as.slice(0, 3).map((a) => truncate(a.title, 120)),
+        implications: ["[작성 필요] 운영 센터에 적용할 때의 시사점"],
+        sourceArticleIds: as.map((a) => a.id),
+      };
+    }),
+    trend: {
+      overview: hasHistory
+        ? `이번 호 ${stats.total}건 중 지난 호와 연관·후속인 기사는 ${stats.repeat.followUp}건, 신규 주제는 ${stats.repeat.fresh}건입니다. [작성 필요] 변화 해석`
+        : "첫 호로 비교 대상 없음. 다음 호부터 호별 추세를 제공합니다.",
+      notes: stats.topKeywords.slice(0, 2).map((k) => `${k.label} 관련 기사 ${k.count}건`),
     },
-    churuStation: churu
-      ? {
-          articleId: churu.id,
-          title: `띵동! ${truncate(churu.title, 40)}`,
-          body: truncate(churu.summary, 220),
-          question: "여러분 센터라면 이 소식, 어떻게 보세요? 답장으로 알려 주세요.",
-          source: churu.source,
-          url: churu.link,
-        }
-      : {
-          articleId: "",
-          title: "띵동! 이번 입고 주제, 여러분 생각이 궁금해요",
-          body: `${conceptLine || "이번 입고 주제"}에 대해 현장에서 느끼는 점이 있다면 들려주세요.`,
-          question: "지금 우리 센터에서 가장 먼저 자동화하고 싶은 공정은 어디인가요?",
-          source: "",
-          url: "",
-        },
-    tailNews: {
-      intro: relations.length
-        ? "이번 입고 소식 중 일부는 지난 입고에서 다룬 이야기와 이어져요."
-        : "이번 입고 소식은 처음 들어온 주제예요.",
-      items: relations.length
-        ? relations.slice(0, 3).map((r) => ({
-            pastIssueLabel: `${issueShort(r.issueNo)} · ${shortDate(r.publishDate)}`,
-            topic: r.sharedKeywords.join(", ") || "유사 주제",
-            story: r.label,
-          }))
-        : [{ pastIssueLabel: "첫 입고", topic: keywords.slice(0, 3).join(", ") || main.category, story: "다음 입고부터 이어지는 소식을 추적해 볼게요." }],
-      watchList: keywords.slice(0, 2).map((k) => `${k}의 다음 행보`),
-    },
-    closing: input.publishDate
-      ? `다음 입고는 ${nextIssueDate(input.publishDate)} 예정이에요. 따끈한 소식 물어 올게요!`
-      : "2주 뒤에 따끈한 소식 물어 올게요!",
+    recommendations: ["[작성 필요] 검토·확인할 대상이 분명한 제언"],
+    watchList: stats.topKeywords.slice(0, 2).map((k) => `${k.label} 후속 동향`),
     keywords,
   };
 }

@@ -18,16 +18,12 @@ export const config = {
   appPassword: process.env.APP_PASSWORD ?? "",
   lookbackDays: Number(process.env.COLLECT_LOOKBACK_DAYS || 14),
   miLookbackDays: Number(process.env.MI_LOOKBACK_DAYS || 180),
-  newsletterName: process.env.NEWSLETTER_NAME || "NEWS/INBOUND",
-  tagline: process.env.NEWSLETTER_TAGLINE || "레포냥이 물어 온 물류·로봇 트렌드",
+  newsletterName: process.env.NEWSLETTER_NAME || "TDL Trend",
+  tagline: process.env.NEWSLETTER_TAGLINE || "물류·로봇 Market Intelligence",
   feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "테크이노베이션팀",
-  /** 독자: '우리 ○○엔?' 박스와 프롬프트에 쓰인다 */
+  /** 배포 대상: 헤더·시사점 제목·프롬프트에 쓰인다 */
   audience: process.env.NEWSLETTER_AUDIENCE || "CL사업부",
   feedbackEmail: process.env.NEWSLETTER_FEEDBACK_EMAIL || "",
-  surveyUrl: process.env.NEWSLETTER_SURVEY_URL || "",
-  archiveUrl: process.env.NEWSLETTER_ARCHIVE_URL || "",
-  /** 메일에 들어갈 캐릭터 이미지의 공개 기준 URL. 비우면 복사 시 현재 접속 주소로 변환 */
-  assetBaseUrl: process.env.PUBLIC_ASSET_BASE_URL || "",
 };
 
 export const sheetsEnabled = () =>

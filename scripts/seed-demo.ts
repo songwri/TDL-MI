@@ -8,6 +8,7 @@ import { config } from "@/lib/config";
 import { extractKeywords, classify } from "@/lib/mi/matcher";
 import { buildFallbackDraft } from "@/lib/newsletter/fallback";
 import { renderAll } from "@/lib/newsletter/render";
+import { computeStats } from "@/lib/report/stats";
 import { addArticles, saveIssue } from "@/lib/store";
 import type { Article, Region } from "@/lib/types";
 import { articleIdFromUrl } from "@/lib/utils/text";
@@ -67,8 +68,8 @@ async function main() {
     { issueNo: 3, publishDate: at(42).slice(0, 10), concept: "LogiMAT로 본 피스피킹 상용화와 대형 AS/RS 투자", ids: [past[4], past[5]] },
   ];
   for (const i of issues) {
-    const [main, ...quick] = i.ids;
-    const content = buildFallbackDraft({ issueNo: i.issueNo, publishDate: i.publishDate, concept: i.concept, main, quick, intel: [] });
+    const stats = computeStats(i.ids, [], [], { issueNo: i.issueNo, publishDate: i.publishDate });
+    const content = { ...buildFallbackDraft({ issueNo: i.issueNo, concept: i.concept, articles: i.ids, stats }), stats };
     const { html } = renderAll(content, i.issueNo, i.publishDate, i.ids);
     await saveIssue({
       issueNo: i.issueNo,

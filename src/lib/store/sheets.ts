@@ -13,7 +13,7 @@ export const ARTICLE_HEADERS = [
   "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드",
 ] as const;
 export const ISSUE_HEADERS = [
-  "차수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
+  "호수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
   "HTML(이어짐1)", "HTML(이어짐2)", "HTML(이어짐3)",
 ] as const;
 
@@ -51,7 +51,7 @@ function getClient(): sheets_v4.Sheets {
 const sid = () => config.spreadsheetId;
 
 export const BODY_HEADERS = ["ID", "본문"] as const;
-export const HANDOFF_HEADERS = ["차수", "작성 의뢰(JSON)", "작성본(JSON)", "작성본(이어짐)", "의뢰 저장일시", "작성본 저장일시"] as const;
+export const HANDOFF_HEADERS = ["호수", "작성 의뢰(JSON)", "작성본(JSON)", "작성본(이어짐)", "의뢰 저장일시", "작성본 저장일시"] as const;
 
 let schemaReady = false;
 
@@ -94,7 +94,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
 
 /** ── 직렬화 ─────────────────────────────────────────────── */
 export function selectionLabel(a: Pick<Article, "selected" | "publishedInIssue">): string {
-  if (a.publishedInIssue) return `발행(${a.publishedInIssue}차)`;
+  if (a.publishedInIssue) return `발행(제${a.publishedInIssue}호)`;
   return a.selected ? "후보" : "";
 }
 

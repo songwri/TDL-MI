@@ -1,25 +1,24 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { config, llmEnabled } from "@/lib/config";
-import { analyzeArticles, keywordTimeline } from "@/lib/mi";
-import type { Article, NewsletterContent, NewsletterIssue } from "@/lib/types";
+import { analyzeArticles } from "@/lib/mi";
+import { computeStats } from "@/lib/report/stats";
+import type { Article, NewsletterIssue, ReportContent, ReportStats } from "@/lib/types";
 import { buildFallbackDraft } from "./fallback";
 import { buildUserPrompt, systemPrompt } from "./prompt";
-import { NewsletterSchema } from "./schema";
+import { ReportSchema } from "./schema";
 
 export interface SynthesizeInput {
   issueNo: number;
   publishDate: string;
   concept: string;
   articles: Article[]; // 선택 순서 유지
-  mainArticleId?: string;
-  churuArticleId?: string;
   issues: NewsletterIssue[];
   allArticles: Article[];
 }
 
 export interface SynthesizeOutput {
-  content: NewsletterContent;
+  content: ReportContent;
   mode: "llm" | "draft";
   model?: string;
   notice?: string;
@@ -28,46 +27,37 @@ export interface SynthesizeOutput {
 let client: Anthropic | null = null;
 const getClient = () => (client ??= new Anthropic({ apiKey: config.anthropicApiKey }));
 
-export const OUTPUT_SCHEMA = z.toJSONSchema(NewsletterSchema) as Record<string, unknown>;
+export const OUTPUT_SCHEMA = z.toJSONSchema(ReportSchema) as Record<string, unknown>;
 delete OUTPUT_SCHEMA.$schema;
 
-/** 기사 역할 분배 + MI 이력 + 프롬프트. API 호출과 Claude Code 작성 의뢰서가 같은 맥락을 쓴다 */
+/** 통계 계산 + 프롬프트. API 호출과 Claude Code 작성 의뢰서가 같은 맥락을 쓴다 */
 export function buildContext(input: SynthesizeInput) {
-  const main = input.articles.find((a) => a.id === input.mainArticleId) ?? input.articles[0];
-  if (!main) throw new Error("선택된 기사가 없습니다.");
-  const churu = input.articles.find((a) => a.id === input.churuArticleId && a.id !== main.id);
-  const quick = input.articles.filter((a) => a.id !== main.id && a.id !== churu?.id);
+  if (!input.articles.length) throw new Error("선택된 기사가 없습니다.");
   const pastIssues = input.issues.filter((i) => i.issueNo !== input.issueNo);
   const intel = analyzeArticles(input.articles, input.issues, input.allArticles, { excludeIssueNo: input.issueNo });
-  const keywords = [...new Set(input.articles.flatMap((a) => a.keywords))];
-  const timeline = keywordTimeline(keywords, pastIssues, input.allArticles);
+  const stats = computeStats(input.articles, input.issues, input.allArticles, { issueNo: input.issueNo, publishDate: input.publishDate });
   return {
-    main,
-    quick,
-    churu,
     intel,
+    stats,
     system: systemPrompt(config.newsletterName, config.audience, config.feedbackContact),
     user: buildUserPrompt({
       issueNo: input.issueNo,
       publishDate: input.publishDate,
       concept: input.concept,
-      mainArticle: main,
-      quickArticles: quick,
-      churuArticle: churu,
+      articles: input.articles,
       intel,
       issues: pastIssues,
-      timeline,
+      stats,
     }),
   };
 }
 
 export async function synthesizeNewsletter(input: SynthesizeInput): Promise<SynthesizeOutput> {
   const ctx = buildContext(input);
-  const { main, quick, churu, intel } = ctx;
 
   if (!llmEnabled()) {
     return {
-      content: buildFallbackDraft({ ...input, main, quick, churu, intel }),
+      content: { ...buildFallbackDraft({ ...input, stats: ctx.stats }), stats: ctx.stats },
       mode: "draft",
       notice: "규칙 기반 초안입니다. 레이아웃 확인용으로 쓰고, 본문은 Claude Code 작성본으로 바꿔 주세요.",
     };
@@ -92,26 +82,20 @@ export async function synthesizeNewsletter(input: SynthesizeInput): Promise<Synt
     throw new Error("응답이 최대 토큰 한도에서 잘렸습니다. 기사 수를 줄여 다시 시도하세요.");
   }
   const text = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-  const parsed = NewsletterSchema.safeParse(JSON.parse(text));
+  const parsed = ReportSchema.safeParse(JSON.parse(text));
   if (!parsed.success) throw new Error(`생성 결과 형식 오류: ${parsed.error.message}`);
 
-  return { content: anchorToSources(parsed.data, main, quick, churu), mode: "llm", model: message.model };
+  return { content: anchorToSources(parsed.data, input.articles, ctx.stats).content, mode: "llm", model: message.model };
 }
 
-/** 링크/출처는 작성 결과 대신 원본 데이터로 고정 (잘못된 링크 방지) */
-export function anchorToSources(c: NewsletterContent, main: Article, quick: Article[], churu?: Article): NewsletterContent {
-  const pick = (id: string, i: number) => quick.find((a) => a.id === id) ?? quick[i];
-  return {
-    ...c,
-    mainReport: { ...c.mainReport, articleId: main.id, source: main.source, url: main.link },
-    quickNews: c.quickNews
-      .map((q, i) => {
-        const a = pick(q.articleId, i);
-        return a ? { ...q, articleId: a.id, source: a.source, url: a.link } : null;
-      })
-      .filter((q): q is NewsletterContent["quickNews"][number] => q !== null),
-    churuStation: churu
-      ? { ...c.churuStation, articleId: churu.id, source: churu.source, url: churu.link }
-      : { ...c.churuStation, articleId: "", source: "", url: "" },
-  };
+/**
+ * 작성 결과를 선정 기사와 맞춘다: 존재하지 않는 근거 기사 ID 는 버리고, 통계는 서버 계산값으로 고정한다.
+ * 선정 기사 중 어느 테마에도 인용되지 않은 기사는 missing 으로 알려 준다.
+ */
+export function anchorToSources(draft: z.infer<typeof ReportSchema>, articles: Article[], stats: ReportStats): { content: ReportContent; missing: Article[] } {
+  const valid = new Set(articles.map((a) => a.id));
+  const themes = draft.themes.map((t) => ({ ...t, sourceArticleIds: [...new Set(t.sourceArticleIds.filter((id) => valid.has(id)))] }));
+  const cited = new Set(themes.flatMap((t) => t.sourceArticleIds));
+  const content: ReportContent = { ...draft, themes, stats };
+  return { content, missing: articles.filter((a) => !cited.has(a.id)) };
 }

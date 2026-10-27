@@ -37,7 +37,7 @@ export function IssueDetail({ issueNo }: { issueNo: number }) {
       <Link href="/issues" className="text-sm text-slate-500 hover:text-brand">← 발행 이력</Link>
       <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold text-brand">{issue.issueNo}차 입고</h1>
+          <h1 className="text-xl font-bold text-brand">제{issue.issueNo}호</h1>
           <Badge>{issue.publishDate}</Badge>
           <span className="font-semibold">{issue.headline}</span>
         </div>
@@ -49,7 +49,7 @@ export function IssueDetail({ issueNo }: { issueNo: number }) {
           ))}
         </ul>
       </div>
-      <EmailPreview html={issue.html} fragment={parts.fragment} text={parts.text} fileName={`NEWS-INBOUND-${issue.issueNo}차-${issue.publishDate}.html`} onToast={push} />
+      <EmailPreview html={issue.html} fragment={parts.fragment} text={parts.text} fileName={`TDL-Trend-제${issue.issueNo}호-${issue.publishDate}.html`} onToast={push} />
     </div>
   );
 }

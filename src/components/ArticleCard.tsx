@@ -40,7 +40,7 @@ export function ArticleCard({
           <Badge tone="accent">{a.category}</Badge>
           <span className="font-medium text-slate-700">{a.source}</span>
           <span>· {a.publishedAt.slice(0, 10)}</span>
-          {a.publishedInIssue ? <Badge tone="amber">{a.publishedInIssue}차 입고됨</Badge> : null}
+          {a.publishedInIssue ? <Badge tone="amber">제{a.publishedInIssue}호 게재</Badge> : null}
           {a.isSample ? <Badge>샘플</Badge> : null}
         </div>
         <a

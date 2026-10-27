@@ -55,21 +55,20 @@ describe("구글 시트가 원본인 웹 모드", () => {
 
   it("작성 의뢰서 → 작성본이 시트 Handoffs 에 저장되고 본문은 Article_Bodies 에서 읽음", async () => {
     const h = await import("@/lib/newsletter/handoff");
-    const { prompt } = await h.createHandoff({
-      issueNo: 1, publishDate: "2026-10-20", concept: "콘셉트", articleIds: ["A1", "A2"], mainArticleId: "A1",
-    });
+    const { prompt } = await h.createHandoff({ issueNo: 1, publishDate: "2026-10-20", concept: "콘셉트", articleIds: ["A1", "A2"] });
     expect(prompt).toContain("첫 기사 본문 첫 기사 본문");
     expect(fake.tabs.get("Handoffs")![1][0]).toBe("1");
     expect((await h.listHandoffs())[0]).toMatchObject({ issueNo: 1, hasContent: false });
 
-    const saved = await h.saveHandoffContent(1, JSON.stringify(sampleContent));
-    expect(saved.content.mainReport.url).toBe("https://x.com/A1");
+    const { stats: _s, ...draft } = sampleContent;
+    const saved = await h.saveHandoffContent(1, JSON.stringify({ ...draft, themes: draft.themes.map((t) => ({ ...t, sourceArticleIds: ["A1", "A2"] })) }));
+    expect(saved.content.themes[0].sourceArticleIds).toEqual(["A1", "A2"]);
     expect((await h.listHandoffs())[0].hasContent).toBe(true);
     expect(JSON.parse(fake.tabs.get("Handoffs")![1][2]).headline).toBe(sampleContent.headline);
-    expect(((await h.getHandoff(1)) as { html: string }).html).toContain("1차 입고");
+    expect(((await h.getHandoff(1)) as { html: string }).html).toContain("제1호");
 
     // 의뢰서를 다시 저장하면(선정 변경) 이전 작성본은 비워짐
-    await h.createHandoff({ issueNo: 1, publishDate: "2026-10-20", concept: "바뀐 콘셉트", articleIds: ["A1", "A3"], mainArticleId: "A1" });
+    await h.createHandoff({ issueNo: 1, publishDate: "2026-10-20", concept: "바뀐 콘셉트", articleIds: ["A1", "A3"] });
     expect(fake.tabs.get("Handoffs")![1][2]).toBe("");
   });
 
@@ -79,7 +78,7 @@ describe("구글 시트가 원본인 웹 모드", () => {
     const issues = fake.tabs.get("Newsletter_Issues")!;
     expect(issues[1][0]).toBe("1");
     expect(issues[1].every((c) => (c ?? "").length <= 49_000)).toBe(true);
-    expect(fake.tabs.get("Raw_Articles")![1][8]).toBe("발행(1차)");
+    expect(fake.tabs.get("Raw_Articles")![1][8]).toBe("발행(제1호)");
     expect(await store.nextIssueNo()).toBe(2);
     expect((await store.getMeta()).issueCount).toBe(1);
   });

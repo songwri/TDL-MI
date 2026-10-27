@@ -3,10 +3,10 @@ import path from "node:path";
 import { config, storeMode } from "@/lib/config";
 import { getAllArticles, getArticlesWithBodies, listIssues } from "@/lib/store";
 import { ensureSchemaOnce, listHandoffRows, upsertHandoffRow } from "@/lib/store/sheets";
-import type { NewsletterContent } from "@/lib/types";
+import type { ReportContent } from "@/lib/types";
 import { issueLabel } from "@/config/brand";
 import { renderAll } from "./render";
-import { NewsletterSchema } from "./schema";
+import { ReportSchema } from "./schema";
 import { OUTPUT_SCHEMA, anchorToSources, buildContext } from "./synthesizer";
 
 /**
@@ -22,8 +22,6 @@ export interface HandoffRequest {
   publishDate: string;
   concept: string;
   articleIds: string[];
-  mainArticleId?: string;
-  churuArticleId?: string;
   createdAt: string;
 }
 
@@ -60,7 +58,7 @@ const inSheetsMode = () => storeMode() === "sheets";
 
 interface Stored {
   request: HandoffRequest | null;
-  content: NewsletterContent | null;
+  content: ReportContent | null;
   contentAt?: string;
 }
 
@@ -70,13 +68,13 @@ async function loadStored(n: number): Promise<Stored> {
     const row = (await listHandoffRows()).find((r) => r.issueNo === n);
     return {
       request: row?.request ? (JSON.parse(row.request) as HandoffRequest) : null,
-      content: row?.content ? (JSON.parse(row.content) as NewsletterContent) : null,
+      content: row?.content ? (JSON.parse(row.content) as ReportContent) : null,
       contentAt: row?.contentAt || undefined,
     };
   }
   const p = handoffPaths(n);
   const stat = await fs.stat(p.content).catch(() => null);
-  return { request: await readJson<HandoffRequest>(p.request), content: await readJson<NewsletterContent>(p.content), contentAt: stat?.mtime.toISOString() };
+  return { request: await readJson<HandoffRequest>(p.request), content: await readJson<ReportContent>(p.content), contentAt: stat?.mtime.toISOString() };
 }
 
 async function storeRequest(req: HandoffRequest) {
@@ -92,7 +90,7 @@ async function storeRequest(req: HandoffRequest) {
   await fs.rename(p.content, `${p.content}.${Date.now()}.bak`).catch(() => undefined);
 }
 
-async function storeContent(req: HandoffRequest, content: NewsletterContent, html: string) {
+async function storeContent(req: HandoffRequest, content: ReportContent, html: string) {
   if (inSheetsMode()) {
     await upsertHandoffRow({
       issueNo: req.issueNo,
@@ -221,14 +219,14 @@ export async function saveHandoffContent(n: number, raw: unknown) {
       throw new Error(`JSON 을 읽을 수 없습니다: ${(e as Error).message}`);
     }
   }
-  const parsed = NewsletterSchema.safeParse(data);
+  const parsed = ReportSchema.safeParse(data);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `- ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
     throw new Error(`작성본이 출력 형식과 맞지 않습니다.\n${issues}`);
   }
   const ctx = await context(request);
-  const content = anchorToSources(parsed.data, ctx.main, ctx.quick, ctx.churu);
+  const { content, missing } = anchorToSources(parsed.data, ctx.articles, ctx.stats);
   const rendered = renderAll(content, request.issueNo, request.publishDate, ctx.articles);
   await storeContent(request, content, rendered.html);
-  return { request, content, ...rendered };
+  return { request, content, missing, ...rendered };
 }

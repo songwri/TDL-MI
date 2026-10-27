@@ -1,21 +1,18 @@
 import { config } from "@/lib/config";
 import { renderEmailHtml, renderFragment, renderPlainText } from "@/lib/email/template";
-import type { Article, NewsletterContent } from "@/lib/types";
+import type { Article, ReportContent } from "@/lib/types";
 
-export function renderAll(content: NewsletterContent, issueNo: number, publishDate: string, articles: Article[]) {
+/** articles: 선정 기사 (선택 순서 = 참고 기사 번호) */
+export function renderAll(content: ReportContent, issueNo: number, publishDate: string, articles: Article[]) {
   const meta = {
     issueNo,
     publishDate,
     newsletterName: config.newsletterName,
     tagline: config.tagline,
     feedbackContact: config.feedbackContact,
-    audience: config.audience,
     feedbackEmail: config.feedbackEmail || undefined,
-    surveyUrl: config.surveyUrl || undefined,
-    archiveUrl: config.archiveUrl || undefined,
-    assetBaseUrl: config.assetBaseUrl || undefined,
-    thumbnails: Object.fromEntries(articles.map((a) => [a.id, a.thumbnail])),
-    dates: Object.fromEntries(articles.map((a) => [a.id, a.publishedAt.slice(0, 10)])),
+    audience: config.audience,
+    articles: articles.map(({ id, title, source, link, publishedAt }) => ({ id, title, source, link, publishedAt })),
   };
   return {
     html: renderEmailHtml(content, meta),

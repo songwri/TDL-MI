@@ -31,7 +31,7 @@
 
 **② 스프레드시트 만들기**
 
-1. https://sheets.google.com → 빈 스프레드시트 → 이름 `NEWS/INBOUND 데이터`
+1. https://sheets.google.com → 빈 스프레드시트 → 이름 `TDL_MI`
 2. 오른쪽 위 **공유** → 위에서 복사한 서비스 계정 이메일을 **편집자**로 추가 (알림 메일 보내기는 꺼도 됨)
 3. 브라우저 주소 `https://docs.google.com/spreadsheets/d/`**`여기 긴 글자`**`/edit` 의 **긴 글자**가 스프레드시트 ID입니다.
 
@@ -52,7 +52,7 @@
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | 1-② 에서 복사한 ID |
 | `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 1-① 에서 받은 JSON 파일을 메모장으로 열어 **내용 전체**를 붙여 넣기 |
 | `APP_PASSWORD` | 접속 비밀번호 (직접 정하세요. 아래 주소를 아는 누구나 들어올 수 있어서 꼭 설정) |
-| `NEWSLETTER_FEEDBACK_EMAIL` | (선택) 답장·설문을 받을 공용 메일 주소 |
+| `NEWSLETTER_FEEDBACK_EMAIL` | (선택) 리포트 푸터에 표시할 문의 메일 주소 |
 
 4. 배포가 끝나면 `https://○○○.vercel.app` 주소가 나옵니다. 열면 비밀번호 창이 뜹니다(사용자 이름은 아무거나, 비밀번호만 입력).
 5. 화면 위쪽 배지에 **📗 구글 시트가 원본 (웹 모드)** 가 보이면 연결된 것입니다.
@@ -83,9 +83,9 @@
 1. Claude Code 환경 설정(웹: 세션 제목 줄의 환경 메뉴 → Edit)에서 환경변수를 넣습니다.
    `STORE_MODE=sheets`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY_JSON`
 2. 네트워크 접근에 `sheets.googleapis.com`, `oauth2.googleapis.com`이 허용되어야 합니다.
-3. 새 세션에서 이 저장소를 열고 `/write-letter 4`(또는 "이번 입고 기사 골라줘").
+3. 새 세션에서 이 저장소를 열고 `/write-report 4`(또는 "이번 호 기사 골라줘").
 
-순서: 웹에서 **📝 작성 의뢰 저장** → Claude Code `/write-letter 4` → 웹 **작성 의뢰서 → 작성본 불러오기** → **✅ 발행 확정**.
+순서: 웹에서 **📝 작성 의뢰 저장** → Claude Code `/write-report 4` → 웹 **작성 의뢰서 → 작성본 불러오기** → **📋 메일 본문용 복사**(아웃룩 새 메일에 Ctrl+V) → **✅ 발행 확정**.
 
 ---
 
