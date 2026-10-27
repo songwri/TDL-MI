@@ -6,6 +6,8 @@ import { CATEGORIES, type Article, type Category, type NewsletterIssue } from "@
 /** ── 시트 스키마 ─────────────────────────────────────────── */
 export const ARTICLE_SHEET = "Raw_Articles";
 export const ISSUE_SHEET = "Newsletter_Issues";
+export const BODY_SHEET = "Article_Bodies"; // 기사 본문 (작성 의뢰서용, 목록 조회와 분리)
+export const HANDOFF_SHEET = "Handoffs"; // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
 
 export const ARTICLE_HEADERS = [
   "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드",
@@ -22,12 +24,22 @@ const SELECTION_COL = "I"; // 선정여부
 
 let client: sheets_v4.Sheets | null = null;
 
+/** 테스트용: 가짜 시트 클라이언트 주입 */
+export function __setClient(c: sheets_v4.Sheets | null) {
+  client = c;
+  schemaReady = false;
+}
+
+function loadCredentials() {
+  if (config.serviceAccountKeyJson) return JSON.parse(config.serviceAccountKeyJson);
+  if (config.serviceAccountKeyBase64) return JSON.parse(Buffer.from(config.serviceAccountKeyBase64, "base64").toString("utf8"));
+  return JSON.parse(fs.readFileSync(config.serviceAccountKeyPath, "utf8"));
+}
+
 function getClient(): sheets_v4.Sheets {
-  if (!sheetsEnabled()) throw new Error("Google Sheets 환경변수가 설정되지 않았습니다.");
   if (client) return client;
-  const credentials = config.serviceAccountKeyBase64
-    ? JSON.parse(Buffer.from(config.serviceAccountKeyBase64, "base64").toString("utf8"))
-    : JSON.parse(fs.readFileSync(config.serviceAccountKeyPath, "utf8"));
+  if (!sheetsEnabled()) throw new Error("Google Sheets 환경변수가 설정되지 않았습니다.");
+  const credentials = loadCredentials();
   const auth = new gauth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
@@ -38,13 +50,25 @@ function getClient(): sheets_v4.Sheets {
 
 const sid = () => config.spreadsheetId;
 
+export const BODY_HEADERS = ["ID", "본문"] as const;
+export const HANDOFF_HEADERS = ["차수", "작성 의뢰(JSON)", "작성본(JSON)", "작성본(이어짐)", "의뢰 저장일시", "작성본 저장일시"] as const;
+
+let schemaReady = false;
+
+/** 프로세스당 한 번만 시트/헤더 확인 */
+export async function ensureSchemaOnce() {
+  if (schemaReady) return;
+  await ensureSchema();
+  schemaReady = true;
+}
+
 /** 시트/헤더가 없으면 생성 */
 export async function ensureSchema(): Promise<{ created: string[] }> {
   const api = getClient();
   const meta = await api.spreadsheets.get({ spreadsheetId: sid(), fields: "sheets.properties.title" });
   const existing = new Set(meta.data.sheets?.map((s) => s.properties?.title) ?? []);
   const created: string[] = [];
-  const requests = [ARTICLE_SHEET, ISSUE_SHEET]
+  const requests = [ARTICLE_SHEET, ISSUE_SHEET, BODY_SHEET, HANDOFF_SHEET]
     .filter((t) => !existing.has(t))
     .map((title) => {
       created.push(title);
@@ -60,6 +84,8 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
       data: [
         { range: `${ARTICLE_SHEET}!A1`, values: [[...ARTICLE_HEADERS]] },
         { range: `${ISSUE_SHEET}!A1`, values: [[...ISSUE_HEADERS]] },
+        { range: `${BODY_SHEET}!A1`, values: [[...BODY_HEADERS]] },
+        { range: `${HANDOFF_SHEET}!A1`, values: [[...HANDOFF_HEADERS]] },
       ],
     },
   });
@@ -143,15 +169,64 @@ export async function fetchAll(): Promise<{ articles: Article[]; issues: Newslet
   };
 }
 
+async function appendRows(sheet: string, values: string[][]) {
+  for (let i = 0; i < values.length; i += 50) {
+    await getClient().spreadsheets.values.append({
+      spreadsheetId: sid(),
+      range: `${sheet}!A1`,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: values.slice(i, i + 50) },
+    });
+  }
+}
+
 export async function appendArticles(articles: Article[]) {
   if (!articles.length) return;
-  await getClient().spreadsheets.values.append({
-    spreadsheetId: sid(),
-    range: `${ARTICLE_SHEET}!A1`,
-    valueInputOption: "RAW",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: articles.map(articleToRow) },
-  });
+  await appendRows(ARTICLE_SHEET, articles.map(articleToRow));
+  const withBody = articles.filter((a) => a.content);
+  await appendRows(BODY_SHEET, withBody.map((a) => [a.id, (a.content ?? "").slice(0, CELL_LIMIT)]));
+}
+
+/** 기사 본문 조회 (id → 본문) */
+export async function fetchBodies(ids: string[]): Promise<Map<string, string>> {
+  const want = new Set(ids);
+  const out = new Map<string, string>();
+  for (const [id, body] of await readRows(BODY_SHEET)) if (want.has(id)) out.set(id, body ?? "");
+  return out;
+}
+
+/** ── 작성 의뢰서 ─────────────────────────────────────── */
+export interface HandoffRow {
+  issueNo: number;
+  request: string; // JSON
+  content: string; // JSON ('' = 미작성)
+  requestAt: string;
+  contentAt: string;
+}
+
+const rowToHandoff = (r: string[]): HandoffRow | null =>
+  Number(r[0]) ? { issueNo: Number(r[0]), request: r[1] ?? "", content: [r[2], r[3]].filter(Boolean).join(""), requestAt: r[4] ?? "", contentAt: r[5] ?? "" } : null;
+
+const handoffToRow = (h: HandoffRow): string[] => [
+  String(h.issueNo), h.request, h.content.slice(0, CELL_LIMIT), h.content.slice(CELL_LIMIT, CELL_LIMIT * 2), h.requestAt, h.contentAt,
+];
+
+export async function listHandoffRows(): Promise<HandoffRow[]> {
+  return (await readRows(HANDOFF_SHEET)).map(rowToHandoff).filter((h): h is HandoffRow => h !== null);
+}
+
+export async function upsertHandoffRow(h: HandoffRow) {
+  const rows = await idRowIndex(HANDOFF_SHEET);
+  const row = rows.get(String(h.issueNo));
+  if (row) {
+    await getClient().spreadsheets.values.update({
+      spreadsheetId: sid(),
+      range: `${HANDOFF_SHEET}!A${row}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [handoffToRow(h)] },
+    });
+  } else await appendRows(HANDOFF_SHEET, [handoffToRow(h)]);
 }
 
 async function idRowIndex(sheet: string): Promise<Map<string, number>> {

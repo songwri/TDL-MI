@@ -9,6 +9,13 @@ argument-hint: "[차수]"
 이 저장소의 웹 앱은 API 토큰을 쓰지 않도록 설정되어 있다. 기사 선정과 콘셉트는 웹에서 저장되고, 글쓰기는 여기(Claude Code)에서 한다.
 `ANTHROPIC_API_KEY` 를 요구하거나 SDK 로 API 를 호출하는 방법을 쓰지 않는다.
 
+## 0. 저장 위치 확인
+
+- 내 PC 모드(기본): 의뢰서가 `data/handoff/<차수>/` 에 파일로 있다.
+- 웹 모드(`STORE_MODE=sheets`, 구글 시트가 원본): 의뢰서와 작성본이 구글 시트 `Handoffs` 에 있다.
+  `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` 이 환경에 설정돼 있어야 한다. 없으면 사용자에게 환경 설정에서 넣어 달라고 안내한다(채팅에 키를 붙여 넣게 하지 않는다).
+- 어느 쪽이든 아래 명령은 같다. 웹 모드에서는 2단계 전에 `npm run letter -- prompt <차수>` 로 의뢰서를 `data/handoff/<차수>/prompt.md` 로 내려받는다.
+
 ## 1. 의뢰서 확인
 
 ```bash
@@ -23,6 +30,10 @@ npm run letter -- list
     기사가 비어 있으면 `npm run collect -- 14` 로 먼저 수집한다(네트워크 필요).
 
 ## 2. 의뢰서 읽기
+
+```bash
+npm run letter -- prompt <차수>   # prompt.md 를 최신 상태로 내려받는다
+```
 
 `data/handoff/<차수>/prompt.md` 를 처음부터 끝까지 읽는다. 작성 지침, 기사 원문(자료), 지난 입고 이력, 출력 JSON 스키마가 모두 들어 있다.
 
@@ -41,7 +52,7 @@ npm run letter -- list
 npm run letter -- save <차수>
 ```
 
-오류가 나오면 메시지에 적힌 필드를 고쳐 다시 저장한다. 통과하면 링크·출처가 원본 데이터로 고정되고 `data/handoff/<차수>/letter.html` 미리보기가 생긴다.
+오류가 나오면 메시지에 적힌 필드를 고쳐 다시 저장한다. 통과하면 링크·출처가 원본 데이터로 고정되어 저장된다(내 PC 모드는 `data/handoff/<차수>/`, 웹 모드는 구글 시트 `Handoffs`).
 
 ## 5. 스스로 점검
 

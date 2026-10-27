@@ -2,7 +2,7 @@ import { fail, ok } from "@/lib/api";
 import { refreshArticles } from "@/lib/collector";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 /** POST /api/articles/refresh — 기사 최신화 (body: { days?, sourceIds? }) */
 export async function POST(req: Request) {

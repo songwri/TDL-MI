@@ -11,6 +11,7 @@ import { RelationTags } from "./RelationTags";
 import { Badge, Button, api, cx, useToasts } from "./ui";
 
 interface Status {
+  store: "sheets" | "local";
   llm: string | null;
   writer: "claude-code" | "api";
   sheets: boolean;
@@ -75,6 +76,7 @@ export function Dashboard() {
   const [articles, setArticles] = useState<ArticleView[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState("");
   const [lastRefresh, setLastRefresh] = useState<RefreshResult | null>(null);
 
   // filters
@@ -201,11 +203,25 @@ export function Dashboard() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const r = await api<RefreshResult & { warning?: string }>("/api/articles/refresh", { json: { days } });
-      setLastRefresh(r);
-      const failed = r.perSource.filter((s) => s.error).length;
-      push(`신규 ${r.added}건 적재 · 중복 ${r.duplicates}건 · 제외 ${r.filtered}건${failed ? ` · 실패 채널 ${failed}곳` : ""}`, failed ? "error" : "success");
-      if (r.warning) push(r.warning, "error");
+      // 채널을 하나씩 요청해 웹 서버의 실행 시간 제한(60초)을 넘지 않게 한다
+      const total: RefreshResult = { added: 0, duplicates: 0, filtered: 0, perSource: [] };
+      const sources = (status?.sources ?? []).filter((s) => s.enabled);
+      for (const [i, s] of sources.entries()) {
+        setRefreshNote(`${s.name} 수집 중 (${i + 1}/${sources.length})`);
+        try {
+          const r = await api<RefreshResult & { warning?: string }>("/api/articles/refresh", { json: { days, sourceIds: [s.id] } });
+          total.added += r.added;
+          total.duplicates += r.duplicates;
+          total.filtered += r.filtered;
+          total.perSource.push(...r.perSource);
+          if (r.warning) push(r.warning, "error");
+        } catch (e) {
+          total.perSource.push({ source: s.name, fetched: 0, added: 0, error: (e as Error).message });
+        }
+      }
+      setLastRefresh(total);
+      const failed = total.perSource.filter((s) => s.error).length;
+      push(`신규 ${total.added}건 적재 · 중복 ${total.duplicates}건 · 제외 ${total.filtered}건${failed ? ` · 실패 채널 ${failed}곳` : ""}`, failed ? "error" : "success");
       await load();
     } catch (e) {
       push((e as Error).message, "error");
@@ -369,7 +385,9 @@ export function Dashboard() {
       {/* 상태 바 */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge tone="green">{status?.writer === "api" ? `⚡ API 작성 모드 · ${status.llm}` : "📝 Claude Code 작성 모드 (API 토큰 사용 없음)"}</Badge>
-        <Badge tone={status?.sheets ? "green" : "amber"}>{status?.sheets ? "📗 Google Sheets 연동" : "📗 Sheets 미설정 (로컬 캐시만 사용)"}</Badge>
+        <Badge tone={status?.sheets ? "green" : "amber"}>
+          {status?.sheets ? (status.store === "sheets" ? "📗 구글 시트가 원본 (웹 모드)" : "📗 Google Sheets 연동 (내 PC 모드)") : "📗 Sheets 미설정 (로컬 캐시만 사용)"}
+        </Badge>
         <Badge>기사 {status?.articleCount ?? 0}건 · 입고 {status?.issueCount ?? 0}차</Badge>
         {status?.lastRefreshAt && <Badge>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR")}</Badge>}
       </div>
@@ -379,7 +397,7 @@ export function Dashboard() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
             <Button variant="primary" onClick={refresh} disabled={refreshing}>
-              {refreshing ? "⏳ 수집 중…" : "🔄 기사 최신화"}
+              {refreshing ? `⏳ ${refreshNote || "수집 중…"}` : "🔄 기사 최신화"}
             </Button>
             <select className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={days} onChange={(e) => setDays(Number(e.target.value))}>
               <option value={7}>최근 1주</option>

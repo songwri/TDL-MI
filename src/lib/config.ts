@@ -1,4 +1,7 @@
+import os from "node:os";
 import path from "node:path";
+
+const onServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
 /** 서버 전용 환경설정. 값이 없으면 해당 기능이 비활성(로컬 캐시 / 초안 모드)으로 동작한다. */
 export const config = {
@@ -7,7 +10,12 @@ export const config = {
   spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID ?? "",
   serviceAccountKeyPath: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ?? "",
   serviceAccountKeyBase64: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 ?? "",
-  dataDir: process.env.DATA_DIR || path.join(process.cwd(), "data"),
+  /** 키 JSON 파일 내용을 그대로 붙여 넣는 방식 (웹 호스팅 환경변수용) */
+  serviceAccountKeyJson: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON ?? "",
+  /** 서버리스는 쓰기 가능한 곳이 임시 폴더뿐이라 캐시만 둔다 */
+  dataDir: process.env.DATA_DIR || (onServerless ? path.join(os.tmpdir(), "tdl-mi") : path.join(process.cwd(), "data")),
+  /** 웹 접속 비밀번호 (비우면 잠금 없음) */
+  appPassword: process.env.APP_PASSWORD ?? "",
   lookbackDays: Number(process.env.COLLECT_LOOKBACK_DAYS || 14),
   miLookbackDays: Number(process.env.MI_LOOKBACK_DAYS || 180),
   newsletterName: process.env.NEWSLETTER_NAME || "NEWS/INBOUND",
@@ -23,7 +31,20 @@ export const config = {
 };
 
 export const sheetsEnabled = () =>
-  Boolean(config.spreadsheetId && (config.serviceAccountKeyPath || config.serviceAccountKeyBase64));
+  Boolean(
+    config.spreadsheetId && (config.serviceAccountKeyPath || config.serviceAccountKeyBase64 || config.serviceAccountKeyJson),
+  );
+
+/**
+ * 저장 방식
+ *  - sheets: 구글 시트가 유일한 원본. 서버에는 임시 캐시만 둔다 (웹 호스팅 기본값, 여러 명이 같이 쓸 때)
+ *  - local:  data/db.json 이 원본, 시트가 있으면 같이 기록 (내 PC 혼자 쓸 때)
+ */
+export const storeMode = (): "sheets" | "local" => {
+  const m = process.env.STORE_MODE;
+  if (m === "sheets" || m === "local") return m;
+  return onServerless ? "sheets" : "local";
+};
 
 /**
  * 레터 작성 방식

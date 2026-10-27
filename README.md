@@ -2,6 +2,8 @@
 
 국내외 물류·로봇 자동화 기사를 수집 → 작업자가 3~5개를 선별하고 기획 콘셉트를 입력 → 캐릭터 **레포냥**(리포트+냥)의 말투로 Claude가 레터를 작성 → **아웃룩 데스크톱에 그대로 붙여넣을 수 있는** 테이블/인라인 CSS HTML로 출력합니다.
 
+> **웹으로 운영하려면** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고, Vercel에 웹을 올리고, GitHub Actions가 매일 기사를 수집합니다. 내 컴퓨터가 필요 없습니다.
+
 ## NEWS/INBOUND 구성
 발행: CL사업부 테크이노베이션팀 · 1차 독자: CL사업부 구성원 (`NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE`).
 컨셉·말투·디자인 규칙은 [`docs/concept/concept-sheet.html`](docs/concept/concept-sheet.html)(브라우저로 열기)에 정리되어 있습니다. 재생성: `npx tsx scripts/render-sample.ts /tmp/f.html --fragment && python3 scripts/build-concept-sheet.py /tmp/f.html`
@@ -33,6 +35,9 @@ npm run dev                    # http://localhost:3000
 
 | 환경변수 | 설명 |
 |---|---|
+| `STORE_MODE` | `sheets`: 구글 시트가 원본(웹 호스팅 기본값) · `local`: `data/db.json` 이 원본(내 PC 기본값) |
+| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 서비스 계정 키 JSON 내용 (웹 환경변수용) |
+| `APP_PASSWORD` | 웹 접속 비밀번호 (비우면 잠금 없음) |
 | `LETTER_WRITER` | 비우면 Claude Code 작성 모드(토큰 없음). `api` 면 웹에서 API 로 바로 작성 |
 | `ANTHROPIC_API_KEY` | `LETTER_WRITER=api` 일 때만 필요 |
 | `ANTHROPIC_MODEL` | 기본 `claude-opus-5-5` |

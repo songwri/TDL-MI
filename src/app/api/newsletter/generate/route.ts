@@ -4,7 +4,7 @@ import { synthesizeNewsletter } from "@/lib/newsletter/synthesizer";
 import { getAllArticles, getArticles, listIssues } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 interface Body {
   issueNo: number;

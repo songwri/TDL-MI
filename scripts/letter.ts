@@ -1,6 +1,7 @@
 /**
  * Claude Code 용 레터 작성 CLI (API 토큰 사용 없음)
  *   npm run letter -- list              작성 의뢰서 목록
+ *   npm run letter -- prompt <N>        의뢰서를 data/handoff/N/prompt.md 로 내려받기 (구글 시트 모드에서 필수)
  *   npm run letter -- show <N>          N차 의뢰서 경로와 상태
  *   npm run letter -- save <N> [file]   작성본 검증·저장 (file 생략 시 data/handoff/N/content.json)
  *   npm run letter -- candidates [일수]  최근 기사 후보 + 지난 입고 연관 태그 (Claude Code에서 선정할 때)
@@ -11,8 +12,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { issueLabel } from "@/config/brand";
+import { storeMode } from "@/lib/config";
 import { analyzeArticles } from "@/lib/mi";
-import { createHandoff, getHandoff, handoffPaths, listHandoffs, saveHandoffContent } from "@/lib/newsletter/handoff";
+import { createHandoff, getHandoff, handoffPaths, listHandoffs, saveHandoffContent, writePrompt } from "@/lib/newsletter/handoff";
 import { getAllArticles, listArticles, listIssues, saveIssue, setSelection } from "@/lib/store";
 
 function flags(args: string[]) {
@@ -48,6 +50,10 @@ async function main() {
   const n = Number(arg);
   if (!n) throw new Error("차수를 숫자로 지정하세요. 예: npm run letter -- show 4");
   const p = handoffPaths(n);
+  if (cmd === "prompt") {
+    console.log(`의뢰서: ${rel(await writePrompt(n))}\n작성본은 ${rel(p.content)} 에 JSON 만 저장한 뒤 'npm run letter -- save ${n}' 을 실행하세요.`);
+    return;
+  }
   if (cmd === "show") {
     const h = await getHandoff(n);
     if (!h) throw new Error(`${issueLabel(n)} 작성 의뢰서가 없습니다.`);
@@ -57,7 +63,7 @@ async function main() {
   if (cmd === "save") {
     const raw = await fs.readFile(file ?? p.content, "utf8");
     const r = await saveHandoffContent(n, raw);
-    console.log(`${issueLabel(n)} 작성본 저장 완료\n- 콘텐츠: ${rel(p.content)}\n- 미리보기: ${rel(p.preview)}\n- 헤드라인: ${r.content.headline}`);
+    console.log(`${issueLabel(n)} 작성본 저장 완료 (${storeMode() === "sheets" ? "구글 시트 Handoffs" : rel(p.content)})\n- 헤드라인: ${r.content.headline}`);
     return;
   }
   if (cmd === "request") {
