@@ -1,0 +1,40 @@
+name: collect-articles
+
+# 매일 06:00(한국시간)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
+# 필요한 값: 저장소 Settings → Secrets and variables → Actions → Repository secrets
+#   GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+on:
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "최근 며칠 기사까지 수집할지"
+        default: "14"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: collect-articles
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Collect articles into Google Sheets
+        env:
+          STORE_MODE: sheets
+          DATA_DIR: ${{ runner.temp }}/tdl-mi
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+          DAYS: ${{ inputs.days }}
+        run: npm run collect -- "${DAYS:-14}"
