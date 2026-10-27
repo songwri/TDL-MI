@@ -1,11 +1,11 @@
 name: collect-articles
 
-# 매일 06:00(한국시간)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
+# 매일 08:00(한국시간)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
 # 필요한 값: 저장소 Settings → Secrets and variables → Actions → Repository secrets
 #   GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_KEY_JSON
 on:
   schedule:
-    - cron: "0 21 * * *"
+    - cron: "0 23 * * *"
   workflow_dispatch:
     inputs:
       days:

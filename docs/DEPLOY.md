@@ -3,7 +3,7 @@
 내 컴퓨터 없이 쓰는 구성입니다.
 
 ```
-[GitHub Actions]  매일 06:00 뉴스 사이트 수집 ─┐
+[GitHub Actions]  매일 08:00 뉴스 사이트 수집 ─┐
                                                ├─▶  [구글 시트]  ◀── 유일한 원본
 [웹 서버(Vercel)] 기사 선정 · 작성 의뢰 · 미리보기 ─┤        Raw_Articles / Newsletter_Issues
                                                │        Article_Bodies / Handoffs
@@ -69,7 +69,7 @@
    - `GOOGLE_SHEETS_SPREADSHEET_ID`
    - `GOOGLE_SERVICE_ACCOUNT_KEY_JSON`
 3. **Actions** 탭 → 왼쪽 `collect-articles` → **Run workflow**로 한 번 실행해 봅니다.
-4. 끝나면 구글 시트 `Raw_Articles`에 기사가 쌓여 있어야 합니다. 이후 매일 06:00(한국시간)에 자동 실행됩니다.
+4. 끝나면 구글 시트 `Raw_Articles`에 기사가 쌓여 있어야 합니다. 이후 매일 08:00(한국시간)에 자동 실행됩니다.
 5. 실행 로그에 사이트별 `✔/✘`와 실패 이유가 나옵니다. 모든 사이트가 실패하면 실행이 실패로 표시되고 GitHub가 알림을 보냅니다.
 
 일부 국내 언론사는 해외 데이터센터 접속을 막기도 합니다. 로그에서 `HTTP 403` 등이 보이는 사이트는 알려 주시면 대체 방법(Google News 검색 등)을 붙입니다.
