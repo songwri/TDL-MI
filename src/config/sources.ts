@@ -1,8 +1,10 @@
 import type { Region } from "@/lib/types";
 
 /**
- * 수집 채널 정의.
- *  - rss:  RSS/Atom 피드 (rss-parser)
+ * 수집 채널 정의. 사이트 주소만 넣어도 된다(type 생략 = auto).
+ *  - auto: 홈페이지에서 RSS 를 자동 탐지 → 없으면 흔한 피드 경로 → 그래도 없으면 기사처럼 생긴 링크를 골라 수집
+ *          새 사이트는 `npm run sources -- probe <주소>` 로 먼저 확인
+ *  - rss:  RSS/Atom 피드 주소를 직접 지정 (가장 빠르고 안정적)
  *  - html: 목록 페이지에서 linkPattern에 맞는 기사 링크를 추출 후, 각 기사 페이지를 스크랩 (cheerio)
  * requireRelevance=true 인 채널은 RELEVANCE_KEYWORDS 매칭 기사만 적재한다(범용 매체용).
  * enrich=true 이면 기사 원문 페이지를 열어 본문/썸네일/발행일을 보강한다.
@@ -11,7 +13,7 @@ export interface SourceDef {
   id: string;
   name: string;
   region: Region;
-  type: "rss" | "html";
+  type?: "auto" | "rss" | "html";
   url: string;
   /** html 타입: 기사 URL로 인정할 경로 패턴 */
   linkPattern?: string;
@@ -84,8 +86,8 @@ export const SOURCES: SourceDef[] = [
     id: "robotics247",
     name: "Robotics 24/7",
     region: "GLOBAL",
-    type: "html",
-    url: "https://www.robotics247.com/topic/category/supply_chain",
+    type: "auto",
+    url: "https://www.robotics247.com/",
     linkPattern: "/article/",
     requireRelevance: false,
     enrich: true,
@@ -96,8 +98,8 @@ export const SOURCES: SourceDef[] = [
     id: "mmh",
     name: "Modern Materials Handling",
     region: "GLOBAL",
-    type: "html",
-    url: "https://www.mmh.com/topic/category/automation",
+    type: "auto",
+    url: "https://www.mmh.com/",
     linkPattern: "/article/",
     requireRelevance: false,
     enrich: true,

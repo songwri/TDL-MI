@@ -12,7 +12,8 @@
     "seed:demo": "tsx scripts/seed-demo.ts",
     "collect": "tsx scripts/collect.ts",
     "render:sample": "tsx scripts/render-sample.ts",
-    "letter": "tsx scripts/letter.ts"
+    "letter": "tsx scripts/letter.ts",
+    "sources": "tsx scripts/sources.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

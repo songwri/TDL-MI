@@ -128,13 +128,30 @@ tests/                  vitest (파서·MI·템플릿·시트 직렬화·저장�
 - 아웃룩 데스크톱은 border-radius 를 그리지 않아 알약 라벨·버튼이 각지게 보입니다
 - 이모지는 아웃룩 데스크톱의 Segoe UI Emoji로 렌더링됩니다
 
-## 수집 채널 메모
-- 물류신문·로봇신문·카고뉴스: ndsoft CMS 공통 RSS(`/rss/allArticle.xml`) + 본문 `#article-view-content-div`
-- Supply Chain Dive: RSS (범용 SCM 매체라 관련성 필터 적용)
-- Robotics 24/7, Modern Materials Handling: 카테고리 목록 페이지에서 `/article/` 링크 추출 후 원문 스크랩
-- LogiMAT/CeMAT: Google News RSS 검색
-- 사이트 구조가 바뀌면 `src/config/sources.ts`의 URL/`linkPattern`만 수정하면 됩니다. JS 렌더링이 필요한 사이트가 생기면 `collector/http.ts`의 `fetchText`를 Puppeteer 구현으로 교체할 수 있습니다.
-- 정기 수집: `npm run collect -- 14` 를 작업 스케줄러/cron에 등록
+## 수집 채널: 사이트 주소만 넣기
+
+`src/config/sources.ts` 에 사이트 주소만 넣으면(`type` 생략 = auto) 수집 방법을 스스로 찾습니다.
+
+1. 홈페이지에 표시된 RSS(`<link rel="alternate" type="application/rss+xml">`)
+2. 없으면 흔한 피드 경로: 국내 언론 CMS 공통 `/rss/allArticle.xml`, WordPress `/feed`, `/rss` 등
+3. 그래도 없으면 홈페이지 링크 중 기사처럼 생긴 주소(`articleView.html?idxno=`, `/article/…`, `/2026/10/…`, 긴 숫자 ID)를 골라 원문을 읽음
+
+새 사이트는 먼저 확인해 보세요.
+
+```bash
+npm run sources -- probe https://www.klnews.co.kr   # 수집 방식, 최근 기사 5건, 첫 기사 본문 길이
+npm run sources -- check                            # 설정된 채널 전체 점검
+```
+
+| 사이트 유형 | 주소만으로 | 비고 |
+|---|---|---|
+| RSS 있는 언론사 (국내 대부분, Supply Chain Dive 등) | 가능 | 가장 안정적. 발행일·요약·썸네일이 정확 |
+| RSS 없는 일반 뉴스 사이트 | 대체로 가능 | 기사 링크 추정. 홈에 안 보이는 기사는 빠질 수 있어 섹션 주소를 넣는 게 좋음 |
+| 자바스크립트로만 그려지는 사이트 | 불가 | probe 가 이유를 알려 줌. `collector/http.ts` 를 브라우저(Puppeteer) 방식으로 바꿔야 함 |
+| 봇 차단(Cloudflare 등)·유료 기사 | 제목·링크까지만 | 본문 없이 요약만 쓰거나 RSS 요약으로 대체 |
+| 범용 매체 (SCM 전반, 로봇 전반) | 가능 | `requireRelevance: true` 로 물류·로봇 키워드 기사만 적재 |
+
+수집은 사내 공유용 요약·링크 목적이며, 각 사이트의 이용약관과 robots.txt 를 확인하고 요청 간격을 과하게 줄이지 마세요(동시 요청 4개로 제한). 정기 수집은 `npm run collect -- 14` 를 작업 스케줄러에 등록합니다.
 
 ## 스크립트
-`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint` · `npm run collect` · `npm run seed:demo` · `npm run render:sample`
+`npm run dev` · `npm run build` · `npm test` · `npm run typecheck` · `npm run lint` · `npm run collect` · `npm run sources` · `npm run letter` · `npm run seed:demo` · `npm run render:sample`

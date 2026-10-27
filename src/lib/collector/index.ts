@@ -5,17 +5,31 @@ import { addArticles, getAllArticles } from "@/lib/store";
 import type { Article, RefreshResult } from "@/lib/types";
 import { mapLimit } from "@/lib/utils/async";
 import { articleIdFromUrl, cleanText, normalizeUrl, truncate } from "@/lib/utils/text";
+import { extractArticleLinks, resolveSource, type Resolved } from "./discover";
 import { fetchText } from "./http";
 import { extractArticlePage, extractListLinks, parseFeed, type RawItem } from "./parse";
 
 const MAX_CONTENT = 12_000;
 
-async function fetchSourceItems(src: SourceDef): Promise<RawItem[]> {
-  const body = await fetchText(src.url);
+/** auto 채널의 탐지 결과 (서버 프로세스 동안 재사용) */
+const resolvedCache = new Map<string, Resolved>();
+
+export async function fetchSourceItems(src: SourceDef): Promise<RawItem[]> {
+  let type = src.type ?? "auto";
+  let url = src.url;
+  if (type === "auto") {
+    let r = resolvedCache.get(src.url);
+    if (!r) resolvedCache.set(src.url, (r = await resolveSource(src.url)));
+    type = r.type;
+    url = r.url;
+  }
+  const body = await fetchText(url);
   const items =
-    src.type === "rss"
-      ? await parseFeed(body, { googleNews: src.url.includes("news.google.com") })
-      : extractListLinks(body, src.url, src.linkPattern ?? "/");
+    type === "rss"
+      ? await parseFeed(body, { googleNews: url.includes("news.google.com") })
+      : src.linkPattern
+        ? extractListLinks(body, url, src.linkPattern)
+        : extractArticleLinks(body, url);
   return items.filter((i) => i.title && i.link).slice(0, src.maxItems ?? 60);
 }
 

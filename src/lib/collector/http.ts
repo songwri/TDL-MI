@@ -17,6 +17,12 @@ export async function fetchText(url: string, timeoutMs = 15_000): Promise<string
     if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
     const buf = Buffer.from(await res.arrayBuffer());
     return decode(buf, res.headers.get("content-type") ?? "");
+  } catch (e) {
+    if ((e as Error).message.startsWith("HTTP ")) throw e;
+    const cause = (e as { cause?: { code?: string; message?: string } }).cause;
+    const reason =
+      ctrl.signal.aborted ? `${timeoutMs / 1000}초 안에 응답 없음` : cause?.code === "ENOTFOUND" ? "주소를 찾을 수 없음(DNS)" : (cause?.code ?? cause?.message ?? (e as Error).message);
+    throw new Error(`접속 실패: ${reason} · ${url}`);
   } finally {
     clearTimeout(timer);
   }
