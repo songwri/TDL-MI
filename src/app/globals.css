@@ -11,3 +11,22 @@ body {
   background: #f7f4f3;
   color: #2b2324;
 }
+
+/* ── 리포트 화면(인터랙티브): 데이터 시각화 토큰 ─────────────────── */
+.rv {
+  --rv-ink: #232021;
+  --rv-soft: #5c5755;
+  --rv-mute: #898781;
+  --rv-line: #e1e0d9;
+  --rv-surface: #fcfcfb;
+  --rv-accent: #a72b2b;
+  --rv-tint: #fbf1ef;
+  --rv-gray: #a9a7a0;
+  font-family: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  color: var(--rv-ink);
+}
+.rv ::selection { background: #f1d8d4; }
+.rv button:focus-visible, .rv a:focus-visible, .rv [tabindex]:focus-visible { outline: 2px solid var(--rv-accent); outline-offset: 2px; }
+.rv-seg { transition: opacity 0.15s, transform 0.15s; }
+.rv-seg:hover, .rv-seg:focus-visible { filter: brightness(1.08); }
+@media (prefers-reduced-motion: reduce) { .rv-seg { transition: none; } .rv * { scroll-behavior: auto !important; } }

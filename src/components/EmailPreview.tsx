@@ -4,6 +4,41 @@ import { useEffect, useRef, useState } from "react";
 import { copyRichHtml, copyText, downloadFile } from "@/lib/clipboard";
 import { Button, cx } from "./ui";
 
+type Toast = (msg: string, tone?: "info" | "error" | "success") => void;
+
+/** 메일에 붙여 넣는 동작 모음: 리포트 보기·메일 본문 화면에서 같이 쓴다 */
+export function ReportActions({ html, fragment, text, fileName, onToast, extra }: { html: string; fragment: string; text: string; fileName: string; onToast: Toast; extra?: React.ReactNode }) {
+  const copyOutlook = async () => {
+    try {
+      const how = await copyRichHtml(fragment, text);
+      onToast(
+        how === "clipboard-api" ? "리포트를 복사했습니다. 아웃룩 새 메일 본문에 Ctrl+V 하세요." : "본문을 복사했습니다(호환 모드). 메일 작성창에 Ctrl+V 하세요.",
+        "success",
+      );
+    } catch (e) {
+      onToast((e as Error).message, "error");
+    }
+  };
+  const copyCode = async () => {
+    try {
+      await copyText(html);
+      onToast("HTML 코드를 복사했습니다.", "success");
+    } catch (e) {
+      onToast((e as Error).message, "error");
+    }
+  };
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button variant="primary" onClick={copyOutlook} title="표와 서식 그대로 복사됩니다. 메일 본문에 붙여 넣으세요">
+        📋 메일 본문용 복사
+      </Button>
+      <Button onClick={copyCode}>{"</>"} HTML 코드 복사</Button>
+      <Button onClick={() => downloadFile(fileName, html)}>⬇ .html</Button>
+      {extra}
+    </div>
+  );
+}
+
 export function EmailPreview({
   html,
   fragment,
@@ -32,28 +67,6 @@ export function EmailPreview({
     return () => clearTimeout(t);
   }, [html, device]);
 
-  const copyOutlook = async () => {
-    try {
-      const how = await copyRichHtml(fragment, text);
-      onToast(
-        how === "clipboard-api"
-          ? "리포트를 복사했습니다. 아웃룩 새 메일 본문에 Ctrl+V 하세요."
-          : "본문을 복사했습니다(호환 모드). 메일 작성창에 Ctrl+V 하세요.",
-        "success",
-      );
-    } catch (e) {
-      onToast((e as Error).message, "error");
-    }
-  };
-  const copyCode = async () => {
-    try {
-      await copyText(html);
-      onToast("HTML 코드를 복사했습니다.", "success");
-    } catch (e) {
-      onToast((e as Error).message, "error");
-    }
-  };
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -68,13 +81,8 @@ export function EmailPreview({
             </button>
           ))}
         </div>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Button variant="accent" onClick={copyOutlook} title="text/html + text/plain 동시 복사">
-            📋 메일 본문용 복사
-          </Button>
-          <Button onClick={copyCode}>{"</>"} HTML 코드 복사</Button>
-          <Button onClick={() => downloadFile(fileName, html)}>⬇ .html</Button>
-          {extraActions}
+        <div className="ml-auto">
+          <ReportActions html={html} fragment={fragment} text={text} fileName={fileName} onToast={onToast} extra={extraActions} />
         </div>
       </div>
       <div className="flex justify-center overflow-x-auto rounded-lg border border-slate-200 bg-slate-200/60 p-4">

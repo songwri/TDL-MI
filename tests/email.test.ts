@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hbarChart, heatmap, mix, stackedBar, trendStack } from "@/lib/email/charts";
+import { hbarChart, heatmap, inkFor, mix, rampColor, stackedBar, themeMatrix, trendStack } from "@/lib/email/charts";
 import { renderEmailHtml, renderFragment, renderPlainText } from "@/lib/email/template";
 import { buildFallbackDraft } from "@/lib/newsletter/fallback";
 import { ReportSchema, StoredReportSchema } from "@/lib/newsletter/schema";
@@ -34,7 +34,7 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(frag).toContain("테크이노베이션팀");
     expect(frag).toContain("TDL Trend");
     expect(frag).toContain("제4호");
-    expect(frag).toContain("발행일 2026.10.27");
+    expect(frag).toContain("2026.10.27 발행");
     expect(frag).toContain("배포 대상 CL사업부");
     expect(frag).toContain('width="640"');
     expect(frag).toContain('bgcolor="#A72B2B"');
@@ -55,6 +55,16 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(frag).toContain('href="https://example.com/sample/c1"');
     expect(frag).toMatch(/\[1\]<\/a>/);
     for (const a of sampleArticles) expect(frag).toContain(`href="${a.link}"`);
+  });
+
+  it("핵심 수치 줄, 주제-기사 연결표, 이어지는 주제 강조 범례가 들어감", () => {
+    expect(frag).toContain("선정 기사");
+    expect(frag).toContain("국내 : 해외");
+    expect(frag).toContain("주제와 근거 기사의 연결");
+    expect(frag.match(/●/g)!.length).toBe(sampleContent.themes.reduce((n, t) => n + t.sourceArticleIds.length, 0));
+    expect(frag).toContain("지난 호에서도 등장"); // 강조(레드)=이어지는 주제
+    expect(frag).toContain("#2A78D6"); // 검증된 카테고리 색 (AMR/AGV)
+    expect(frag).not.toContain("#4F7F8C"); // 예전 팔레트 제거
   });
 
   it("전체 문서와 텍스트 버전", () => {
@@ -103,6 +113,30 @@ describe("표 기반 차트", () => {
     expect(ws.reduce((a, b) => a + b, 0)).toBe(300);
   });
 
+  it("채운 색 위 글자색: 흰색이 기본, 노랑처럼 밝은 색만 검정", () => {
+    expect(inkFor("#2A78D6")).toBe("#FFFFFF");
+    expect(inkFor("#EB6834")).toBe("#FFFFFF");
+    expect(inkFor("#1BAF7A")).toBe("#FFFFFF");
+    expect(inkFor("#EDA100")).toBe("#0B0B0B");
+  });
+
+  it("크기 색은 파랑 한 가지, 건수가 많을수록 진해짐", () => {
+    expect(rampColor(0, 5)).toBe("#F5F5F5");
+    expect(rampColor(1, 5)).toBe("#CDE2FB");
+    expect(rampColor(5, 5)).toBe("#104281");
+  });
+
+  it("기사-주제 연결표: 인용한 칸에만 ● 표시", () => {
+    const html = themeMatrix(
+      [{ id: "a", no: 1, title: "기사 A", href: "https://x/a" }, { id: "b", no: 2, title: "기사 B", href: "https://x/b" }],
+      [{ title: "T1", sourceArticleIds: ["a"] }, { title: "T2", sourceArticleIds: ["a", "b"] }],
+      { width: 576, anchor: (x, h) => `<a href="${h}">${x}</a>` },
+    );
+    expect(html.match(/●/g)).toHaveLength(3);
+    expect(html).toContain("주제 2");
+    expect(themeMatrix([], [], { width: 100, anchor: (x) => x })).toBe("");
+  });
+
   it("빈 데이터는 빈 문자열, 히트맵 색은 건수에 따라 진해짐", () => {
     expect(hbarChart([], { width: 500 })).toBe("");
     expect(stackedBar([{ label: "x", value: 0, color: "#000000" }], { width: 300 })).toBe("");
@@ -142,6 +176,16 @@ describe("시트 직렬화", () => {
     const back = rowToIssue(row)!;
     expect(back.html).toBe(html);
     expect(back.articleIds).toEqual(["A1", "A2"]);
+  });
+
+  it("발행 이력에 리포트 데이터(JSON)도 함께 저장되고 복원됨", () => {
+    const row = issueToRow({ issueNo: 4, publishDate: "2026-10-27", concept: "c", articleIds: ["A1"], html: "<p/>", keywords: ["k"], createdAt: "t", content: sampleContent });
+    expect(row.every((c) => c.length <= 49_000)).toBe(true);
+    expect(rowToIssue(row)!.content).toEqual(JSON.parse(JSON.stringify(sampleContent)));
+    const noContent = rowToIssue(issueToRow({ issueNo: 1, publishDate: "d", concept: "c", articleIds: [], html: "", keywords: [], createdAt: "t" }))!;
+    expect(noContent.content).toBeUndefined();
+    const broken = [...row.slice(0, 11), '{"headline": "잘림', ""];
+    expect(rowToIssue(broken)!.content).toBeUndefined(); // 깨진 데이터는 무시하고 메일 HTML 만 보여 줌
   });
 
   it("기사 행 왕복 + 선정여부(제N호)", () => {

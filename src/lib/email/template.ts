@@ -1,6 +1,6 @@
-import { BRAND, CATEGORY_COLORS, COLORS as C, issueLabel } from "@/config/brand";
+import { BRAND, CATEGORY_COLORS, COLORS as C, NEUTRALS, issueLabel } from "@/config/brand";
 import type { Article, ReportContent } from "@/lib/types";
-import { heatmap, hbarChart, stackedBar, trendStack } from "./charts";
+import { heatmap, hbarChart, legend, stackedBar, statTiles, themeMatrix, trendStack } from "./charts";
 import { FONT, css, link, row, spacer, t, table, td, tr } from "./inline";
 
 export interface RenderMeta {
@@ -15,7 +15,7 @@ export interface RenderMeta {
   /** 배포 대상 (예: CL사업부) */
   audience?: string;
   /** 선정 기사 (참고 기사 목록과 [번호] 링크의 원본). 선택 순서 = 번호 */
-  articles: Pick<Article, "id" | "title" | "source" | "link" | "publishedAt">[];
+  articles: Pick<Article, "id" | "title" | "source" | "link" | "publishedAt" | "region">[];
 }
 
 /** 메일 본문 폭: 640px 프레임, 본문 576px */
@@ -74,18 +74,40 @@ function header(c: ReportContent, m: RenderMeta): string {
     row("&nbsp;", { bgcolor: C.brand, style: { height: 4, fontSize: 1, lineHeight: "4px" } }) +
     row(
       table(
-        row(`${t(m.feedbackContact)} &nbsp;|&nbsp; ${t(BRAND.kind)}`, { style: txt(12, C.sub, { fontWeight: "bold" }) }) +
-          row(
-            `${t(m.newsletterName)} <span style="${css({ color: C.brand })}">${issueLabel(m.issueNo)}</span>`,
-            { style: { ...txt(28, C.ink, { fontWeight: "bold", lineHeight: "38px" }), paddingTop: 6 } },
+        tr(
+          td(
+            `<span style="${css(txt(12, C.sub, { fontWeight: "bold", letterSpacing: "0.5px" }))}">${t(m.feedbackContact)} &nbsp;|&nbsp; ${t(BRAND.kind)}</span><br>` +
+              `<span style="${css({ fontSize: 30, lineHeight: "40px", fontWeight: "bold", color: C.ink, letterSpacing: "-0.5px" })}">${t(m.newsletterName)}</span>`,
+            { valign: "bottom", style: { paddingBottom: 16 } },
           ) +
-          row(`발행일 ${dotDate(m.publishDate)}${m.audience ? ` &nbsp;|&nbsp; 배포 대상 ${t(m.audience)}` : ""}`, { style: { ...txt(13, C.sub), paddingTop: 4 } }) +
-          row(t(c.headline), {
-            style: { ...txt(18, C.ink, { fontWeight: "bold", lineHeight: "28px" }), paddingTop: 18 },
-          }),
+            td(
+              `<span style="${css({ fontSize: 30, lineHeight: "40px", fontWeight: "bold", color: C.brand })}">${issueLabel(m.issueNo)}</span><br>` +
+                `<span style="${css(txt(12, C.sub))}">${dotDate(m.publishDate)} 발행${m.audience ? `<br>배포 대상 ${t(m.audience)}` : ""}</span>`,
+              { align: "right", valign: "bottom", width: 170, style: { paddingBottom: 16 } },
+            ),
+        ) +
+          row(t(c.headline), { colspan: 2, style: { ...txt(19, C.ink, { fontWeight: "bold", lineHeight: "30px" }), paddingTop: 14, borderTop: `1px solid ${C.line}` } }),
       ),
-      { style: { padding: `24px ${PAD}px 22px`, borderBottom: `1px solid ${C.line}` } },
+      { style: { padding: `22px ${PAD}px 20px`, borderBottom: `1px solid ${C.line}` } },
     )
+  );
+}
+
+/** 핵심 수치 줄: 한눈에 보는 규모 */
+function kpis(c: ReportContent, m: RenderMeta): string {
+  const s = c.stats;
+  if (!s) return "";
+  const kr = s.byRegion.find((x) => x.label === "국내")?.count ?? 0;
+  const gl = s.byRegion.find((x) => x.label === "해외")?.count ?? 0;
+  const sources = new Set(m.articles.map((a) => a.source)).size;
+  return statTiles(
+    [
+      { value: `${s.total}건`, label: "선정 기사", sub: `${sources}개 매체` },
+      { value: `${c.themes.length}개`, label: "핵심 주제", sub: "기사를 묶어 분석" },
+      { value: `${kr} : ${gl}`, label: "국내 : 해외", sub: "기사 수 비율" },
+      { value: `${s.repeat.followUp}건`, label: "지난 호 연관", sub: `신규 ${s.repeat.fresh}건` },
+    ],
+    { width: INNER },
   );
 }
 
@@ -103,15 +125,18 @@ function summary(c: ReportContent): string {
 function overview(c: ReportContent): string {
   const s = c.stats;
   if (!s || !s.total) return "";
-  const cat = s.byCategory.map((x) => ({ label: x.label, value: x.count, color: CATEGORY_COLORS[x.label] ?? "#999999" }));
-  const region = s.byRegion.map((x, i) => ({ label: x.label, value: x.count, color: i === 0 ? C.brand : "#2F4B7C" }));
+  const cat = s.byCategory.map((x) => ({ label: x.label, value: x.count, color: CATEGORY_COLORS[x.label] ?? CATEGORY_COLORS["기타"] }));
+  // 국내·해외, 지난 호와의 관계는 카테고리 색과 섞이지 않게 회색과 강조색만 사용 (강조 = 지난 호에서 이어지는 이야기)
+  const region = s.byRegion.map((x, i) => ({ label: x.label, value: x.count, color: i === 0 ? NEUTRALS.strong : NEUTRALS.mid }));
   const rep = [
-    { label: "신규 주제", value: s.repeat.fresh, color: "#2F4B7C" },
     { label: "지난 호와 연관·후속", value: s.repeat.followUp, color: C.brand },
-    { label: "중복 가능", value: s.repeat.duplicate, color: "#B8B8B8" },
+    { label: "신규 주제", value: s.repeat.fresh, color: NEUTRALS.mid },
+    { label: "중복 가능", value: s.repeat.duplicate, color: NEUTRALS.light },
   ];
+  const kw = s.topKeywords.map((k) => ({ label: k.label, value: k.count, color: k.seenBefore ? C.brand : NEUTRALS.mid }));
+  const kwLegend = s.trend.issues.length > 1 ? legend([{ label: "지난 호에서도 등장", color: C.brand }, { label: "이번 호 처음", color: NEUTRALS.mid }]) : "";
   return table(
-    row(heading("■", `이번 호 한눈에 (선정 기사 ${s.total}건)`)) +
+    row(heading("■", "이번 호 한눈에")) +
       spacer(14) +
       row(sub("카테고리 구성"), { style: { paddingBottom: 6 } }) +
       row(stackedBar(cat, { width: INNER })) +
@@ -124,8 +149,11 @@ function overview(c: ReportContent): string {
           ),
         ),
       ) +
-      (s.topKeywords.length
-        ? spacer(18) + row(sub("많이 언급된 기업·기술"), { style: { paddingBottom: 6 } }) + row(hbarChart(s.topKeywords.map((k) => ({ label: k.label, value: k.count })), { width: INNER, unit: "건" }))
+      (kw.length
+        ? spacer(18) +
+          row(sub("많이 언급된 기업·기술"), { style: { paddingBottom: 6 } }) +
+          row(hbarChart(kw, { width: INNER, unit: "건" })) +
+          (kwLegend ? row(kwLegend, { style: { paddingTop: 6 } }) : "")
         : ""),
   );
 }
@@ -150,7 +178,19 @@ function themes(c: ReportContent, m: RenderMeta, refNo: Map<string, number>, byI
       (refs ? row(`<span style="${css(txt(12, C.mute))}">근거 기사 (원문 링크)</span>&nbsp; ${refs}`, { style: { ...txt(13), paddingTop: 10 } }) : "")
     );
   });
-  return table(row(heading("■", "핵심 인사이트")) + blocks.join(""));
+  const matrix =
+    c.themes.length > 1 && m.articles.length > 1
+      ? spacer(14) +
+        row(sub("주제와 근거 기사의 연결"), { style: { paddingBottom: 6 } }) +
+        row(
+          themeMatrix(
+            m.articles.map((a, i) => ({ id: a.id, no: i + 1, title: a.title, href: a.link })),
+            c.themes,
+            { width: INNER, anchor: (txt_, href) => link(txt_, href, { color: C.ink, textDecoration: "underline" }) },
+          ),
+        )
+      : "";
+  return table(row(heading("■", "핵심 인사이트")) + matrix + blocks.join(""));
 }
 
 function trend(c: ReportContent): string {
@@ -234,7 +274,8 @@ export function renderFragment(c: ReportContent, m: RenderMeta): string {
     header(c, m) +
       row(
         table(
-          block(summary(c), 0) +
+          block(kpis(c, m), 0) +
+            block(summary(c), 28) +
             block(overview(c), 32) +
             block(themes(c, m, refNo, byId), 32) +
             block(trend(c), 32) +

@@ -39,7 +39,10 @@ export function computeStats(
   const byCategory = CATEGORIES.map((label) => ({ label: label as string, count: catCounts.get(label) ?? 0 })).filter((c) => c.count > 0);
   const regionCounts = count(selected, (a) => (a.region === "KR" ? "국내" : "해외"));
   const byRegion = ["국내", "해외"].map((label) => ({ label, count: regionCounts.get(label) ?? 0 })).filter((r) => r.count > 0);
-  const topKeywords = sorted(count(selected.flatMap((a) => a.keywords), (k) => k)).slice(0, 8);
+  const pastKeywords = new Set(groups.filter((g) => !g.current).flatMap((g) => g.articles.flatMap((a) => a.keywords)));
+  const topKeywords = sorted(count(selected.flatMap((a) => a.keywords), (k) => k))
+    .slice(0, 8)
+    .map((k) => ({ ...k, seenBefore: pastKeywords.has(k.label) }));
 
   const intel = analyzeArticles(selected, issues, allArticles, { excludeIssueNo: opts.issueNo, now: opts.now });
   const kind = (id: string) => {

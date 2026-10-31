@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { analyzeArticles, keywordTimeline } from "@/lib/mi";
 import { classify, extractKeywords, isRelevant } from "@/lib/mi/matcher";
+import { computeStats } from "@/lib/report/stats";
 import type { Article, NewsletterIssue } from "@/lib/types";
 
 const art = (p: Partial<Article> & Pick<Article, "id" | "title">): Article => ({
@@ -65,5 +66,35 @@ describe("MI 이력 매칭", () => {
   it("키워드 타임라인", () => {
     const tl = keywordTimeline(["AutoStore", "AMR"], issues, [past]);
     expect(tl).toEqual([{ keyword: "AutoStore", appearances: [{ issueNo: 2, publishDate: "2026-05-10", concept: "큐브형 AS/RS" }] }]);
+  });
+});
+
+describe("리포트 통계", () => {
+  const mk = (id: string, title: string, category: Article["category"], kw: string[], region: Article["region"] = "KR"): Article => ({
+    id, collectedAt: "", publishedAt: "2026-10-10T00:00:00Z", source: "s", region, title, link: `https://x/${id}`, summary: "", category, keywords: kw, selected: false,
+  });
+  const p1 = mk("P1", "과거1", "AMR/AGV", ["AMR", "쿠팡"]);
+  const p2 = mk("P2", "과거2", "소팅/보관설비", ["AutoStore"]);
+  const issues: NewsletterIssue[] = [
+    { issueNo: 1, publishDate: "2026-08-01", concept: "c", articleIds: ["P1"], html: "", keywords: [], createdAt: "" },
+    { issueNo: 2, publishDate: "2026-09-01", concept: "c", articleIds: ["P2"], html: "", keywords: [], createdAt: "" },
+  ];
+  const now = [mk("N1", "이번1", "AMR/AGV", ["AMR"]), mk("N2", "이번2", "로봇 피킹/매니퓰레이션", ["휴머노이드"], "GLOBAL")];
+
+  it("카테고리·지역 분포, 호별 추이, 지난 호에서도 등장한 키워드를 계산", () => {
+    const s = computeStats(now, issues, [p1, p2, ...now], { issueNo: 3, publishDate: "2026-10-27" });
+    expect(s.total).toBe(2);
+    expect(s.byRegion).toEqual([{ label: "국내", count: 1 }, { label: "해외", count: 1 }]);
+    expect(s.trend.issues.map((i) => [i.no, i.current])).toEqual([[1, false], [2, false], [3, true]]);
+    expect(s.trend.category.find((c) => c.label === "AMR/AGV")!.counts).toEqual([1, 0, 1]);
+    expect(s.topKeywords.find((k) => k.label === "AMR")!.seenBefore).toBe(true);
+    expect(s.topKeywords.find((k) => k.label === "휴머노이드")!.seenBefore).toBe(false);
+  });
+
+  it("첫 호는 비교 대상이 없고, 이번 호보다 뒤 번호의 호는 추세에 넣지 않음", () => {
+    const first = computeStats(now, [], now, { issueNo: 1, publishDate: "2026-10-27" });
+    expect(first.trend.issues).toHaveLength(1);
+    const early = computeStats(now, issues, [p1, p2, ...now], { issueNo: 2, publishDate: "2026-09-01" });
+    expect(early.trend.issues.map((i) => i.no)).toEqual([1, 2]);
   });
 });

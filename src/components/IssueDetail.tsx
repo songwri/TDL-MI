@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Article, NewsletterIssue } from "@/lib/types";
-import { EmailPreview } from "./EmailPreview";
-import { Badge, api, useToasts } from "./ui";
+import { cx, api, useToasts } from "./ui";
+import { EmailPreview, ReportActions } from "./EmailPreview";
+import { ReportViewer } from "./report/ReportViewer";
+import type { Article, NewsletterIssue, ViewerData } from "@/lib/types";
 
 /** HTML 문서에서 아웃룩 붙여넣기용 본문(body 내부)과 텍스트를 추출 */
 function splitHtml(html: string) {
@@ -14,12 +15,13 @@ function splitHtml(html: string) {
 
 export function IssueDetail({ issueNo }: { issueNo: number }) {
   const { push, view } = useToasts();
-  const [data, setData] = useState<{ issue: NewsletterIssue; articles: Article[] } | null>(null);
+  const [data, setData] = useState<{ issue: NewsletterIssue; articles: Article[]; viewer: ViewerData | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [parts, setParts] = useState<{ fragment: string; text: string } | null>(null);
+  const [tab, setTab] = useState<"view" | "mail">("view");
 
   useEffect(() => {
-    api<{ issue: NewsletterIssue; articles: Article[] }>(`/api/issues/${issueNo}`)
+    api<{ issue: NewsletterIssue; articles: Article[]; viewer: ViewerData | null }>(`/api/issues/${issueNo}`)
       .then((d) => {
         setData(d);
         setParts(splitHtml(d.issue.html));
@@ -29,27 +31,37 @@ export function IssueDetail({ issueNo }: { issueNo: number }) {
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!data || !parts) return <p className="text-slate-500">불러오는 중…</p>;
-  const { issue, articles } = data;
+  const { issue, viewer } = data;
+  const file = `TDL-Trend-제${issue.issueNo}호-${issue.publishDate}.html`;
+  const showView = tab === "view" && viewer && issue.content;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {view}
       <Link href="/issues" className="text-sm text-slate-500 hover:text-brand">← 발행 이력</Link>
-      <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold text-brand">제{issue.issueNo}호</h1>
-          <Badge>{issue.publishDate}</Badge>
-          <span className="font-semibold">{issue.headline}</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-md border border-slate-300 p-0.5 text-sm">
+          {([["view", "리포트 보기"], ["mail", "메일 본문"]] as const)
+            .filter(([k]) => k === "mail" || (viewer && issue.content))
+            .map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)} className={cx("rounded px-3 py-1", (tab === k && (k === "mail" || showView)) || (k === "mail" && !showView) ? "bg-slate-800 text-white" : "text-slate-600")}>
+                {label}
+              </button>
+            ))}
         </div>
-        <p className="text-sm text-slate-600"><b>메인 콘셉트:</b> {issue.concept}</p>
-        <div className="flex flex-wrap gap-1">{issue.keywords.map((k) => <Badge key={k} tone="accent">#{k}</Badge>)}</div>
-        <ul className="list-inside list-disc text-sm text-slate-700">
-          {articles.map((a) => (
-            <li key={a.id}><a href={a.link} target="_blank" rel="noreferrer" className="hover:text-brand hover:underline">{a.title}</a> <span className="text-slate-400">({a.source})</span></li>
-          ))}
-        </ul>
+        {showView && (
+          <div className="ml-auto">
+            <ReportActions html={issue.html} fragment={parts.fragment} text={parts.text} fileName={file} onToast={push} />
+          </div>
+        )}
       </div>
-      <EmailPreview html={issue.html} fragment={parts.fragment} text={parts.text} fileName={`TDL-Trend-제${issue.issueNo}호-${issue.publishDate}.html`} onToast={push} />
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        {showView ? (
+          <ReportViewer content={issue.content!} viewer={viewer!} />
+        ) : (
+          <EmailPreview html={issue.html} fragment={parts.fragment} text={parts.text} fileName={file} onToast={push} />
+        )}
+      </div>
     </div>
   );
 }

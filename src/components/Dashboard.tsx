@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CATEGORIES, type ReportContent, type RefreshResult } from "@/lib/types";
+import { CATEGORIES, type ReportContent, type RefreshResult, type ViewerData } from "@/lib/types";
 import { copyText } from "@/lib/clipboard";
 import { ArticleCard, type ArticleView } from "./ArticleCard";
 import { ContentEditor } from "./ContentEditor";
-import { EmailPreview } from "./EmailPreview";
+import { EmailPreview, ReportActions } from "./EmailPreview";
+import { ReportViewer } from "./report/ReportViewer";
 import { RelationTags } from "./RelationTags";
 import { Badge, Button, api, cx, useToasts } from "./ui";
 
@@ -42,6 +43,8 @@ interface Generated {
   html: string;
   fragment: string;
   text: string;
+  /** 인터랙티브 리포트 화면용. 예전에 저장된 초안에는 없을 수 있음 */
+  viewer?: ViewerData;
   issueNo: number;
   publishDate: string;
   articleIds: string[];
@@ -93,7 +96,7 @@ export function Dashboard() {
   const [concept, setConcept] = useState("");
   const [generating, setGenerating] = useState(false);
   const [gen, setGen] = useState<Generated | null>(null);
-  const [tab, setTab] = useState<"preview" | "edit">("preview");
+  const [tab, setTab] = useState<"view" | "mail" | "edit">("view");
   const [rendering, setRendering] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [handoffs, setHandoffs] = useState<HandoffSummary[]>([]);
@@ -225,7 +228,7 @@ export function Dashboard() {
       const g: Generated = { ...r, issueNo, publishDate, articleIds, concept };
       setGen(g);
       saveDraft(g);
-      setTab("preview");
+      setTab("view");
       push(r.notice ?? `뉴스레터 생성 완료 (${r.model ?? "LLM"})`, r.mode === "draft" ? "info" : "success");
       setTimeout(() => document.getElementById("preview")?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (e) {
@@ -264,13 +267,14 @@ export function Dashboard() {
     }
   };
 
-  const showHandoffResult = (r: { request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string }) => {
+  const showHandoffResult = (r: { request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData }) => {
     const g: Generated = {
       content: r.content,
       mode: "claude-code",
       html: r.html,
       fragment: r.fragment,
       text: r.text,
+      viewer: r.viewer,
       issueNo: r.request.issueNo,
       publishDate: r.request.publishDate,
       articleIds: r.request.articleIds,
@@ -278,7 +282,7 @@ export function Dashboard() {
     };
     setGen(g);
     saveDraft(g);
-    setTab("preview");
+    setTab("view");
     // 작성 패널도 의뢰서 기준으로 맞춘다 (CLI 에서 만든 의뢰서 포함)
     setIssueNo(r.request.issueNo);
     setPublishDate(r.request.publishDate);
@@ -289,7 +293,7 @@ export function Dashboard() {
 
   const loadHandoff = async (n: number) => {
     try {
-      const r = await api<{ request: HandoffSummary; content: ReportContent | null; html: string; fragment: string; text: string }>(`/api/handoff/${n}`);
+      const r = await api<{ request: HandoffSummary; content: ReportContent | null; html: string; fragment: string; text: string; viewer: ViewerData }>(`/api/handoff/${n}`);
       if (!r.content) return push(`제${n}호 작성본이 아직 없습니다. Claude Code에서 /write-report ${n} 를 실행하세요.`, "error");
       showHandoffResult({ ...r, content: r.content });
       push(`제${n}호 작성본을 불러왔습니다.`, "success");
@@ -301,7 +305,7 @@ export function Dashboard() {
   const submitPaste = async () => {
     if (pasteFor === null) return;
     try {
-      const r = await api<{ request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string }>(
+      const r = await api<{ request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData }>(
         `/api/handoff/${pasteFor}/content`,
         { json: { json: pasteText } },
       );
@@ -320,13 +324,13 @@ export function Dashboard() {
     if (!gen) return;
     setRendering(true);
     try {
-      const r = await api<{ html: string; fragment: string; text: string }>("/api/newsletter/render", {
+      const r = await api<{ html: string; fragment: string; text: string; viewer: ViewerData }>("/api/newsletter/render", {
         json: { content: gen.content, issueNo: gen.issueNo, publishDate: gen.publishDate, articleIds: gen.articleIds },
       });
       const g = { ...gen, ...r };
       setGen(g);
       saveDraft(g);
-      setTab("preview");
+      setTab("view");
       push("편집 내용을 미리보기에 반영했습니다.", "success");
     } catch (e) {
       push((e as Error).message, "error");
@@ -356,17 +360,23 @@ export function Dashboard() {
     }
   };
 
+  const publishButton = (
+    <Button onClick={publish} disabled={publishing}>
+      {publishing ? "저장 중…" : "✅ 발행 확정"}
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
       {toasts}
-      {/* 상태 바 */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <Badge tone="green">{status?.writer === "api" ? `⚡ API 작성 모드 · ${status.llm}` : "📝 Claude Code 작성 모드 (API 토큰 사용 없음)"}</Badge>
-        <Badge tone={status?.sheets ? "green" : "amber"}>
-          {status?.sheets ? (status.store === "sheets" ? `📗 구글 시트가 원본 (${status.sheetsVia === "apps-script" ? "Apps Script, 무료" : "서비스 계정"})` : "📗 Google Sheets 연동 (내 PC 모드)") : "📗 Sheets 미설정 (로컬 캐시만 사용)"}
-        </Badge>
-        <Badge>기사 {status?.articleCount ?? 0}건 · 발행 {status?.issueCount ?? 0}호</Badge>
-        {status?.lastRefreshAt && <Badge>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR")}</Badge>}
+      {/* 상태 줄: 작업에 필요한 사실만. 연결 문제가 있을 때만 경고를 보인다 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+        <span>기사 {status?.articleCount ?? 0}건</span>
+        <span>발행 {status?.issueCount ?? 0}호</span>
+        {status?.lastRefreshAt && <span>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR", { dateStyle: "medium", timeStyle: "short" })}</span>}
+        {status && !status.sheets && status.store === "sheets" && (
+          <span className="font-semibold text-red-700">구글 시트 연결 설정이 필요합니다. 관리자에게 문의해 주세요.</span>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
@@ -507,24 +517,20 @@ export function Dashboard() {
             <Button variant="primary" className="w-full py-2" onClick={saveHandoff} disabled={savingHandoff || !selected.length}>
               {savingHandoff ? "저장 중…" : "📝 작성 의뢰 저장"}
             </Button>
-            <div className="flex gap-2">
-              {status?.writer === "api" && (
-                <Button className="flex-1" onClick={generate} disabled={generating || !selected.length}>
-                  {generating ? "⏳ 작성 중…" : "⚡ API로 바로 작성"}
-                </Button>
-              )}
-              <Button variant="ghost" className="flex-1" onClick={generate} disabled={generating || !selected.length} title="본문은 기사 원문으로 채운 레이아웃 확인용 초안">
-                {generating ? "⏳" : "👀 규칙 초안으로 레이아웃 보기"}
+            {status?.writer === "api" && (
+              <Button className="w-full" onClick={generate} disabled={generating || !selected.length}>
+                {generating ? "작성 중…" : "바로 작성"}
               </Button>
-            </div>
+            )}
           </div>
 
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="font-bold text-brand">작성 의뢰서</h2>
-            <p className="text-xs leading-relaxed text-slate-500">
-              선정 결과는 서버에 의뢰서로 저장됩니다. Claude Code에서 <code className="rounded bg-slate-100 px-1">/write-report 호수</code> 를 실행하면
-              선정 기사를 주제별로 묶은 리포트가 작성되고, 여기서 <b>작성본 불러오기</b>로 확인합니다. Claude 대화창을 쓴다면 의뢰서를 복사해 붙여넣고, 받은 JSON 을 붙여넣으세요.
-            </p>
+          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+            <h2 className="font-bold text-brand">리포트 작성 현황</h2>
+            <ol className="space-y-1 text-xs text-slate-600">
+              <li><b className="text-slate-800">1.</b> 위에서 기사를 고르고 <b>작성 의뢰 저장</b></li>
+              <li><b className="text-slate-800">2.</b> 작성 담당자가 Claude Code에서 <code className="rounded bg-slate-100 px-1">/write-report 호수</code> 실행</li>
+              <li><b className="text-slate-800">3.</b> 상태가 <b>작성 완료</b>가 되면 <b>작성본 불러오기</b>로 확인하고 발송</li>
+            </ol>
             {handoffs.length === 0 ? (
               <p className="rounded border border-dashed border-slate-300 p-3 text-center text-xs text-slate-500">아직 저장된 의뢰서가 없습니다.</p>
             ) : (
@@ -541,11 +547,16 @@ export function Dashboard() {
                       <Button className="px-2 py-1 text-xs" variant={h.hasContent ? "primary" : "secondary"} onClick={() => loadHandoff(h.issueNo)} disabled={!h.hasContent}>
                         작성본 불러오기
                       </Button>
-                      <Button className="px-2 py-1 text-xs" onClick={() => copyHandoffPrompt(h.issueNo)}>의뢰서 복사</Button>
-                      <Button className="px-2 py-1 text-xs" variant="ghost" onClick={() => setPasteFor(pasteFor === h.issueNo ? null : h.issueNo)}>
-                        작성본 붙여넣기
-                      </Button>
                     </div>
+                    <details className="mt-1.5 text-slate-500">
+                      <summary className="cursor-pointer select-none">다른 방법으로 작성</summary>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        <Button className="px-2 py-1 text-xs" onClick={() => copyHandoffPrompt(h.issueNo)}>의뢰서 복사</Button>
+                        <Button className="px-2 py-1 text-xs" variant="ghost" onClick={() => setPasteFor(pasteFor === h.issueNo ? null : h.issueNo)}>
+                          작성본 붙여넣기
+                        </Button>
+                      </div>
+                    </details>
                     {pasteFor === h.issueNo && (
                       <div className="mt-2 space-y-1.5">
                         <textarea
@@ -565,11 +576,11 @@ export function Dashboard() {
                 ))}
               </ul>
             )}
-            <Button variant="ghost" className="w-full text-xs" onClick={load}>↻ 상태 새로고침</Button>
+            <Button variant="ghost" className="w-full text-xs" onClick={load}>↻ 새로고침</Button>
           </div>
           <p className="px-1 text-xs text-slate-500">
-            과거 발행 이력과 비교한 연관 태그는 최근 6개월 내 발행 호를 기준으로 표시됩니다. 전체 이력은{" "}
-            <Link href="/issues" className="text-brand underline">MI 아카이브</Link>에서 확인하세요.
+            기사의 <b>제N호 후속·연관</b> 태그는 최근 6개월 발행분과 비교한 결과입니다. 전체 이력은{" "}
+            <Link href="/issues" className="text-brand underline">발행 이력</Link>에서 확인하세요.
           </p>
         </aside>
       </div>
@@ -579,20 +590,29 @@ export function Dashboard() {
         <section id="preview" className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-bold text-brand">제{gen.issueNo}호 미리보기</h2>
-            <Badge tone={gen.mode === "draft" ? "amber" : "green"}>{gen.mode === "claude-code" ? "Claude Code 작성본" : gen.mode === "llm" ? `API 작성 · ${gen.model ?? ""}` : "규칙 초안 (레이아웃 확인용)"}</Badge>
             <div className="inline-flex rounded-md border border-slate-300 p-0.5 text-sm">
-              {(["preview", "edit"] as const).map((t) => (
-                <button key={t} onClick={() => setTab(t)} className={cx("rounded px-3 py-1", tab === t ? "bg-slate-800 text-white" : "text-slate-600")}>
-                  {t === "preview" ? "미리보기" : "섹션 편집"}
-                </button>
-              ))}
+              {([["view", "리포트 보기"], ["mail", "메일 본문"], ["edit", "내용 수정"]] as const)
+                .filter(([k]) => k !== "view" || gen.viewer)
+                .map(([k, label]) => (
+                  <button key={k} onClick={() => setTab(k)} className={cx("rounded px-3 py-1", tab === k || (k === "mail" && tab === "view" && !gen.viewer) ? "bg-slate-800 text-white" : "text-slate-600")}>
+                    {label}
+                  </button>
+                ))}
             </div>
-            <Button variant="ghost" className="ml-auto" onClick={() => { setGen(null); saveDraft(null); }}>초안 닫기</Button>
+            <Button variant="ghost" className="ml-auto" onClick={() => { setGen(null); saveDraft(null); }}>닫기</Button>
           </div>
           {tab === "edit" ? (
             <div className="space-y-3">
               <ContentEditor value={gen.content} onChange={(content) => setGen({ ...gen, content })} />
-              <Button variant="primary" onClick={applyEdits} disabled={rendering}>{rendering ? "반영 중…" : "✔ 미리보기에 반영"}</Button>
+              <Button variant="primary" onClick={applyEdits} disabled={rendering}>{rendering ? "반영 중…" : "✔ 수정 내용 반영"}</Button>
+            </div>
+          ) : tab === "view" && gen.viewer ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <span>화면에서 필터·펼침으로 살펴보는 보기입니다. 메일에는 <b>메일 본문용 복사</b>로 같은 내용의 정지된 표 버전이 붙습니다.</span>
+                <ReportActions html={gen.html} fragment={gen.fragment} text={gen.text} fileName={`TDL-Trend-제${gen.issueNo}호-${gen.publishDate}.html`} onToast={push} extra={publishButton} />
+              </div>
+              <ReportViewer content={gen.content} viewer={gen.viewer} />
             </div>
           ) : (
             <EmailPreview
@@ -601,11 +621,7 @@ export function Dashboard() {
               text={gen.text}
               fileName={`TDL-Trend-제${gen.issueNo}호-${gen.publishDate}.html`}
               onToast={push}
-              extraActions={
-                <Button variant="primary" onClick={publish} disabled={publishing}>
-                  {publishing ? "저장 중…" : "✅ 발행 확정 (이력 저장)"}
-                </Button>
-              }
+              extraActions={publishButton}
             />
           )}
         </section>

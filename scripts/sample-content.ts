@@ -2,12 +2,12 @@ import type { ReportContent } from "@/lib/types";
 
 /** 톤·레이아웃·인포그래픽 확인용 예시 리포트 (기사 내용은 샘플 데이터 기준의 가상 예시) */
 export const SAMPLE_ARTICLES = [
-  { id: "s1", title: "AutoStore unveils next-gen picking port with integrated robotic arm", source: "Robotics 24/7", link: "https://example.com/sample/c1", publishedAt: "2026-10-17" },
-  { id: "s2", title: "CJ대한통운, 곤지암 메가허브에 AMR 200대 추가 투입", source: "물류신문", link: "https://example.com/sample/c2", publishedAt: "2026-10-18" },
-  { id: "s3", title: "Agility Robotics raises new round to scale Digit humanoid production", source: "Supply Chain Dive", link: "https://example.com/sample/c3", publishedAt: "2026-10-15" },
-  { id: "s4", title: "현대글로비스, 디지털 트윈 기반 물류센터 시뮬레이션 플랫폼 구축", source: "카고뉴스", link: "https://example.com/sample/c4", publishedAt: "2026-10-14" },
-  { id: "s5", title: "Tariff uncertainty pushes shippers toward warehouse automation", source: "Supply Chain Dive", link: "https://example.com/sample/c7", publishedAt: "2026-10-09" },
-  { id: "s6", title: "레인보우로보틱스, 물류용 양팔 모바일 매니퓰레이터 공개", source: "로봇신문", link: "https://example.com/sample/c6", publishedAt: "2026-10-11" },
+  { id: "s1", title: "AutoStore unveils next-gen picking port with integrated robotic arm", source: "Robotics 24/7", link: "https://example.com/sample/c1", publishedAt: "2026-10-17", region: "GLOBAL" as const },
+  { id: "s2", title: "CJ대한통운, 곤지암 메가허브에 AMR 200대 추가 투입", source: "물류신문", link: "https://example.com/sample/c2", publishedAt: "2026-10-18", region: "KR" as const },
+  { id: "s3", title: "Agility Robotics raises new round to scale Digit humanoid production", source: "Supply Chain Dive", link: "https://example.com/sample/c3", publishedAt: "2026-10-15", region: "GLOBAL" as const },
+  { id: "s4", title: "현대글로비스, 디지털 트윈 기반 물류센터 시뮬레이션 플랫폼 구축", source: "카고뉴스", link: "https://example.com/sample/c4", publishedAt: "2026-10-14", region: "KR" as const },
+  { id: "s5", title: "Tariff uncertainty pushes shippers toward warehouse automation", source: "Supply Chain Dive", link: "https://example.com/sample/c7", publishedAt: "2026-10-09", region: "GLOBAL" as const },
+  { id: "s6", title: "레인보우로보틱스, 물류용 양팔 모바일 매니퓰레이터 공개", source: "로봇신문", link: "https://example.com/sample/c6", publishedAt: "2026-10-11", region: "KR" as const },
 ];
 
 export const SAMPLE_REPORT: ReportContent = {
@@ -83,10 +83,10 @@ export const SAMPLE_REPORT: ReportContent = {
       { label: "해외", count: 3 },
     ],
     topKeywords: [
-      { label: "AutoStore", count: 2 },
-      { label: "AMR", count: 2 },
-      { label: "휴머노이드", count: 2 },
-      { label: "피스피킹", count: 2 },
+      { label: "AutoStore", count: 2, seenBefore: true },
+      { label: "AMR", count: 2, seenBefore: true },
+      { label: "휴머노이드", count: 2, seenBefore: true },
+      { label: "피스피킹", count: 2, seenBefore: true },
       { label: "디지털 트윈", count: 1 },
       { label: "Agility Robotics", count: 1 },
       { label: "현대글로비스", count: 1 },

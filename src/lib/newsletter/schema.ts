@@ -34,7 +34,7 @@ export const StoredReportSchema = ReportSchema.extend({
       total: z.number(),
       byCategory: z.array(z.object({ label: z.string(), count: z.number() })),
       byRegion: z.array(z.object({ label: z.string(), count: z.number() })),
-      topKeywords: z.array(z.object({ label: z.string(), count: z.number() })),
+      topKeywords: z.array(z.object({ label: z.string(), count: z.number(), seenBefore: z.boolean().optional() })),
       repeat: z.object({ fresh: z.number(), followUp: z.number(), duplicate: z.number() }),
       trend: z.object({
         issues: z.array(z.object({ no: z.number(), date: z.string(), current: z.boolean() })),

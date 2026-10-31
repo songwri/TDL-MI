@@ -15,7 +15,7 @@ export const ARTICLE_HEADERS = [
 ] as const;
 export const ISSUE_HEADERS = [
   "호수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
-  "HTML(이어짐1)", "HTML(이어짐2)", "HTML(이어짐3)",
+  "HTML(이어짐1)", "HTML(이어짐2)", "HTML(이어짐3)", "리포트 데이터(JSON)", "리포트 데이터(이어짐)",
 ] as const;
 
 /** 구글 시트 셀 최대 50,000자 제한 → 완성된 HTML은 여러 셀로 분할 저장 */
@@ -139,7 +139,17 @@ export function issueToRow(i: NewsletterIssue): string[] {
   return [
     String(i.issueNo), i.publishDate, i.concept, i.articleIds.join(", "), chunks[0], i.keywords.join(", "),
     i.headline ?? "", i.createdAt, ...chunks.slice(1),
+    ...(i.content ? [JSON.stringify(i.content).slice(0, CELL_LIMIT), JSON.stringify(i.content).slice(CELL_LIMIT, CELL_LIMIT * 2)] : ["", ""]),
   ];
+}
+
+function parseContent(json: string): NewsletterIssue["content"] {
+  if (!json) return undefined;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return undefined; // 일부만 저장된 경우 등: 메일 HTML 만 보여 준다
+  }
 }
 
 export function rowToIssue(r: string[]): NewsletterIssue | null {
@@ -154,6 +164,7 @@ export function rowToIssue(r: string[]): NewsletterIssue | null {
     keywords: (r[5] ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     headline: r[6] || undefined,
     createdAt: r[7] ?? "",
+    content: parseContent([r[11], r[12]].filter(Boolean).join("")),
   };
 }
 

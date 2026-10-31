@@ -78,7 +78,8 @@ export interface ReportStats {
   total: number;
   byCategory: { label: string; count: number }[];
   byRegion: { label: string; count: number }[];
-  topKeywords: { label: string; count: number }[];
+  /** seenBefore: 지난 호에서도 등장한 키워드 */
+  topKeywords: { label: string; count: number; seenBefore?: boolean }[];
   /** 이번 호 기사 중 지난 호와의 관계 */
   repeat: { fresh: number; followUp: number; duplicate: number };
   /** 최근 호 + 이번 호 (오래된 순) */
@@ -90,6 +91,14 @@ export interface ReportStats {
 }
 
 export type ReportContent = ReportDraft & { stats?: ReportStats };
+
+/** 웹 인터랙티브 리포트 화면에 필요한 부가 정보 (선정 기사 순서 = 참고 기사 번호) */
+export interface ViewerData {
+  issueNo: number;
+  publishDate: string;
+  brand: { product: string; publisher: string; audience: string };
+  articles: Pick<Article, "id" | "title" | "source" | "link" | "publishedAt" | "category" | "region">[];
+}
 
 export type RelationKind = "duplicate" | "follow-up" | "related";
 
