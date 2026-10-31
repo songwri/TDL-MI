@@ -10,6 +10,9 @@ export const config = {
   spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID ?? "",
   serviceAccountKeyPath: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ?? "",
   serviceAccountKeyBase64: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_BASE64 ?? "",
+  /** 무료 방식: 시트에 붙인 Apps Script 웹 앱 주소와 토큰 (구글 클라우드 불필요) */
+  sheetsWebAppUrl: process.env.SHEETS_WEBAPP_URL ?? "",
+  sheetsWebAppToken: process.env.SHEETS_WEBAPP_TOKEN ?? "",
   /** 키 JSON 파일 내용을 그대로 붙여 넣는 방식 (웹 호스팅 환경변수용) */
   serviceAccountKeyJson: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON ?? "",
   /** 서버리스는 쓰기 가능한 곳이 임시 폴더뿐이라 캐시만 둔다 */
@@ -26,10 +29,14 @@ export const config = {
   feedbackEmail: process.env.NEWSLETTER_FEEDBACK_EMAIL || "",
 };
 
-export const sheetsEnabled = () =>
-  Boolean(
-    config.spreadsheetId && (config.serviceAccountKeyPath || config.serviceAccountKeyBase64 || config.serviceAccountKeyJson),
-  );
+/** 시트 연결 방식: Apps Script(무료, 권장) 또는 서비스 계정(구글 클라우드) */
+export const sheetsVia = (): "apps-script" | "service-account" | null => {
+  if (config.sheetsWebAppUrl && config.sheetsWebAppToken) return "apps-script";
+  if (config.spreadsheetId && (config.serviceAccountKeyPath || config.serviceAccountKeyBase64 || config.serviceAccountKeyJson)) return "service-account";
+  return null;
+};
+
+export const sheetsEnabled = () => sheetsVia() !== null;
 
 /**
  * 저장 방식

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { auth as gauth, sheets as gsheets, type sheets_v4 } from "@googleapis/sheets";
-import { config, sheetsEnabled } from "@/lib/config";
+import { config, sheetsEnabled, sheetsVia } from "@/lib/config";
+import { createAppsScriptClient } from "./appsScript";
 import { CATEGORIES, type Article, type Category, type NewsletterIssue } from "@/lib/types";
 
 /** ── 시트 스키마 ─────────────────────────────────────────── */
@@ -38,7 +39,11 @@ function loadCredentials() {
 
 function getClient(): sheets_v4.Sheets {
   if (client) return client;
-  if (!sheetsEnabled()) throw new Error("Google Sheets 환경변수가 설정되지 않았습니다.");
+  if (!sheetsEnabled()) throw new Error("구글 시트 연결 설정(SHEETS_WEBAPP_URL, SHEETS_WEBAPP_TOKEN)이 없습니다.");
+  if (sheetsVia() === "apps-script") {
+    client = createAppsScriptClient(config.sheetsWebAppUrl, config.sheetsWebAppToken);
+    return client;
+  }
   const credentials = loadCredentials();
   const auth = new gauth.GoogleAuth({
     credentials,

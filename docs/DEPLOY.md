@@ -1,78 +1,94 @@
-# 웹으로 운영하기 (구글 시트 + Vercel + GitHub Actions)
+# 무료로 웹 운영하기 (구글 시트 + Apps Script + 무료 호스팅 + GitHub Actions)
 
-내 컴퓨터 없이 쓰는 구성입니다.
+구글 클라우드 콘솔, 서비스 계정, 결제 정보가 필요 없습니다. **구글 계정, GitHub 계정, (선택) 호스팅 계정**만 있으면 됩니다.
 
 ```
-[GitHub Actions]  매일 08:00 뉴스 사이트 수집 ─┐
-                                               ├─▶  [구글 시트]  ◀── 유일한 원본
-[웹 서버(Vercel)] 기사 선정 · 작성 의뢰 · 미리보기 ─┤        Raw_Articles / Newsletter_Issues
-                                               │        Article_Bodies / Handoffs
-[Claude Code]     /write-letter 로 레터 작성  ───┘
+[GitHub Actions]  매일 08:00 뉴스 수집 ──┐
+[웹 서버(무료 호스팅)] 기사 선정 · 작성 의뢰 · 미리보기 · 복사 ──┼─▶ Apps Script ─▶ 구글 시트 TDL_MI  ◀── 유일한 원본
+[Claude Code]  /write-report 로 리포트 작성 ──┘
 ```
 
-- 기사, 선정 결과, 작성 의뢰서, 작성본, 발행 이력이 **모두 구글 시트에 쌓입니다.** 웹 서버에는 아무것도 저장하지 않습니다.
-- 시트를 열어 보고 직접 고쳐도 됩니다(카테고리, 선정여부 칸 등). 웹은 20초마다 시트를 다시 읽습니다.
+| 구성 요소 | 용도 | 비용 |
+|---|---|---|
+| 구글 시트 + **Apps Script** | 데이터 저장소와 연결 통로 | 무료 (구글 계정만) |
+| GitHub + **GitHub Actions** | 코드 보관, 매일 기사 수집 | 무료 (공개 저장소는 실행 시간 무제한, 비공개는 월 무료 한도가 있으니 요금표 확인) |
+| **Vercel Hobby** 또는 **Render Free** | 웹 화면 | 무료 (아래 2번 참고) |
+| **Claude Code** (현재 사용 중인 구독) | 리포트 글쓰기 | 추가 비용 없음. Anthropic API를 쓰지 않습니다 |
 
-> 개인 구글 계정·개인 GitHub 계정으로 진행하는 것을 기준으로 합니다. 화면 문구는 바뀔 수 있습니다.
+> 한도와 약관은 각 서비스 요금 페이지에서 바뀔 수 있습니다. 시작하기 전에 한 번 확인해 주세요.
 
 ---
 
-## 1. 구글 시트 준비 (약 15분)
+## 1. 구글 시트 연결 (약 10분)
 
-**① 서비스 계정 만들기** (웹 서버가 시트에 쓰기 위한 "로봇 계정")
+1. 만들어 둔 **TDL_MI** 시트를 엽니다.
+2. 위쪽 메뉴 **확장 프로그램 → Apps Script**를 누르면 새 탭이 열립니다.
+3. 왼쪽 파일 `Code.gs`의 기존 내용을 모두 지우고, 이 저장소의 [`apps-script/Code.gs`](../apps-script/Code.gs) 내용 전체를 붙여 넣습니다.
+   (GitHub에서 파일을 열고 오른쪽 위 **Copy raw file** 버튼 → Apps Script 편집기에서 `Ctrl+V`)
+4. 맨 위의 `TOKEN` 값을 바꿉니다. 영문·숫자 30자 이상, 아무거나 괜찮습니다. **이 값을 메모해 두세요.** `Ctrl+S`로 저장합니다.
+   ```
+   var TOKEN = '여기에-길고-랜덤한-문자열을-넣으세요';   ← 이 부분을 바꿉니다
+   ```
+5. 오른쪽 위 **배포 → 새 배포** → 톱니바퀴(유형 선택) → **웹 앱**
+   - 설명: `v1`
+   - **실행 사용자: 나**
+   - **액세스 권한이 있는 사용자: 모든 사용자** → **배포**
+6. **액세스 승인**을 누르고 구글 계정을 선택합니다. "Google에서 확인하지 않은 앱" 화면이 나오면 **고급 → (프로젝트 이름)(안전하지 않음)으로 이동 → 허용**을 누릅니다. 본인이 만든 스크립트에 본인 시트 접근을 허락하는 절차입니다.
+7. 나온 **웹 앱 URL**(`https://script.google.com/macros/s/…/exec`)을 복사합니다.
+8. 확인: 브라우저 새 탭에 그 주소를 붙여 넣어 열었을 때 `{"ok":true,"data":{"service":"TDL Trend sheet bridge"…`가 보이면 성공입니다.
 
-1. https://console.cloud.google.com 접속 → 개인 구글 계정으로 로그인 (처음이면 약관 동의 화면이 나옵니다)
-2. 위쪽 프로젝트 선택 → **새 프로젝트** → 이름 `news-inbound` → 만들기
-3. 왼쪽 메뉴 **API 및 서비스 → 라이브러리** → `Google Sheets API` 검색 → **사용**
-4. **IAM 및 관리자 → 서비스 계정 → 서비스 계정 만들기** → 이름 `news-inbound` → 역할은 건너뛰고 **완료**
-5. 만든 서비스 계정을 눌러 **키** 탭 → **키 추가 → 새 키 만들기 → JSON → 만들기**
-   - JSON 파일이 내려받아집니다. **이 파일은 비밀번호와 같습니다.** 메신저·메일·채팅에 붙여 넣지 마세요.
-6. 서비스 계정 상세 화면의 이메일(`news-inbound@…iam.gserviceaccount.com`)을 복사해 둡니다.
+이제 두 값이 생겼습니다.
+- `SHEETS_WEBAPP_URL` = 7번에서 복사한 주소
+- `SHEETS_WEBAPP_TOKEN` = 4번에서 정한 TOKEN
 
-**② 스프레드시트 만들기**
+> **보안:** "모든 사용자"는 주소를 아는 사람이 요청을 보낼 수 있다는 뜻이지만, TOKEN이 맞지 않으면 아무것도 읽거나 쓸 수 없습니다. 주소와 TOKEN을 함께 공개하지 마세요. 새어 나갔다면 4번에서 TOKEN을 바꾸고 **배포 관리 → 편집(연필) → 버전: 새 버전 → 배포**로 다시 배포하면 됩니다.
+> 코드를 나중에 고쳤을 때도 같은 방법으로 **새 버전으로 다시 배포**해야 반영됩니다.
 
-1. https://sheets.google.com → 빈 스프레드시트 → 이름 `TDL_MI`
-2. 오른쪽 위 **공유** → 위에서 복사한 서비스 계정 이메일을 **편집자**로 추가 (알림 메일 보내기는 꺼도 됨)
-3. 브라우저 주소 `https://docs.google.com/spreadsheets/d/`**`여기 긴 글자`**`/edit` 의 **긴 글자**가 스프레드시트 ID입니다.
-
-시트의 탭(Raw_Articles 등)은 만들지 않아도 됩니다. 앱이 처음 접속할 때 알아서 만듭니다.
-
-> 서비스 계정과 키 만들기, 시트 공유는 개인 구글 계정에서 별도 승인 없이 할 수 있습니다. 클라우드 콘솔에서 결제 정보 등록을 요구하더라도 Google Sheets API와 서비스 계정 사용에는 요금이 들지 않습니다.
+시트 탭(Raw_Articles 등 4개)은 만들 필요가 없습니다. 웹이 처음 접속할 때 자동으로 만들고, 웹의 **발행 이력 → 📗 연결 확인 · 시트 초기화** 버튼으로도 만들 수 있습니다.
 
 ---
 
-## 2. 웹 서버 올리기 (Vercel, 약 10분)
+## 2. 웹 화면 올리기 (무료, 둘 중 하나)
 
-1. https://vercel.com → **Continue with GitHub**로 가입
+### A. Vercel Hobby
+
+1. https://vercel.com → **Continue with GitHub**로 가입 (카드 등록 없음)
 2. **Add New → Project** → `songwri/TDL-MI` 선택 → **Import**
-3. **Environment Variables**에 아래를 입력한 뒤 **Deploy**
+3. **Environment Variables**에 입력 후 **Deploy**
 
 | 이름 | 값 |
 |---|---|
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | 1-② 에서 복사한 ID |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 1-① 에서 받은 JSON 파일을 메모장으로 열어 **내용 전체**를 붙여 넣기 |
-| `APP_PASSWORD` | 접속 비밀번호 (직접 정하세요. 아래 주소를 아는 누구나 들어올 수 있어서 꼭 설정) |
-| `NEWSLETTER_FEEDBACK_EMAIL` | (선택) 리포트 푸터에 표시할 문의 메일 주소 |
+| `SHEETS_WEBAPP_URL` | 1번의 웹 앱 URL |
+| `SHEETS_WEBAPP_TOKEN` | 1번의 TOKEN |
+| `APP_PASSWORD` | 웹 접속 비밀번호 (직접 정하세요. 주소를 아는 누구나 들어올 수 있어서 꼭 설정) |
 
-4. 배포가 끝나면 `https://○○○.vercel.app` 주소가 나옵니다. 열면 비밀번호 창이 뜹니다(사용자 이름은 아무거나, 비밀번호만 입력).
-5. 화면 위쪽 배지에 **📗 구글 시트가 원본 (웹 모드)** 가 보이면 연결된 것입니다.
+- 장점: 항상 즉시 열립니다.
+- 주의: Hobby 플랜은 약관상 **개인·비상업 용도**로 안내됩니다. 회사 업무용이면 약관을 확인하고, 애매하면 B를 쓰세요.
+- 한도: 요청 하나가 60초를 넘으면 끊깁니다. **🔄 기사 최신화** 버튼은 채널을 하나씩 나눠 요청하고, 대량 수집은 3번이 맡습니다.
 
-> 무료(Hobby) 플랜으로 시작할 수 있습니다. 다른 호스팅(Cloud Run, Render 등)에도 같은 환경변수로 올릴 수 있습니다.
-> 웹 서버의 요청 시간 제한(60초) 때문에 **🔄 기사 최신화** 버튼은 채널을 하나씩 나눠서 요청합니다. 대량 수집은 아래 3번 자동 수집이 맡습니다.
+### B. Render Free
+
+1. https://render.com → GitHub로 가입
+2. **New → Blueprint** → `songwri/TDL-MI` 선택 (저장소의 `render.yaml`을 읽습니다)
+3. 입력 칸이 나오면 `SHEETS_WEBAPP_URL`, `SHEETS_WEBAPP_TOKEN`, `APP_PASSWORD`를 넣고 **Apply**
+- 장점: 요청 시간 제한이 짧지 않아 기사 최신화 버튼으로 한 번에 수집해도 됩니다.
+- 주의: 무료 서비스는 한동안 접속이 없으면 잠들고, 다음 첫 접속에서 깨어나는 데 **1분 안팎** 걸립니다. 격주 사용에는 큰 문제가 없습니다. (이 설정 파일은 제가 직접 Render에서 실행해 보지는 못했습니다. 안 되면 화면을 보내 주세요.)
+
+어느 쪽이든 배포가 끝나면 주소가 나옵니다. 열면 비밀번호 창이 뜹니다(사용자 이름은 아무거나, 비밀번호만 입력). 화면 위쪽에 **📗 구글 시트가 원본 (Apps Script, 무료)** 배지가 보이면 연결된 것입니다.
 
 ---
 
-## 3. 매일 자동 수집 (GitHub Actions, 약 5분)
+## 3. 매일 08:00 자동 수집 (GitHub Actions)
 
 1. GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret**
-2. 두 개를 만듭니다. 값은 Vercel에 넣은 것과 같습니다.
-   - `GOOGLE_SHEETS_SPREADSHEET_ID`
-   - `GOOGLE_SERVICE_ACCOUNT_KEY_JSON`
+2. 두 개를 만듭니다. 값은 2번에 넣은 것과 같습니다.
+   - `SHEETS_WEBAPP_URL`
+   - `SHEETS_WEBAPP_TOKEN`
 3. **Actions** 탭 → 왼쪽 `collect-articles` → **Run workflow**로 한 번 실행해 봅니다.
-4. 끝나면 구글 시트 `Raw_Articles`에 기사가 쌓여 있어야 합니다. 이후 매일 08:00(한국시간)에 자동 실행됩니다.
+4. 끝나면 시트 `Raw_Articles`에 기사가 쌓여 있어야 합니다. 이후 매일 08:00(한국시간)에 자동 실행됩니다. GitHub 예약 작업은 몇 분에서 길게는 1시간쯤 늦게 시작하기도 합니다.
 5. 실행 로그에 사이트별 `✔/✘`와 실패 이유가 나옵니다. 모든 사이트가 실패하면 실행이 실패로 표시되고 GitHub가 알림을 보냅니다.
 
-일부 국내 언론사는 해외 데이터센터 접속을 막기도 합니다. 로그에서 `HTTP 403` 등이 보이는 사이트는 알려 주시면 대체 방법(Google News 검색 등)을 붙입니다.
+일부 국내 언론사는 해외 데이터센터 접속을 막기도 합니다. 로그에서 `HTTP 403` 등이 보이는 사이트는 알려 주세요.
 
 ---
 
@@ -80,31 +96,45 @@
 
 글쓰기는 Claude Code가 하고, 의뢰서와 작성본은 구글 시트를 통해 오갑니다.
 
-1. Claude Code 환경 설정(웹: 세션 제목 줄의 환경 메뉴 → Edit)에서 환경변수를 넣습니다.
-   `STORE_MODE=sheets`, `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY_JSON`
-2. 네트워크 접근에 `sheets.googleapis.com`, `oauth2.googleapis.com`이 허용되어야 합니다.
-3. 새 세션에서 이 저장소를 열고 `/write-report 4`(또는 "이번 호 기사 골라줘").
+1. Claude Code 환경 설정(웹: 세션 제목 줄의 환경 메뉴 → Edit)에 환경변수를 넣습니다.
+   `STORE_MODE=sheets`, `SHEETS_WEBAPP_URL`, `SHEETS_WEBAPP_TOKEN`
+2. 네트워크 접근에 `script.google.com`과 `script.googleusercontent.com`을 허용합니다. (Apps Script는 응답을 두 번째 주소로 돌려줍니다.)
+3. 새 세션에서 이 저장소를 열고 `/write-report 4`(또는 "이번 호 기사 골라줘")를 입력합니다.
 
 순서: 웹에서 **📝 작성 의뢰 저장** → Claude Code `/write-report 4` → 웹 **작성 의뢰서 → 작성본 불러오기** → **📋 메일 본문용 복사**(아웃룩 새 메일에 Ctrl+V) → **✅ 발행 확정**.
 
 ---
 
+## 무료 한도에서 알아 둘 점
+
+| 항목 | 내용 |
+|---|---|
+| Apps Script | 계정당 하루 호출·실행 시간 한도가 있지만, 이 앱은 하루 수십~수백 번 호출이라 여유가 있습니다. 한도를 넘으면 오류가 나고 다음 날 풀립니다 |
+| 속도 | 시트 호출마다 1~3초 걸립니다. 기사 수백 건을 한 번에 저장해도 수십 초 안입니다 |
+| 시트 크기 | 기사 1건은 몇 줄과 본문 1칸입니다. 수천 건까지는 문제없고, 오래 쌓이면 오래된 기사를 다른 탭으로 옮기면 됩니다 |
+| 한 시트를 여러 명이 | 쓰기는 한 번에 하나씩 처리되어 겹쳐 쓰지 않습니다 |
+
 ## 환경변수 한눈에
 
 | 이름 | 필요 | 설명 |
 |---|---|---|
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | 필수 | 스프레드시트 ID |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 필수 | 서비스 계정 키 JSON 내용 (파일 경로 `…_KEY_PATH`, base64 `…_KEY_BASE64` 방식도 지원) |
+| `SHEETS_WEBAPP_URL` | 필수 | Apps Script 웹 앱 URL |
+| `SHEETS_WEBAPP_TOKEN` | 필수 | Code.gs의 TOKEN과 같은 값 |
 | `APP_PASSWORD` | 권장 | 웹 접속 비밀번호 |
-| `STORE_MODE` | 자동 | Vercel 등 서버리스에서는 자동으로 `sheets`. 내 PC에서 시트를 원본으로 쓰려면 `sheets` |
+| `STORE_MODE` | 자동 | Vercel에서는 자동으로 `sheets`. Render·내 PC에서 시트를 원본으로 쓰려면 `sheets` |
 | `SHEETS_CACHE_SECONDS` | 선택 | 시트를 다시 읽는 간격(기본 20초) |
 
 ## 문제 해결
 
-| 증상 | 원인 |
+| 증상 | 원인과 해결 |
 |---|---|
-| 화면에 "웹 모드에는 구글 시트 설정이 필요합니다" | 환경변수 두 개가 빠짐. 입력 후 Vercel에서 **Redeploy** |
-| `The caller does not have permission` | 시트를 서비스 계정 이메일에 **편집자**로 공유하지 않음 |
-| `Google Sheets API has not been used in project…` | 1-① 3번 API 사용 설정이 안 됨 |
-| `invalid_grant` / JSON 오류 | 키 JSON을 일부만 붙여 넣음. 파일 내용 **전체**(`{`부터 `}`까지)를 다시 입력 |
+| "웹 모드에는 구글 시트 연결 설정이 필요합니다" | 환경변수 두 개가 빠짐. 입력 후 다시 배포(Vercel: Redeploy) |
+| "TOKEN 이 맞지 않습니다" | Code.gs의 TOKEN과 `SHEETS_WEBAPP_TOKEN`이 다름. 수정 후 **새 버전으로 다시 배포** |
+| "배포의 액세스 권한이 '모든 사용자'가 아닙니다" | 1번 5단계에서 권한을 '모든 사용자'로 설정하고 다시 배포 |
+| "TOKEN 을 바꾼 뒤 다시 배포해 주세요" | Code.gs 맨 위 TOKEN을 아직 바꾸지 않음 |
+| 주소를 열었는데 `ok:true`가 안 보임 | 1번 5~6단계(배포·승인)를 다시 확인 |
 | 기사가 0건 | Actions 로그에서 사이트별 오류 확인 |
+
+## (선택) 구글 클라우드 서비스 계정 방식
+
+Apps Script 대신 서비스 계정 키로도 연결할 수 있습니다. 환경변수 `GOOGLE_SHEETS_SPREADSHEET_ID`와 `GOOGLE_SERVICE_ACCOUNT_KEY_JSON`을 넣으면 됩니다. 구글 클라우드 콘솔에서 프로젝트와 키를 만들어야 하므로 이 문서의 무료 구성에서는 쓰지 않습니다. `SHEETS_WEBAPP_URL`과 `SHEETS_WEBAPP_TOKEN`이 함께 있으면 Apps Script가 우선합니다.

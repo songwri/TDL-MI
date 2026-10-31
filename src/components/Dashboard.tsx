@@ -12,6 +12,7 @@ import { Badge, Button, api, cx, useToasts } from "./ui";
 
 interface Status {
   store: "sheets" | "local";
+  sheetsVia: "apps-script" | "service-account" | null;
   llm: string | null;
   writer: "claude-code" | "api";
   sheets: boolean;
@@ -362,7 +363,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <Badge tone="green">{status?.writer === "api" ? `⚡ API 작성 모드 · ${status.llm}` : "📝 Claude Code 작성 모드 (API 토큰 사용 없음)"}</Badge>
         <Badge tone={status?.sheets ? "green" : "amber"}>
-          {status?.sheets ? (status.store === "sheets" ? "📗 구글 시트가 원본 (웹 모드)" : "📗 Google Sheets 연동 (내 PC 모드)") : "📗 Sheets 미설정 (로컬 캐시만 사용)"}
+          {status?.sheets ? (status.store === "sheets" ? `📗 구글 시트가 원본 (${status.sheetsVia === "apps-script" ? "Apps Script, 무료" : "서비스 계정"})` : "📗 Google Sheets 연동 (내 PC 모드)") : "📗 Sheets 미설정 (로컬 캐시만 사용)"}
         </Badge>
         <Badge>기사 {status?.articleCount ?? 0}건 · 발행 {status?.issueCount ?? 0}호</Badge>
         {status?.lastRefreshAt && <Badge>최근 수집 {new Date(status.lastRefreshAt).toLocaleString("ko-KR")}</Badge>}

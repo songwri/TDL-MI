@@ -1,0 +1,19 @@
+# Render 무료 웹 서비스 설정 (Blueprint). 사용법은 docs/DEPLOY.md 2-B
+services:
+  - type: web
+    name: tdl-trend
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: STORE_MODE
+        value: sheets
+      - key: SHEETS_WEBAPP_URL
+        sync: false
+      - key: SHEETS_WEBAPP_TOKEN
+        sync: false
+      - key: APP_PASSWORD
+        sync: false

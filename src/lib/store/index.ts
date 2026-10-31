@@ -37,7 +37,7 @@ async function pullFromSheets() {
 /** sheets 모드에서 캐시를 최신으로 맞춘다 (local 모드에서는 아무 일도 하지 않음) */
 export async function refresh(force = false) {
   if (!inSheetsMode()) return;
-  if (!sheetsEnabled()) throw new Error("웹 모드에는 구글 시트 설정(GOOGLE_SHEETS_SPREADSHEET_ID, 서비스 계정 키)이 필요합니다.");
+  if (!sheetsEnabled()) throw new Error("웹 모드에는 구글 시트 연결 설정(SHEETS_WEBAPP_URL, SHEETS_WEBAPP_TOKEN)이 필요합니다. docs/DEPLOY.md 를 확인해 주세요.");
   if (!force && Date.now() - lastPull < TTL_MS) return;
   pulling ??= pullFromSheets().finally(() => {
     pulling = null;
@@ -172,7 +172,7 @@ export async function saveIssue(issue: NewsletterIssue): Promise<WriteResult> {
 
 /** 시트 → 로컬 캐시 병합 (local 모드). 시트 값을 우선하되 로컬 전용 필드(본문, 구조화 콘텐츠)는 보존 */
 export async function syncFromSheets() {
-  if (!sheetsEnabled()) throw new Error("Google Sheets 환경변수가 설정되지 않았습니다.");
+  if (!sheetsEnabled()) throw new Error("구글 시트 연결 설정이 없습니다.");
   await sheets.ensureSchema();
   const remote = await sheets.fetchAll();
   return mutate((db) => {

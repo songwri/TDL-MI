@@ -2,7 +2,8 @@ name: collect-articles
 
 # 매일 08:00(한국시간)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
 # 필요한 값: 저장소 Settings → Secrets and variables → Actions → Repository secrets
-#   GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_KEY_JSON
+#   SHEETS_WEBAPP_URL, SHEETS_WEBAPP_TOKEN   (시트에 붙인 Apps Script 웹 앱 주소와 토큰, 무료)
+#   서비스 계정 방식을 쓴다면 GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_KEY_JSON
 on:
   schedule:
     - cron: "0 23 * * *"
@@ -34,6 +35,8 @@ jobs:
         env:
           STORE_MODE: sheets
           DATA_DIR: ${{ runner.temp }}/tdl-mi
+          SHEETS_WEBAPP_URL: ${{ secrets.SHEETS_WEBAPP_URL }}
+          SHEETS_WEBAPP_TOKEN: ${{ secrets.SHEETS_WEBAPP_TOKEN }}
           GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
           DAYS: ${{ inputs.days }}

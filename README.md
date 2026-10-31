@@ -3,7 +3,7 @@
 CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 도구입니다.
 매일 아침 국내외 뉴스를 수집하고, 2주치 기사에서 후보를 골라 웹에서 선정하면, 선정한 기사 여러 건을 **주제별로 묶어 인사이트를 뽑은 기사형 리포트**(제N호)를 만듭니다. 통계 인포그래픽과 원문 링크가 포함되고, **메일 본문에 그대로 붙여 넣을 수 있는** 형태입니다.
 
-> **웹으로 운영하려면** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고, Vercel에 웹을 올리고, GitHub Actions가 매일 08:00(한국시간)에 기사를 수집합니다.
+> **웹으로 운영하려면(전부 무료)** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고(Apps Script 연결, 구글 클라우드 불필요), Vercel 또는 Render 무료 플랜에 웹을 올리고, GitHub Actions가 매일 08:00(한국시간)에 기사를 수집합니다.
 
 ## 흐름
 
@@ -44,8 +44,8 @@ npm run dev                    # http://localhost:3000
 | 환경변수 | 설명 |
 |---|---|
 | `STORE_MODE` | `sheets`: 구글 시트가 원본(웹 호스팅 기본값) · `local`: `data/db.json` 이 원본(내 PC 기본값) |
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | 스프레드시트 ID |
-| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | 서비스 계정 키 JSON 내용 (파일 경로 `…_KEY_PATH`, base64 `…_KEY_BASE64` 도 지원) |
+| `SHEETS_WEBAPP_URL`, `SHEETS_WEBAPP_TOKEN` | 시트에 붙인 Apps Script 웹 앱 주소와 토큰 (무료, 권장) |
+| `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | (선택) 구글 클라우드 서비스 계정 방식 |
 | `APP_PASSWORD` | 웹 접속 비밀번호 (비우면 잠금 없음) |
 | `NEWSLETTER_NAME`, `NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE` | 리포트 이름(TDL Trend), 발행 팀(테크이노베이션팀), 배포 대상(CL사업부) |
 | `NEWSLETTER_FEEDBACK_EMAIL` | 푸터에 표시할 문의 메일 |
