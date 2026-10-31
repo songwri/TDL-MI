@@ -9,7 +9,8 @@ type Fetch = typeof fetch;
 
 const TIMEOUT_MS = 40_000;
 
-export function createAppsScriptClient(url: string, token: string, fetchImpl: Fetch = fetch): sheets_v4.Sheets {
+/** Apps Script 웹 앱에 요청 하나를 보낸다 (일시적 오류는 한 번 더 시도) */
+export function appsScriptCaller(url: string, token: string, fetchImpl: Fetch = fetch) {
   async function once<T>(op: string, args: Record<string, unknown>): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -61,7 +62,11 @@ export function createAppsScriptClient(url: string, token: string, fetchImpl: Fe
       }
     }
   }
+  return call;
+}
 
+export function createAppsScriptClient(url: string, token: string, fetchImpl: Fetch = fetch): sheets_v4.Sheets {
+  const call = appsScriptCaller(url, token, fetchImpl);
   const client = {
     spreadsheets: {
       get: async () => ({ data: { sheets: (await call<string[]>("sheets")).map((title) => ({ properties: { title } })) } }),

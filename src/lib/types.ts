@@ -17,6 +17,8 @@ export interface Article {
   source: string;
   region: Region;
   title: string;
+  /** 해외 기사 제목의 한국어 번역 (수집할 때 구글 번역, 화면에서 원제목 아래 작게 표시) */
+  titleKo?: string;
   link: string;
   summary: string;
   /** 본문 텍스트 (로컬 캐시에만 보관, 시트에는 저장하지 않음) */

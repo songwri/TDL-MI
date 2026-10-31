@@ -98,11 +98,11 @@ function mark(m: RenderMeta): string {
     return `<img src="${t(m.markSrc)}" width="${width}" height="${height}" alt="${MARK_ALT}" style="${css({ display: "block", width, height, border: 0, outline: "none" })}">`;
   return table(
     row(
-      `<span style="${css({ fontSize: 34, lineHeight: "36px", fontWeight: 900, color: MARK.fg, letterSpacing: "1px" })}">TDL</span><br>` +
+      `<span style="${css({ fontSize: 34, lineHeight: "36px", fontWeight: "bold", color: MARK.fg, letterSpacing: "1px" })}">TDL</span><br>` +
         `<span style="${css({ fontSize: 9, lineHeight: "14px", fontWeight: "bold", color: MARK.fg, letterSpacing: "1.6px" })}">TREND REPORT</span>`,
-      { bgcolor: MARK.bg, align: "right", style: { padding: "12px 14px 10px" } },
+      { bgcolor: MARK.bg, align: "right", style: { padding: "0" } },
     ),
-    { width },
+    { width: 96 }, // 글자 TDL 폭에 맞춰 TREND REPORT 를 오른쪽 끝에 붙임
   );
 }
 
@@ -129,7 +129,9 @@ function header(c: ReportContent, m: RenderMeta): string {
   );
 }
 
-/** 테크이노베이션팀의 한마디: 맨 위에서 가장 눈에 띄는 발행팀 메시지 (마크와 같은 어두운 바탕) */
+const NOTE_BG = "#161616";
+
+/** 테크이노베이션팀의 한마디: 맨 위에서 가장 눈에 띄는 발행팀 메시지 (어두운 바탕) */
 function teamNote(c: ReportContent, m: RenderMeta): string {
   if (!c.teamNote?.trim()) return "";
   return table(
@@ -139,12 +141,12 @@ function teamNote(c: ReportContent, m: RenderMeta): string {
           td(`<span style="${css({ fontSize: 44, lineHeight: "40px", fontWeight: "bold", color: "#E0675B", fontFamily: "Georgia, serif" })}">&ldquo;</span>`, { width: 40, valign: "top" }) +
             td(
               `<span style="${css(txt(12, "#E0675B", { fontWeight: "bold", letterSpacing: "1px" }))}">${t(m.feedbackContact)}의 한마디</span><br>` +
-                `<span style="${css(txt(16, MARK.fg, { lineHeight: "28px" }))}">${t(stripRich(c.teamNote))}</span>`,
+                `<span style="${css(txt(16, "#FFFFFF", { lineHeight: "28px" }))}">${t(stripRich(c.teamNote))}</span>`,
               { valign: "top" },
             ),
         ) + row(`<span style="${css(txt(12, "#B5B5B5"))}">&mdash; ${t(m.feedbackContact)} 드림</span>`, { colspan: 2, align: "right", style: { paddingTop: 8 } }),
       ),
-      { bgcolor: MARK.bg, style: { padding: "20px 24px 18px" } },
+      { bgcolor: NOTE_BG, style: { padding: "20px 24px 18px" } },
     ),
   );
 }

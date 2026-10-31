@@ -3,18 +3,19 @@
  * 굵은 기하학 TDL 글자는 도형으로 그리고(폰트 차이 없음), 아래 오른쪽 정렬로 TREND REPORT 를 붙인다.
  * PNG 는 scripts/make-mark.ts 로 public/brand/ 에 만든다 (메일에 이미지로 들어감).
  */
-export const MARK = { width: 240, height: 128, bg: "#161616", fg: "#FFFFFF", accent: "#A72B2B" } as const;
+/** 흰 바탕에 검은 글자 (메일 본문 바탕과 이어지도록 여백 없이 글자 크기에 맞춤) */
+export const MARK = { width: 200, height: 92, bg: "#FFFFFF", fg: "#161616", accent: "#A72B2B" } as const;
 
 /** 메일·웹에서 쓰는 공개 경로 (비밀번호 제외 대상) */
 export const MARK_PATH = "/brand/tdl-trend-report.png";
 /** 표시 크기 (PNG 는 3배 해상도) */
-export const MARK_DISPLAY = { width: 150, height: 80 } as const;
+export const MARK_DISPLAY = { width: 150, height: 69 } as const;
 export const MARK_ALT = "TDL TREND REPORT";
 
 export function markSvg(): string {
   const { width: W, height: H, bg, fg, accent } = MARK;
-  const x = 24;
-  const y = 24;
+  const x = 4;
+  const y = 4;
   const S = 16; // 획 두께
   const h = 60; // 글자 높이
   const letters =
@@ -30,7 +31,7 @@ export function markSvg(): string {
   const right = x + 192;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${MARK_ALT}">` +
-    `<rect width="${W}" height="${H}" rx="6" fill="${bg}"/>` +
+    `<rect width="${W}" height="${H}" fill="${bg}"/>` +
     `<g fill="${fg}">${letters}</g>` +
     `<rect x="${x}" y="${y + h + 17}" width="22" height="4" fill="${accent}"/>` +
     `<text x="${right}" y="${y + h + 24}" text-anchor="end" font-family="Pretendard" font-weight="700" font-size="14" letter-spacing="2.2" fill="${fg}">TREND REPORT</text>` +

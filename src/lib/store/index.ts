@@ -117,6 +117,24 @@ export async function addArticles(candidates: Article[]): Promise<{ added: Artic
   return { added, duplicates, ...w };
 }
 
+/** 번역 제목 저장 (예전에 수집된 해외 기사 채우기) */
+export async function setTitlesKo(map: Map<string, string>): Promise<WriteResult> {
+  if (!map.size) return {};
+  await refresh(true);
+  const updated = await mutate((db) => {
+    const out: Article[] = [];
+    for (const a of db.articles) {
+      const k = map.get(a.id);
+      if (k && a.titleKo !== k) {
+        a.titleKo = k;
+        out.push(a);
+      }
+    }
+    return out;
+  });
+  return toSheets(() => sheets.updateArticleTitlesKo(updated));
+}
+
 export async function setSelection(ids: string[], selected: boolean): Promise<{ updated: Article[] } & WriteResult> {
   await refresh(true);
   const updated = await mutate((db) => {

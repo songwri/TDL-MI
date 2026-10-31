@@ -1,7 +1,8 @@
 import { SOURCES, type SourceDef } from "@/config/sources";
 import { config } from "@/lib/config";
 import { classify, extractKeywords, isRelevant } from "@/lib/mi/matcher";
-import { addArticles, getAllArticles } from "@/lib/store";
+import { addArticles, getAllArticles, setTitlesKo } from "@/lib/store";
+import { needsKoTitle, withKoTitles } from "@/lib/translate";
 import type { Article, RefreshResult } from "@/lib/types";
 import { mapLimit } from "@/lib/utils/async";
 import { articleIdFromUrl, cleanText, normalizeUrl, stripBoilerplate, truncate } from "@/lib/utils/text";
@@ -115,12 +116,22 @@ export async function refreshArticles(opts: { days?: number; sourceIds?: string[
     }
   });
 
-  const { added, duplicates, warning } = await addArticles(candidates);
+  // 해외 기사 제목은 한국어 번역을 함께 저장 (Apps Script 구글 번역, 무료)
+  const tr = await withKoTitles(candidates);
+  const { added, duplicates, warning } = await addArticles(tr.articles);
+  // 예전에 번역 없이 수집된 최근 해외 기사도 채운다 (한 번에 최대 100건)
+  let backfillWarning: string | undefined;
+  if (!tr.warning) {
+    const old = (await getAllArticles()).filter((a) => needsKoTitle(a) && new Date(a.publishedAt).getTime() >= since).slice(0, 100);
+    const done = await withKoTitles(old);
+    const map = new Map(done.articles.filter((a) => a.titleKo).map((a) => [a.id, a.titleKo!]));
+    backfillWarning = done.warning ?? (await setTitlesKo(map)).warning;
+  }
   for (const a of added) {
     const stat = statOf.get(a.id);
     if (stat) stat.added++;
   }
-  return { added: added.length, duplicates, filtered, perSource, warning };
+  return { added: added.length, duplicates, filtered, perSource, warning: [warning, tr.warning, backfillWarning].filter(Boolean).join(" / ") || undefined };
 }
 
 /** 채널 점검: 지금 접속되는지, 어떤 방식으로 수집하는지, 최근 기사 몇 건이 보이는지 */

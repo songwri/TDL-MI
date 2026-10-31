@@ -47,7 +47,7 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
 
   it("마크 이미지: 크기·대체 글자 포함, 주제가 없으면 제목이 맨 위 큰 제목", () => {
     const withMark = renderFragment(sampleContent, { ...meta, markSrc: "https://x.test/brand/tdl-trend-report.png" });
-    expect(withMark).toMatch(/<img src="https:\/\/x\.test\/brand\/tdl-trend-report\.png" width="150" height="80" alt="TDL TREND REPORT"/);
+    expect(withMark).toMatch(/<img src="https:\/\/x\.test\/brand\/tdl-trend-report\.png" width="150" height="69" alt="TDL TREND REPORT"/);
     expect(withMark).not.toContain(">TREND REPORT</span>");
     const noTheme = renderFragment({ ...sampleContent, issueTheme: undefined }, meta);
     expect(noTheme).not.toContain("이번 호 주제");

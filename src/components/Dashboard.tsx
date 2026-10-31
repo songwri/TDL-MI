@@ -152,7 +152,7 @@ export function Dashboard() {
         (region === "ALL" || a.region === region) &&
         (!onlySelected || order.includes(a.id)) &&
         (!hidePublished || !a.publishedInIssue || order.includes(a.id)) &&
-        (!q || `${a.title} ${a.summary} ${a.source} ${a.keywords.join(" ")}`.toLowerCase().includes(q)),
+        (!q || `${a.title} ${a.titleKo ?? ""} ${a.summary} ${a.source} ${a.keywords.join(" ")}`.toLowerCase().includes(q)),
     );
   }, [articles, category, region, query, onlySelected, hidePublished, order]);
 
@@ -488,6 +488,7 @@ export function Dashboard() {
                         <span className="mt-0.5 w-4 shrink-0 text-center font-bold text-brand">{i + 1}</span>
                         <div className="min-w-0 flex-1">
                           <div className="line-clamp-2 font-medium text-slate-800">{a.title}</div>
+                          {a.titleKo && <div className="line-clamp-1 text-[11px] text-slate-500">{a.titleKo}</div>}
                           <div className="text-slate-500">{a.source} · {a.category}</div>
                         </div>
                         <div className="flex shrink-0 flex-col">

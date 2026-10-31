@@ -13,7 +13,7 @@
 // 반드시 바꾸세요. 영문·숫자 30자 이상 아무거나. 웹 앱 환경변수 SHEETS_WEBAPP_TOKEN 과 같은 값이어야 합니다.
 var TOKEN = '여기에-길고-랜덤한-문자열을-넣으세요';
 
-var VERSION = 1;
+var VERSION = 2;
 
 function doGet() {
   // 브라우저로 웹 앱 주소를 열었을 때 연결 확인용 (시트 내용은 보여 주지 않음)
@@ -55,6 +55,8 @@ function run_(req) {
         for (var i = 0; i < req.data.length; i++) update_(ss, req.data[i].range, req.data[i].values);
         return true;
       });
+    case 'translate':
+      return translate_(req.texts, req.from || 'en', req.to || 'ko');
     default:
       throw new Error('알 수 없는 요청: ' + req.op);
   }
@@ -158,4 +160,15 @@ function update_(ss, a1, values) {
   var p = parse_(a1);
   write_(sheet_(ss, p.sheet), p.r1, p.c1, values);
   return true;
+}
+
+// 영어 기사 제목 → 한국어 (구글 번역, Apps Script 기본 기능이라 무료·키 불필요). 실패한 항목은 빈 문자열
+function translate_(texts, from, to) {
+  return (texts || []).slice(0, 100).map(function (t) {
+    try {
+      return t ? LanguageApp.translate(String(t), from, to) : '';
+    } catch (err) {
+      return '';
+    }
+  });
 }

@@ -52,6 +52,12 @@ export function ArticleCard({
         >
           {a.title}
         </a>
+        {a.titleKo && a.titleKo !== a.title ? (
+          <p lang="ko" className="line-clamp-2 text-[13px] leading-snug text-slate-500">
+            <span className="mr-1 rounded bg-slate-100 px-1 py-px text-[10px] font-semibold text-slate-500">번역</span>
+            {a.titleKo}
+          </p>
+        ) : null}
         <p className="line-clamp-2 text-sm text-slate-600">{a.summary}</p>
         <div className="flex flex-wrap gap-1">
           {a.keywords.slice(0, 6).map((k) => (

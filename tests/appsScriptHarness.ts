@@ -56,6 +56,8 @@ export function createAppsScriptServer(opts: { token?: string } = {}) {
     SpreadsheetApp: { getActiveSpreadsheet: () => spreadsheet },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     ContentService: { createTextOutput: output, MimeType: { JSON: "JSON" } },
+    // 구글 번역 흉내: "FAIL" 이 들어간 문장은 실패
+    LanguageApp: { translate: (t: string, from: string, to: string) => { if (t.includes("FAIL")) throw new Error("x"); return `[${from}>${to}] ${t}`; } },
     JSON, String, Number, Math, Object, Error,
   };
   const code = fs.readFileSync(path.join(__dirname, "..", "apps-script", "Code.gs"), "utf8").replace(/var TOKEN = '[^']*';/, `var TOKEN = '${opts.token ?? TEST_TOKEN}';`);

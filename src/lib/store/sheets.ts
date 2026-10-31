@@ -11,7 +11,7 @@ export const BODY_SHEET = "Article_Bodies"; // 기사 본문 (작성 의뢰서�
 export const HANDOFF_SHEET = "Handoffs"; // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
 
 export const ARTICLE_HEADERS = [
-  "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드", "수집채널",
+  "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드", "수집채널", "제목(한글)",
 ] as const;
 export const ISSUE_HEADERS = [
   "호수", "발행일", "메인 콘셉트", "선정 기사 ID 목록", "완성된 HTML", "핵심 키워드", "헤드라인", "생성일시",
@@ -22,6 +22,7 @@ export const ISSUE_HEADERS = [
 const CELL_LIMIT = 49_000;
 const HTML_CELLS = 4;
 const SELECTION_COL = "I"; // 선정여부
+const TITLE_KO_COL = "N"; // 제목(한글)
 
 let client: sheets_v4.Sheets | null = null;
 
@@ -106,7 +107,7 @@ export function selectionLabel(a: Pick<Article, "selected" | "publishedInIssue">
 export function articleToRow(a: Article): string[] {
   return [
     a.id, a.collectedAt, a.publishedAt, a.source, a.title, a.link, a.summary, a.category,
-    selectionLabel(a), a.region, a.thumbnail ?? "", a.keywords.join(", "), a.channel ?? "",
+    selectionLabel(a), a.region, a.thumbnail ?? "", a.keywords.join(", "), a.channel ?? "", a.titleKo ?? "",
   ];
 }
 
@@ -130,6 +131,7 @@ export function rowToArticle(r: string[]): Article | null {
     thumbnail: r[10] || undefined,
     keywords: (r[11] ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     channel: r[12] || undefined,
+    titleKo: r[13] || undefined,
   };
 }
 
@@ -269,6 +271,16 @@ export async function updateArticleSelections(articles: Article[]) {
     });
   }
   if (missing.length) await appendArticles(missing);
+}
+
+/** 번역 제목 채우기 (예전에 수집된 해외 기사) */
+export async function updateArticleTitlesKo(articles: Article[]) {
+  if (!articles.length) return;
+  const rows = await idRowIndex(ARTICLE_SHEET);
+  const data = articles
+    .filter((a) => rows.has(a.id))
+    .map((a) => ({ range: `${ARTICLE_SHEET}!${TITLE_KO_COL}${rows.get(a.id)}`, values: [[a.titleKo ?? ""]] }));
+  if (data.length) await getClient().spreadsheets.values.batchUpdate({ spreadsheetId: sid(), requestBody: { valueInputOption: "RAW", data } });
 }
 
 export async function upsertIssue(issue: NewsletterIssue) {

@@ -42,7 +42,7 @@ describe("Claude Code 작성 의뢰서", () => {
     expect(saved.content.stats?.total).toBe(3); // 통계는 서버가 계산
     expect(saved.html).toContain("제5호");
     expect(saved.html).toContain('href="https://x.com/M1"');
-    expect(saved.html).toContain('src="/brand/tdl-trend-report.png" width="150" height="80" alt="TDL TREND REPORT"'); // 마크 이미지 (표 버전은 글자 마크)
+    expect(saved.html).toContain('src="/brand/tdl-trend-report.png" width="150" height="69" alt="TDL TREND REPORT"'); // 마크 이미지 (표 버전은 글자 마크)
     expect(saved.tables.html).not.toContain("tdl-trend-report.png");
     expect((await h.getHandoff(5))?.content?.headline).toBe(sampleContent.headline);
 

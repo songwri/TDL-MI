@@ -65,7 +65,7 @@ describe("Apps Script 연결 (무료 방식)", () => {
 
   it("브라우저로 주소를 열면 연결 확인 응답만 나오고 시트 내용은 보이지 않음", () => {
     const srv = createAppsScriptServer();
-    expect(srv.doGet()).toEqual({ ok: true, data: { service: "TDL Trend sheet bridge", version: 1 } });
+    expect(srv.doGet()).toEqual({ ok: true, data: { service: "TDL Trend sheet bridge", version: 2 } });
   });
 
   it("로그인 화면이 돌아오면 배포 권한 안내, 일시 오류는 한 번 재시도", async () => {
