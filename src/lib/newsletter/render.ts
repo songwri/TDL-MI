@@ -1,5 +1,6 @@
 import { chartSig, contentVersion } from "@/lib/charts/sign";
-import { chartSvg, svgHeight, type ChartId } from "@/lib/charts/svg";
+import { CHART_IDS, chartSvg, svgHeight } from "@/lib/charts/svg";
+import { MARK_PATH } from "@/lib/brand/mark";
 import { config } from "@/lib/config";
 import { renderEmailHtml, renderFragment, renderPlainText, type RenderMeta } from "@/lib/email/template";
 import type { Article, ReportContent, ViewerData } from "@/lib/types";
@@ -13,14 +14,13 @@ export function buildViewer(issueNo: number, publishDate: string, articles: Arti
   };
 }
 
-const CHARTS: ChartId[] = ["category", "keywords", "map", "trend", "heatmap"];
 const unescape = (x: string) => x.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 
 /** 인포그래픽 이미지 주소와 크기. 주소는 서명이 붙어 비밀번호 없이 열린다(PUBLIC_BASE_URL 이 없으면 상대 주소 → 복사할 때 채움) */
 function chartImages(content: ReportContent, issueNo: number, viewer: ViewerData): RenderMeta["charts"] {
   const v = contentVersion({ content, ids: viewer.articles.map((a) => a.id) });
   const out: NonNullable<RenderMeta["charts"]> = {};
-  for (const id of CHARTS) {
+  for (const id of CHART_IDS) {
     const svg = chartSvg(id, content, viewer.articles);
     if (!svg) continue;
     out[id] = {
@@ -32,7 +32,7 @@ function chartImages(content: ReportContent, issueNo: number, viewer: ViewerData
   return out;
 }
 
-/** articles: 선정 기사 (선택 순서 = 참고 기사 번호) *//** articles: 선정 기사 (선택 순서 = 참고 기사 번호) */
+/** articles: 선정 기사 (선택 순서 = 참고 기사 번호) */
 export function renderAll(content: ReportContent, issueNo: number, publishDate: string, articles: Article[]) {
   const meta = {
     issueNo,
@@ -45,7 +45,7 @@ export function renderAll(content: ReportContent, issueNo: number, publishDate: 
     articles: articles.map(({ id, title, source, link, publishedAt, region }) => ({ id, title, source, link, publishedAt, region })),
   };
   const viewer = buildViewer(issueNo, publishDate, articles);
-  const withImages = { ...meta, charts: chartImages(content, issueNo, viewer) };
+  const withImages = { ...meta, charts: chartImages(content, issueNo, viewer), markSrc: `${config.publicBaseUrl}${MARK_PATH}` };
   return {
     /** 웹 인터랙티브 화면용 (메일 HTML 과 같은 데이터) */
     viewer,

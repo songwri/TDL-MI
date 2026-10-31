@@ -1,6 +1,6 @@
 import { issueLabel } from "@/config/brand";
 import type { Article, ReportDraft, ReportStats } from "@/lib/types";
-import { truncate } from "@/lib/utils/text";
+import { stripBoilerplate, truncate } from "@/lib/utils/text";
 
 const sentences = (s: string) => s.split(/(?<=[.!?다요])\s+/).filter((x) => x.length > 15);
 
@@ -11,7 +11,9 @@ export function buildFallbackDraft(input: {
   articles: Article[];
   stats: ReportStats;
 }): ReportDraft {
-  const { articles, stats } = input;
+  const { stats } = input;
+  // 기자 서명·저작권 고지·사이트 문구는 초안에 담지 않는다 (예전에 수집된 본문 포함)
+  const articles = input.articles.map((a) => ({ ...a, content: stripBoilerplate(a.content), summary: stripBoilerplate(a.summary) }));
   const concept = input.concept.split("\n")[0].trim();
 
   // 카테고리별로 묶어 테마 구성 (기사 수가 많은 순, 최대 3개)
@@ -26,6 +28,8 @@ export function buildFallbackDraft(input: {
   const hasHistory = stats.trend.issues.length > 1;
 
   return {
+    issueTheme: "[작성 필요] 이번 호 핵심 주제 (예: 자율주행으로 바라보는 물류)",
+    teamNote: "[작성 필요] 테크이노베이션팀의 한마디 (위트 있는 첫 문장 + 이번 호를 읽는 관점)",
     headline: truncate(concept || `${issueLabel(input.issueNo)} 물류·로봇 자동화 주요 동향`, 45),
     keyTakeaway: "[작성 필요] 이번 호 한 줄 결론",
     executiveSummary: articles.slice(0, 5).map((a) => truncate(`${a.title} (${a.source})`, 110)),

@@ -1,6 +1,6 @@
 import { sheetsEnabled, storeMode } from "@/lib/config";
 import type { Article, NewsletterIssue } from "@/lib/types";
-import { normalizeTitle, normalizeUrl } from "@/lib/utils/text";
+import { normalizeTitle, normalizeUrl, stripBoilerplate } from "@/lib/utils/text";
 import { mutate, read } from "./local";
 import * as sheets from "./sheets";
 
@@ -78,9 +78,11 @@ export async function getArticles(ids: string[]): Promise<Article[]> {
 /** 본문까지 포함 (작성 의뢰서용). sheets 모드에서는 Article_Bodies 시트에서 가져온다 */
 export async function getArticlesWithBodies(ids: string[]): Promise<Article[]> {
   const articles = await getArticles(ids);
-  if (!inSheetsMode()) return articles;
+  // 예전에 수집된 본문에 남은 기자 서명·저작권 고지도 여기서 걸러 작성 의뢰서에 담지 않는다
+  const clean = (a: Article): Article => ({ ...a, content: stripBoilerplate(a.content) || undefined, summary: stripBoilerplate(a.summary) || a.summary });
+  if (!inSheetsMode()) return articles.map(clean);
   const bodies = await sheets.fetchBodies(ids);
-  return articles.map((a) => ({ ...a, content: bodies.get(a.id) ?? a.content }));
+  return articles.map((a) => clean({ ...a, content: bodies.get(a.id) ?? a.content }));
 }
 
 export async function getAllArticles(): Promise<Article[]> {

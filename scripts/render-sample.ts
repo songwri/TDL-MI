@@ -7,7 +7,8 @@
 import fs from "node:fs";
 import { config } from "@/lib/config";
 import { svgToPng } from "@/lib/charts/png";
-import { chartSvg, svgHeight, type ChartId } from "@/lib/charts/svg";
+import { CHART_IDS, chartSvg, svgHeight } from "@/lib/charts/svg";
+import { markSvg } from "@/lib/brand/mark";
 import { renderEmailHtml, renderFragment, renderPlainText } from "@/lib/email/template";
 import { SAMPLE_ARTICLES, SAMPLE_REPORT } from "./sample-content";
 
@@ -26,11 +27,11 @@ const CATS = ["소팅/보관설비", "AMR/AGV", "로봇 피킹/매니퓰레이�
 if (process.argv.includes("--images")) {
   const arts = SAMPLE_ARTICLES.map((a, i) => ({ ...a, category: CATS[i] }));
   const charts: NonNullable<Parameters<typeof renderFragment>[1]["charts"]> = {};
-  for (const id of ["category", "keywords", "map", "trend", "heatmap"] as ChartId[]) {
+  for (const id of CHART_IDS) {
     const svg = chartSvg(id, SAMPLE_REPORT, arts);
     if (svg) charts[id] = { src: `data:image/png;base64,${svgToPng(svg).toString("base64")}`, height: svgHeight(svg), alt: id };
   }
-  Object.assign(meta, { charts });
+  Object.assign(meta, { charts, markSrc: `data:image/png;base64,${svgToPng(markSvg(), 3).toString("base64")}` });
 }
 const html = process.argv.includes("--fragment") ? renderFragment(SAMPLE_REPORT, meta) : renderEmailHtml(SAMPLE_REPORT, meta);
 fs.writeFileSync(out, html);

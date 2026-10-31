@@ -4,7 +4,9 @@ import { z } from "zod";
 const HL = " 가장 중요한 구절 하나를 **두 별표**로 감싸 하이라이트한다.";
 
 export const ReportSchema = z.object({
+  issueTheme: z.string().describe("이번 호 핵심 주제. 선정 기사를 관통하는 렌즈를 담은 짧은 제목 (20자 이내, 예: '자율주행으로 바라보는 물류')"),
   headline: z.string().describe("리포트 제목 겸 메일 제목. 이번 호의 핵심 메시지를 담은 한 줄 (45자 이내)"),
+  teamNote: z.string().describe("발행팀의 한마디. 위트 있는 첫 문장 + 이번 호를 읽는 관점을 짚는 전문적인 문장, 2~3문장 (150자 이내, 별표 없이)"),
   keyTakeaway: z.string().describe("이번 호 한 줄 결론. 독자가 이것만 읽어도 되는 문장 (60자 이내, 별표 없이)"),
   executiveSummary: z.array(z.string()).describe("핵심 요약 3~5개. 각 1문장, 결론 먼저." + HL),
   themes: z
@@ -33,6 +35,8 @@ const Counts = z.array(z.object({ label: z.string(), counts: z.array(z.number())
 
 /** 저장·렌더링용 (서버가 계산한 통계 포함, 예전 리포트는 한 줄 결론이 없을 수 있음) */
 export const StoredReportSchema = ReportSchema.extend({
+  issueTheme: z.string().optional(),
+  teamNote: z.string().optional(),
   keyTakeaway: z.string().optional(),
   themes: z.array(ReportSchema.shape.themes.element.extend({ takeaway: z.string().optional() })),
   stats: z

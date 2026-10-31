@@ -2,7 +2,7 @@ import { issueLabel } from "@/config/brand";
 import { rulesMarkdown } from "@/config/report-rules";
 import { statsToText } from "@/lib/report/stats";
 import type { Article, ArticleIntel, NewsletterIssue, ReportStats } from "@/lib/types";
-import { shortDate, truncate } from "@/lib/utils/text";
+import { shortDate, stripBoilerplate, truncate } from "@/lib/utils/text";
 
 export const systemPrompt = (product: string, audience: string, publisher: string) => rulesMarkdown(audience, publisher, product);
 
@@ -27,7 +27,7 @@ keywords: ${a.keywords.join(", ") || "-"}
 title: ${a.title}
 summary: ${a.summary}
 body:
-${truncate(a.content || a.summary, 6000)}
+${truncate(stripBoilerplate(a.content) || stripBoilerplate(a.summary) || "(본문 없음: 제목과 출처만 참고)", 6000)}
 pastIssueLinks: ${rel.length ? rel.map((r) => r.label).join(" | ") : "없음"}
 </article>`;
   };

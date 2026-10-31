@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { issueLabel } from "@/config/brand";
 import { CATEGORIES, type ReportContent, type ViewerData } from "@/lib/types";
 import { stripRich } from "@/lib/report/rich";
-import { Heat, InsightMap, Legend, RankBars, Rich, SegBar, TipRow, TrendBars, catColor, useTip, type SegItem } from "./parts";
+import { MARK_ALT, MARK_DISPLAY, MARK_PATH } from "@/lib/brand/mark";
+import { Heat, InsightMap, Legend, Rich, TipRow, TrendBars, catColor, useTip } from "./parts";
 
 const NAV = [
   { id: "sec-summary", label: "핵심 요약" },
-  { id: "sec-overview", label: "한눈에" },
   { id: "sec-insights", label: "핵심 인사이트" },
   { id: "sec-trend", label: "추세" },
   { id: "sec-reco", label: "제언" },
@@ -100,8 +100,6 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
     setTimeout(() => document.getElementById(`theme-${i}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 30);
   };
 
-  const catItems: SegItem[] = cats.map((k) => ({ key: k, label: k, value: articles.filter((a) => a.category === k).length, color: catColor(k), active: active.has(k) }));
-  const sources = new Set(vis.map((a) => a.source)).size;
 
   const refs = vis
     .map((a) => ({ a, no: noOf.get(a.id)! }))
@@ -109,22 +107,29 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
     .sort((x, y) => (sort === "no" ? x.no - y.no : y.a.publishedAt.localeCompare(x.a.publishedAt)));
 
   return (
-    <div className="rv mx-auto max-w-[900px] text-[15px] leading-7">
+    <div className="rv mx-auto max-w-[900px] break-keep text-[15px] leading-7">
       {tip.view}
 
-      {/* 머리 */}
-      <header className="border-t-4 border-[var(--rv-accent)] pb-4 pt-5">
+      {/* 머리: 마크 · 호수 → 이번 호 주제 → 제목 */}
+      <header className="border-t-4 border-[var(--rv-accent)] pb-6 pt-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold tracking-wide text-[var(--rv-soft)]">{brand.publisher} | Market Intelligence Report</p>
-            <p className="text-3xl font-bold leading-tight tracking-tight">{brand.product}</p>
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- 메일과 같은 PNG 마크를 그대로 쓴다 */}
+          <img src={MARK_PATH} width={MARK_DISPLAY.width} height={MARK_DISPLAY.height} alt={MARK_ALT} className="block" />
           <div className="text-right">
-            <p className="text-3xl font-bold leading-tight text-[var(--rv-accent)]">{issueLabel(viewer.issueNo)}</p>
+            <p className="text-[26px] font-bold leading-tight text-[var(--rv-accent)]">{issueLabel(viewer.issueNo)}</p>
             <p className="text-xs text-[var(--rv-soft)]">{day(viewer.publishDate)} 발행 · 배포 대상 {brand.audience}</p>
+            <p className="text-[11px] text-[var(--rv-mute)]">{brand.publisher} · Market Intelligence Report</p>
           </div>
         </div>
-        <h1 className="mt-4 border-t border-[var(--rv-line)] pt-4 text-xl font-bold leading-snug [text-wrap:balance]">{c.headline}</h1>
+        {c.issueTheme ? (
+          <>
+            <p className="mt-7 text-xs font-bold tracking-widest text-[var(--rv-accent)]">이번 호 주제</p>
+            <h1 className="mt-1 text-[34px] font-bold leading-tight tracking-tight [text-wrap:balance]">{c.issueTheme}</h1>
+            <p className="mt-2 text-base leading-relaxed text-[var(--rv-soft)] [text-wrap:balance]">{c.headline}</p>
+          </>
+        ) : (
+          <h1 className="mt-6 text-2xl font-bold leading-snug [text-wrap:balance]">{c.headline}</h1>
+        )}
       </header>
 
       {/* 목차 + 필터: 아래 모든 내용이 이 줄의 선택에 맞춰 바뀜 */}
@@ -162,75 +167,31 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
       </div>
 
       <div className="space-y-12 pb-12 pt-8">
-        {/* 이번 호 한 줄 결론 */}
-        {c.keyTakeaway && (
-          <div className="flex overflow-hidden rounded border border-[#f1d8d4] bg-[var(--rv-tint)]">
-            <span aria-hidden className="w-1.5 shrink-0 bg-[var(--rv-accent)]" />
-            <div className="px-5 py-4">
-              <p className="text-[11px] font-bold text-[var(--rv-accent)]">이번 호 한 줄 결론</p>
-              <p className="mt-1 text-lg font-bold leading-snug [text-wrap:balance]">{stripRich(c.keyTakeaway)}</p>
-            </div>
-          </div>
+        {/* 테크이노베이션팀의 한마디 */}
+        {c.teamNote && (
+          <figure className="relative overflow-hidden rounded-md bg-[#161616] px-6 py-5 text-white sm:px-8 sm:py-6">
+            <span aria-hidden className="absolute left-5 top-1 font-serif text-[64px] leading-none text-[#E0675B] sm:left-6">&ldquo;</span>
+            <figcaption className="pl-9 text-xs font-bold tracking-wider text-[#E0675B]">{brand.publisher}의 한마디</figcaption>
+            <blockquote className="mt-1.5 pl-9 text-[17px] leading-8 [text-wrap:pretty]">{stripRich(c.teamNote)}</blockquote>
+            <p className="mt-2 text-right text-xs text-[#b5b5b5]">&mdash; {brand.publisher} 드림</p>
+          </figure>
         )}
-
-        {/* 핵심 수치 */}
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-[var(--rv-line)] bg-[var(--rv-line)] sm:grid-cols-4">
-          {[
-            { v: `${vis.length}건`, l: "선정 기사", s: `${sources}개 매체${filtering ? ` · 전체 ${articles.length}건` : ""}` },
-            { v: `${shownThemes.length}개`, l: "핵심 주제", s: filtering ? `전체 ${c.themes.length}개` : "기사를 묶어 분석" },
-            { v: stats ? `${stats.repeat.followUp}건` : "-", l: "지난 호 연관", s: stats ? `이어지는 키워드 ${stats.topKeywords.filter((k) => k.seenBefore).length}개 · 전체 기준` : "" },
-            (() => {
-              const top = catItems.filter((i) => active.has(i.key)).sort((a, b) => b.value - a.value)[0];
-              return { v: top?.label ?? "-", l: "가장 많이 다룬 분야", s: top ? `${top.value}건 · ${Math.round((top.value / Math.max(vis.length, 1)) * 100)}%` : "" };
-            })(),
-          ].map((k) => (
-            <div key={k.l} className="min-w-0 bg-white px-4 py-3">
-              <p className={`font-bold ${k.v.length > 5 ? "text-lg leading-9" : "text-[26px] leading-9"}`}>{k.v}</p>
-              <p className="text-xs font-bold text-[var(--rv-soft)]">{k.l}</p>
-              <p className="text-[11px] text-[var(--rv-mute)]">{k.s}</p>
-            </div>
-          ))}
-        </div>
 
         {/* 핵심 요약 */}
         <section aria-labelledby="sec-summary" className="space-y-3">
           <H2 id="sec-summary" no="■">핵심 요약</H2>
+          {c.keyTakeaway && (
+            <div className="pt-1">
+              <p className="text-[11px] font-bold tracking-wide text-[var(--rv-accent)]">한 줄 결론</p>
+              <p className="text-lg font-bold leading-snug [text-wrap:balance]">{stripRich(c.keyTakeaway)}</p>
+            </div>
+          )}
           <ul className="space-y-2 border-l-[3px] border-[var(--rv-accent)] bg-[#f6f5f2] px-5 py-4">
             {c.executiveSummary.map((s, i) => (
               <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span><Rich text={s} /></span></li>
             ))}
           </ul>
         </section>
-
-        {/* 한눈에 */}
-        {stats && (
-          <section aria-labelledby="sec-overview" className="space-y-5">
-            <H2 id="sec-overview" no="■" right={<ViewToggle table={tableView} onChange={setTableView} />}>이번 호 한눈에</H2>
-            {tableView ? (
-              <Table head={["카테고리", "기사 수", "비율"]} rows={catItems.map((i) => [i.label, i.value, `${Math.round((i.value / articles.length) * 100)}%`])} />
-            ) : (
-              <div>
-                <p className="mb-1.5 text-sm font-bold">카테고리 구성 <span className="text-xs font-normal text-[var(--rv-mute)]">조각을 누르면 해당 카테고리만 봅니다</span></p>
-                <SegBar items={catItems} height={32} onPick={soloCat} tip={tip} dimInactive />
-                <Legend items={catItems} onPick={toggleCat} />
-              </div>
-            )}
-            {stats.topKeywords.length > 0 && (
-              <div>
-                <p className="mb-1.5 text-sm font-bold">
-                  많이 다룬 기업·기술
-                  {stats.trend.issues.length > 1 && (
-                    <span className="ml-3 text-xs font-normal text-[var(--rv-soft)]">
-                      <span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-[2px] bg-[#a72b2b]" />지난 호에서도 등장
-                      <span aria-hidden className="ml-3 mr-1 inline-block h-2.5 w-2.5 rounded-[2px] bg-[#a9a7a0]" />이번 호 처음
-                    </span>
-                  )}
-                </p>
-                <RankBars tip={tip} rows={stats.topKeywords.map((k) => ({ label: k.label, value: k.count, color: k.seenBefore ? "#a72b2b" : "#a9a7a0", hint: k.seenBefore ? "지난 호에서도 등장" : "이번 호 처음" }))} />
-              </div>
-            )}
-          </section>
-        )}
 
         {/* 핵심 인사이트 */}
         <section aria-labelledby="sec-insights" className="space-y-5">
@@ -320,7 +281,7 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
 
         {/* 추세 */}
         <section aria-labelledby="sec-trend" className="space-y-5">
-          <H2 id="sec-trend" no="■">추세 분석</H2>
+          <H2 id="sec-trend" no="■" right={stats && stats.trend.issues.length > 1 ? <ViewToggle table={tableView} onChange={setTableView} /> : undefined}>추세 분석</H2>
           <p><Rich text={c.trend.overview} /></p>
           {c.trend.notes.length > 0 && <ul className="space-y-1">{c.trend.notes.map((n, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span><Rich text={n} /></span></li>)}</ul>}
           {stats && stats.trend.issues.length > 1 ? (

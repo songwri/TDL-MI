@@ -1,6 +1,6 @@
 import { svgToPng } from "@/lib/charts/png";
 import { verifyChartSig } from "@/lib/charts/sign";
-import { chartSvg, type ChartId } from "@/lib/charts/svg";
+import { CHART_IDS, chartSvg, type ChartId } from "@/lib/charts/svg";
 import { getHandoffContent } from "@/lib/newsletter/handoff";
 import { buildViewer } from "@/lib/newsletter/render";
 import { getArticles, getIssue } from "@/lib/store";
@@ -8,7 +8,7 @@ import { getArticles, getIssue } from "@/lib/store";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const IDS = new Set<ChartId>(["category", "keywords", "map", "trend", "heatmap"]);
+const IDS = new Set<ChartId>(CHART_IDS);
 
 /**
  * GET /api/charts/:issueNo/:chart.png?s=서명

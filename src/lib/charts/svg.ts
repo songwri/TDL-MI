@@ -4,7 +4,7 @@
  * 카테고리 색은 항목에 고정, 크기는 파랑 한 가지 색, 강조(브랜드 레드)는 한 가지 의미에만.
  * 제목은 메일 본문의 글자로 두고(검색·이미지 차단 대비), 이미지는 그래픽과 라벨만 담는다.
  */
-import { CATEGORY_COLORS, COLORS, NEUTRALS, RAMP } from "@/config/brand";
+import { CATEGORY_COLORS, COLORS, RAMP } from "@/config/brand";
 import { stripRich } from "@/lib/report/rich";
 import type { ReportContent, ReportStats, ViewerData } from "@/lib/types";
 
@@ -87,49 +87,6 @@ function legendRow(items: { label: string; color: string; note?: string }[], y: 
 
 const wrap = (w: number, h: number, body: string, label: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${Math.ceil(h)}" viewBox="0 0 ${w} ${Math.ceil(h)}" role="img" aria-label="${esc(label)}"><rect width="100%" height="100%" fill="#FFFFFF"/>${body}</svg>`;
-
-/** 1) 카테고리 구성: 분할 막대 + 범례 */
-export function categorySvg(s: ReportStats): string {
-  const items = s.byCategory.filter((c) => c.count > 0);
-  const total = items.reduce((n, c) => n + c.count, 0) || 1;
-  const gap = 2;
-  const avail = CHART_W - gap * (items.length - 1);
-  let x = 0;
-  const segs = items.map((c, i) => {
-    const w = i === items.length - 1 ? CHART_W - x : Math.round((c.count / total) * avail);
-    const color = cat(c.label);
-    const out =
-      bar(x, 0, w, 34, color, items.length === 1 ? "both" : i === 0 ? "left" : i === items.length - 1 ? "right" : "none") +
-      (w >= 34 ? T(x + w / 2, 22, `${c.count}건`, { size: 13, weight: 700, fill: inkOn(color), anchor: "middle" }) : "");
-    x += w + gap;
-    return out;
-  });
-  const lg = legendRow(items.map((c) => ({ label: c.label, color: cat(c.label), note: `${c.count}건 · ${Math.round((c.count / total) * 100)}%` })), 58);
-  return wrap(CHART_W, lg.bottom + 6, segs.join("") + lg.svg, `카테고리 구성: ${items.map((c) => `${c.label} ${c.count}건`).join(", ")}`);
-}
-
-/** 2) 많이 언급된 기업·기술: 순위 막대 (이어지는 주제 = 강조색) */
-export function keywordSvg(s: ReportStats): string {
-  const rows = s.topKeywords;
-  const max = Math.max(...rows.map((r) => r.count), 1);
-  const labelW = 150, valueW = 44, rowH = 26;
-  const area = CHART_W - labelW - valueW;
-  const body = rows
-    .map((r, i) => {
-      const y = i * rowH;
-      const w = Math.max(4, (r.count / max) * area);
-      return (
-        T(0, y + 16, fit(r.label, labelW - 12, 13), { size: 13 }) +
-        `<line x1="${labelW}" y1="${y + 3}" x2="${labelW}" y2="${y + 23}" stroke="${LINE}"/>` +
-        bar(labelW, y + 7, w, 12, r.seenBefore ? COLORS.brand : NEUTRALS.mid, "right") +
-        T(labelW + w + 8, y + 17, `${r.count}건`, { size: 12, weight: 700, fill: SOFT })
-      );
-    })
-    .join("");
-  const hasHistory = s.trend.issues.length > 1;
-  const lg = hasHistory ? legendRow([{ label: "지난 호에서도 등장", color: COLORS.brand }, { label: "이번 호 처음", color: NEUTRALS.mid }], rows.length * rowH + 18) : { svg: "", bottom: rows.length * rowH };
-  return wrap(CHART_W, lg.bottom + 6, body + lg.svg, `많이 다룬 기업·기술: ${rows.map((r) => `${r.label} ${r.count}건`).join(", ")}`);
-}
 
 /** 3) 인사이트 맵: 주제 ↔ 근거 기사 */
 export function insightMapSvg(c: ReportContent, articles: ViewerData["articles"]): string {
@@ -244,14 +201,13 @@ export function heatmapSvg(s: ReportStats): string {
   return wrap(CHART_W, y0 + 18, header + rows + scale, `키워드 호별 등장: ${keywords.map((k) => k.label).join(", ")}`);
 }
 
-export type ChartId = "category" | "keywords" | "map" | "trend" | "heatmap";
+export const CHART_IDS = ["map", "trend", "heatmap"] as const;
+export type ChartId = (typeof CHART_IDS)[number];
 
 export function chartSvg(id: ChartId, c: ReportContent, articles: ViewerData["articles"]): string | null {
   const s = c.stats;
   if (id === "map") return c.themes.length && articles.length ? insightMapSvg(c, articles) : null;
   if (!s) return null;
-  if (id === "category") return s.byCategory.length ? categorySvg(s) : null;
-  if (id === "keywords") return s.topKeywords.length ? keywordSvg(s) : null;
   if (id === "trend") return s.trend.issues.length > 1 ? trendSvg(s) : null;
   if (id === "heatmap") return s.trend.issues.length > 1 && s.trend.keywords.length ? heatmapSvg(s) : null;
   return null;

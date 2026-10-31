@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import Parser from "rss-parser";
-import { cleanText } from "@/lib/utils/text";
+import { cleanText, stripBoilerplate } from "@/lib/utils/text";
 
 export interface RawItem {
   title: string;
@@ -129,6 +129,8 @@ export function extractArticlePage(html: string, url: string): PageMeta {
     $("time[datetime]").first().attr("datetime");
 
   $("script, style, noscript, figure, aside, iframe, form, nav, header, footer, .ad, .ads, .related").remove();
+  // 기자 서명·저작권·댓글 영역 (국내 언론 CMS 공통 클래스)
+  $('[class*="copyright"], [class*="byline"], [class*="writer"], [class*="reporter"], [class*="comment"], [class*="share"], [class*="sns"], .view-editors, .article-copy, .art_copyright').remove();
   let content = "";
   for (const sel of BODY_SELECTORS) {
     const node = $(sel).first();
@@ -138,7 +140,7 @@ export function extractArticlePage(html: string, url: string): PageMeta {
       .map((_, p) => cleanText($(p).text()))
       .get()
       .filter((t) => t.length > 30);
-    content = paras.length >= 2 ? paras.join("\n") : cleanText(node.text());
+    content = stripBoilerplate(paras.length >= 2 ? paras.join("\n") : cleanText(node.text()));
     if (content.length > 200) break;
   }
 

@@ -14,7 +14,8 @@
     "render:sample": "tsx scripts/render-sample.ts",
     "letter": "tsx scripts/report.ts",
     "sources": "tsx scripts/sources.ts",
-    "report": "tsx scripts/report.ts"
+    "report": "tsx scripts/report.ts",
+    "make:mark": "tsx scripts/make-mark.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

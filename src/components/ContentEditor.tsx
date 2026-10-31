@@ -40,8 +40,10 @@ export function ContentEditor({ value, onChange }: { value: ReportContent; onCha
     <div className="grid gap-6 text-sm lg:grid-cols-2">
       <div className="space-y-6">
         <Section title="제목과 핵심 요약">
+          <Field label="이번 호 핵심 주제" hint="맨 위 큰 제목 · 예: 자율주행으로 바라보는 물류" value={c.issueTheme ?? ""} onChange={(v) => set({ issueTheme: v })} />
           <Field label="리포트 제목 (메일 제목)" value={c.headline} onChange={(v) => set({ headline: v })} />
-          <Field label="이번 호 한 줄 결론" hint="맨 위 강조 상자" value={c.keyTakeaway ?? ""} onChange={(v) => set({ keyTakeaway: v })} />
+          <Field label="테크이노베이션팀의 한마디" hint="위트 있는 첫 문장 + 읽는 관점, 2~3문장" value={c.teamNote ?? ""} rows={4} onChange={(v) => set({ teamNote: v })} />
+          <Field label="이번 호 한 줄 결론" hint="핵심 요약 맨 위" value={c.keyTakeaway ?? ""} onChange={(v) => set({ keyTakeaway: v })} />
           <Field label="핵심 요약" hint="한 줄에 하나 · **핵심 구절**은 형광펜 표시" value={c.executiveSummary.join("\n")} rows={6} onChange={(v) => set({ executiveSummary: lines(v) })} />
         </Section>
         <Section title="추세 분석">

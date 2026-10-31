@@ -4,7 +4,7 @@ import { classify, extractKeywords, isRelevant } from "@/lib/mi/matcher";
 import { addArticles, getAllArticles } from "@/lib/store";
 import type { Article, RefreshResult } from "@/lib/types";
 import { mapLimit } from "@/lib/utils/async";
-import { articleIdFromUrl, cleanText, normalizeUrl, truncate } from "@/lib/utils/text";
+import { articleIdFromUrl, cleanText, normalizeUrl, stripBoilerplate, truncate } from "@/lib/utils/text";
 import { extractArticleLinks, resolveSource, type Resolved } from "./discover";
 import { fetchText } from "./http";
 import { extractArticlePage, extractListLinks, parseFeed, type RawItem } from "./parse";
@@ -50,8 +50,10 @@ async function enrich(item: RawItem): Promise<RawItem> {
 }
 
 export function toArticle(item: RawItem, src: { id?: string; name: string; region: SourceDef["region"] }, now = new Date()): Article {
-  const content = item.content ? truncate(item.content, MAX_CONTENT) : undefined;
-  const summary = truncate(cleanText(item.summary || content || ""), 400);
+  // 기자 서명·저작권 고지·사이트 문구는 저장하지 않는다
+  const body = stripBoilerplate(item.content);
+  const content = body ? truncate(body, MAX_CONTENT) : undefined;
+  const summary = truncate(stripBoilerplate(cleanText(item.summary || "")) || content || "", 400);
   const text = `${item.title}\n${summary}\n${content ?? ""}`;
   return {
     id: articleIdFromUrl(item.link),

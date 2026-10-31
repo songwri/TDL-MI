@@ -51,8 +51,12 @@ export interface NewsletterIssue {
  * Claude 가 쓰는 부분(ReportDraft)과 서버가 계산해 붙이는 통계(stats)로 이루어진다.
  */
 export interface ReportDraft {
+  /** 이번 호 핵심 주제 (리포트 맨 위 큰 제목). 예: "자율주행으로 바라보는 물류". 예전 리포트에는 없을 수 있음 */
+  issueTheme?: string;
   /** 메일 제목 겸 리포트 제목 */
   headline: string;
+  /** 테크이노베이션팀의 한마디: 위트와 전문성을 담은 발행팀 메시지 (맨 위 눈에 띄는 상자) */
+  teamNote?: string;
   /** 이번 호 한 줄 결론 (리포트 맨 위 강조 상자). 예전에 만든 리포트에는 없을 수 있음 */
   keyTakeaway?: string;
   /** 핵심 요약 (결론 먼저, 3~5개). **두 별표**로 감싼 부분이 하이라이트된다 */

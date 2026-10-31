@@ -182,27 +182,6 @@ export function heatmap(
   return table(head + body.join("") + tr(td(scale, { colspan: columns.length + 1, style: { paddingTop: 6 } })), { width: labelW + cellW * columns.length, style: { fontFamily: FONT } });
 }
 
-/** 핵심 수치 타일 (KPI 줄) */
-export function statTiles(tiles: { value: string; label: string; sub?: string }[], opts: { width: number }): string {
-  const n = tiles.length;
-  const tileW = Math.floor(opts.width / n);
-  return table(
-    tr(
-      tiles
-        .map((x, i) =>
-          td(
-            `<span style="${css({ fontSize: x.value.length > 5 ? 17 : 28, lineHeight: x.value.length > 5 ? "24px" : "32px", fontWeight: "bold", color: C.ink })}">${t(x.value)}</span><br>` +
-              `<span style="${css(text(12, C.sub, { fontWeight: "bold" }))}">${t(x.label)}</span>` +
-              (x.sub ? `<br><span style="${css(text(11, C.mute))}">${t(x.sub)}</span>` : ""),
-            { width: tileW, valign: "top", style: { padding: "12px 14px 12px", borderTop: `2px solid ${C.ink}`, borderLeft: i ? `1px solid ${C.line}` : "0", backgroundColor: C.paper } },
-          ),
-        )
-        .join(""),
-    ),
-    { width: opts.width },
-  );
-}
-
 /** 기사 × 주제 연결표: 어느 기사가 어느 주제의 근거인지 ● 로 표시 (웹 화면 '인사이트 맵'의 메일용 버전) */
 export function themeMatrix(
   articles: { id: string; no: number; title: string; href: string }[],

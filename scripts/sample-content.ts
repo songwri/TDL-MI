@@ -11,6 +11,9 @@ export const SAMPLE_ARTICLES = [
 ];
 
 export const SAMPLE_REPORT: ReportContent = {
+  issueTheme: "손이 생긴 물류센터",
+  teamNote:
+    "그동안 물류센터의 로봇은 바퀴로 달리는 데 바빴는데, 이번 호에서는 드디어 손을 쓰기 시작했습니다. 다만 손재주보다 중요한 것은 어떤 물건을 맡기느냐입니다. 이번 호는 '무엇이 되는가'보다 '우리 센터 SKU에서 되는가'를 기준으로 읽어 주시길 권합니다.",
   headline: "로봇 피킹, 상용화 단계 진입 신호와 센터 자동화 투자 판단 기준",
   keyTakeaway: "로봇 피킹은 설비 일체형으로 상용화 단계에 들어섰고, 도입 판단의 열쇠는 SKU 적합도 검증입니다.",
   executiveSummary: [
