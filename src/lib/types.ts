@@ -53,11 +53,15 @@ export interface NewsletterIssue {
 export interface ReportDraft {
   /** 메일 제목 겸 리포트 제목 */
   headline: string;
-  /** 핵심 요약 (결론 먼저, 3~5개) */
+  /** 이번 호 한 줄 결론 (리포트 맨 위 강조 상자). 예전에 만든 리포트에는 없을 수 있음 */
+  keyTakeaway?: string;
+  /** 핵심 요약 (결론 먼저, 3~5개). **두 별표**로 감싼 부분이 하이라이트된다 */
   executiveSummary: string[];
   /** 선정 기사들을 공통 주제로 묶은 기사형 인사이트 */
   themes: {
     title: string;
+    /** 이 주제의 핵심 한 줄 (제목 아래 강조) */
+    takeaway?: string;
     lead: string;
     body: string[];
     insights: string[];

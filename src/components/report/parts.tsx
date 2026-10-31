@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 import { CATEGORY_COLORS, RAMP } from "@/config/brand";
+import { parseRich } from "@/lib/report/rich";
 import type { ReportContent, ViewerData } from "@/lib/types";
 
 /** 모든 차트가 함께 쓰는 툴팁: 값이 먼저, 이름은 보조. 마우스와 키보드 포커스 모두 같은 내용을 보여 준다 */
@@ -352,5 +353,22 @@ export function InsightMap({
       </svg>
       <figcaption className="mt-1 text-xs text-[var(--rv-mute)]">선 색은 기사의 카테고리입니다. 주제를 누르면 본문으로, 기사를 누르면 원문으로 이동합니다.</figcaption>
     </figure>
+  );
+}
+
+/** 문장 속 **핵심 구절**을 형광펜으로 표시 */
+export function Rich({ text }: { text: string }) {
+  return (
+    <>
+      {parseRich(text).map((p, i) =>
+        p.hl ? (
+          <mark key={i} className="rounded-[2px] bg-[#ffeda8] px-0.5 font-bold text-[var(--rv-ink)]">
+            {p.text}
+          </mark>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
   );
 }

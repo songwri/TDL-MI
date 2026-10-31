@@ -25,5 +25,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // 인포그래픽 이미지는 메일에서 비밀번호 없이 열려야 하므로 제외 (주소 서명으로 보호)
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/charts/).*)"],
 };

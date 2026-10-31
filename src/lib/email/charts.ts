@@ -191,7 +191,7 @@ export function statTiles(tiles: { value: string; label: string; sub?: string }[
       tiles
         .map((x, i) =>
           td(
-            `<span style="${css({ fontSize: 28, lineHeight: "32px", fontWeight: "bold", color: C.ink })}">${t(x.value)}</span><br>` +
+            `<span style="${css({ fontSize: x.value.length > 5 ? 17 : 28, lineHeight: x.value.length > 5 ? "24px" : "32px", fontWeight: "bold", color: C.ink })}">${t(x.value)}</span><br>` +
               `<span style="${css(text(12, C.sub, { fontWeight: "bold" }))}">${t(x.label)}</span>` +
               (x.sub ? `<br><span style="${css(text(11, C.mute))}">${t(x.sub)}</span>` : ""),
             { width: tileW, valign: "top", style: { padding: "12px 14px 12px", borderTop: `2px solid ${C.ink}`, borderLeft: i ? `1px solid ${C.line}` : "0", backgroundColor: C.paper } },

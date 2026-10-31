@@ -177,6 +177,12 @@ export async function writePrompt(n: number): Promise<string> {
   return writePromptFile(n, built.prompt);
 }
 
+/** 작성본만 가볍게 (인포그래픽 이미지용, 프롬프트를 다시 만들지 않음) */
+export async function getHandoffContent(n: number) {
+  const { request, content } = await loadStored(n);
+  return request && content ? { content, articleIds: request.articleIds, publishDate: request.publishDate } : null;
+}
+
 export async function listHandoffs(): Promise<HandoffSummary[]> {
   if (inSheetsMode()) {
     await ensureSchemaOnce();

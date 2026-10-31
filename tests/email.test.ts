@@ -21,7 +21,7 @@ const meta = {
 describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
   const frag = renderFragment(sampleContent, meta);
 
-  it("이미지·클래스·스타일시트·div 없이 표와 인라인 스타일만 사용", () => {
+  it("뼈대는 표, 스타일은 인라인 (표 모드: 이미지 없음)", () => {
     expect(frag).not.toMatch(/<img/i);
     expect(frag).not.toMatch(/class=/);
     expect(frag).not.toMatch(/<style/);
@@ -57,14 +57,49 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     for (const a of sampleArticles) expect(frag).toContain(`href="${a.link}"`);
   });
 
-  it("핵심 수치 줄, 주제-기사 연결표, 이어지는 주제 강조 범례가 들어감", () => {
+  it("핵심 수치 줄(국내·해외 비중 없음), 주제-기사 연결표, 이어지는 주제 강조 범례", () => {
     expect(frag).toContain("선정 기사");
-    expect(frag).toContain("국내 : 해외");
+    expect(frag).toContain("지난 호 연관");
+    expect(frag).toContain("가장 많이 다룬 분야");
+    expect(frag).not.toContain("국내 : 해외");
+    expect(frag).not.toContain("국내·해외");
+    expect(frag).not.toContain("지난 호와의 관계");
     expect(frag).toContain("주제와 근거 기사의 연결");
     expect(frag.match(/●/g)!.length).toBe(sampleContent.themes.reduce((n, t) => n + t.sourceArticleIds.length, 0));
     expect(frag).toContain("지난 호에서도 등장"); // 강조(레드)=이어지는 주제
     expect(frag).toContain("#2A78D6"); // 검증된 카테고리 색 (AMR/AGV)
     expect(frag).not.toContain("#4F7F8C"); // 예전 팔레트 제거
+  });
+
+  it("하이라이트: 한 줄 결론 상자, 주제별 핵심 한 줄, **구절**은 형광펜", () => {
+    expect(frag).toContain("이번 호 한 줄 결론");
+    expect(frag).toContain(sampleContent.keyTakeaway!);
+    expect(frag).toContain(sampleContent.themes[0].takeaway!);
+    expect(frag).not.toContain("**");
+    const marks = frag.match(/background-color:#FFEDA8;font-weight:bold/g) ?? [];
+    expect(marks.length).toBeGreaterThanOrEqual(8);
+    expect(frag).toContain('font-weight:bold;color:#222222;padding:0 2px">시범에서 증설 단계로 전환</span>');
+  });
+
+  it("이미지 모드: 인포그래픽을 크기·대체 글자가 있는 <img> 로 넣고 표 차트는 쓰지 않음", () => {
+    const charts = {
+      category: { src: "/api/charts/4/category.png?s=x", height: 86, alt: "카테고리 구성" },
+      keywords: { src: "/api/charts/4/keywords.png?s=x", height: 220, alt: "많이 다룬 기업·기술" },
+      map: { src: "/api/charts/4/map.png?s=x", height: 260, alt: "인사이트 맵" },
+      trend: { src: "/api/charts/4/trend.png?s=x", height: 160, alt: "호별 카테고리 추이" },
+      heatmap: { src: "/api/charts/4/heatmap.png?s=x", height: 200, alt: "키워드 호별 등장" },
+    };
+    const img = renderFragment(sampleContent, { ...meta, charts });
+    const imgs = img.match(/<img [^>]+>/g)!;
+    expect(imgs).toHaveLength(5);
+    for (const tag of imgs) {
+      expect(tag).toMatch(/width="576"/);
+      expect(tag).toMatch(/height="\d+"/);
+      expect(tag).toMatch(/alt="[^"]+"/);
+      expect(tag).toMatch(/display:block/);
+    }
+    expect(img).not.toContain("주제 1</td>"); // 표 버전 연결표 대신 이미지
+    expect(img).not.toMatch(/<(div|svg|canvas|script)[ >]/);
   });
 
   it("전체 문서와 텍스트 버전", () => {
@@ -75,6 +110,9 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(text).toContain("테크이노베이션팀 TDL Trend 제4호 (2026.10.27)");
     expect(text).toContain("[참고 기사]");
     expect(text).toContain("[1] AutoStore unveils");
+    expect(text).toContain("▶ 이번 호 한 줄 결론:");
+    expect(text).toContain("「시범에서 증설 단계로 전환」");
+    expect(text).not.toContain("**");
   });
 
   it("통계가 없으면 인포그래픽만 빠지고 나머지는 렌더링", () => {
@@ -153,6 +191,11 @@ describe("스키마 & 초안", () => {
     expect(StoredReportSchema.safeParse(sampleContent).success).toBe(true);
     const { stats: _stats, ...draft } = sampleContent;
     expect(ReportSchema.safeParse(draft).success).toBe(true);
+    // 예전에 저장된 리포트(한 줄 결론 없음)도 저장용 스키마는 통과, Claude 출력 스키마는 요구
+    const { keyTakeaway: _k, ...old } = sampleContent;
+    const oldThemes = { ...old, themes: old.themes.map(({ takeaway: _t, ...t }) => t) };
+    expect(StoredReportSchema.safeParse(oldThemes).success).toBe(true);
+    expect(ReportSchema.safeParse({ ...oldThemes, stats: undefined }).success).toBe(false);
   });
 
   it("기본 초안은 스키마를 만족하고 모든 기사를 테마에 인용", () => {

@@ -41,7 +41,8 @@ export function ContentEditor({ value, onChange }: { value: ReportContent; onCha
       <div className="space-y-6">
         <Section title="제목과 핵심 요약">
           <Field label="리포트 제목 (메일 제목)" value={c.headline} onChange={(v) => set({ headline: v })} />
-          <Field label="핵심 요약" hint="한 줄에 하나" value={c.executiveSummary.join("\n")} rows={6} onChange={(v) => set({ executiveSummary: lines(v) })} />
+          <Field label="이번 호 한 줄 결론" hint="맨 위 강조 상자" value={c.keyTakeaway ?? ""} onChange={(v) => set({ keyTakeaway: v })} />
+          <Field label="핵심 요약" hint="한 줄에 하나 · **핵심 구절**은 형광펜 표시" value={c.executiveSummary.join("\n")} rows={6} onChange={(v) => set({ executiveSummary: lines(v) })} />
         </Section>
         <Section title="추세 분석">
           <Field label="해석" value={c.trend.overview} rows={3} onChange={(v) => tr({ overview: v })} />
@@ -57,8 +58,9 @@ export function ContentEditor({ value, onChange }: { value: ReportContent; onCha
         {c.themes.map((t, i) => (
           <Section key={i} title={`핵심 인사이트 ${i + 1}`}>
             <Field label="제목" value={t.title} onChange={(v) => th(i, { title: v })} />
+            <Field label="핵심 한 줄" hint="제목 아래 강조" value={t.takeaway ?? ""} onChange={(v) => th(i, { takeaway: v })} />
             <Field label="리드" value={t.lead} rows={2} onChange={(v) => th(i, { lead: v })} />
-            <Field label="본문" hint="문단은 빈 줄로 구분" value={t.body.join("\n\n")} rows={8} onChange={(v) => th(i, { body: paras(v) })} />
+            <Field label="본문" hint="문단은 빈 줄로 구분 · **핵심 구절**" value={t.body.join("\n\n")} rows={8} onChange={(v) => th(i, { body: paras(v) })} />
             <Field label="핵심 인사이트" hint="한 줄에 하나" value={t.insights.join("\n")} rows={3} onChange={(v) => th(i, { insights: lines(v) })} />
             <Field label="시사점" hint="한 줄에 하나" value={t.implications.join("\n")} rows={3} onChange={(v) => th(i, { implications: lines(v) })} />
           </Section>

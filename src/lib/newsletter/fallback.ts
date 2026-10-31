@@ -27,11 +27,13 @@ export function buildFallbackDraft(input: {
 
   return {
     headline: truncate(concept || `${issueLabel(input.issueNo)} 물류·로봇 자동화 주요 동향`, 45),
+    keyTakeaway: "[작성 필요] 이번 호 한 줄 결론",
     executiveSummary: articles.slice(0, 5).map((a) => truncate(`${a.title} (${a.source})`, 110)),
     themes: groups.map(([cat, as]) => {
       const body = sentences(as.map((a) => a.content || a.summary).join(" "));
       return {
         title: `${cat} 분야 동향`,
+        takeaway: "[작성 필요] 이 주제의 핵심 한 줄",
         lead: truncate(as[0].summary || as[0].title, 200),
         body: body.length ? [truncate(body.slice(0, 3).join(" "), 500)] : [as[0].summary || "[작성 필요] 본문"],
         insights: as.slice(0, 3).map((a) => truncate(a.title, 120)),

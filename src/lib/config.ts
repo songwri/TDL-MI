@@ -17,6 +17,8 @@ export const config = {
   serviceAccountKeyJson: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_JSON ?? "",
   /** 서버리스는 쓰기 가능한 곳이 임시 폴더뿐이라 캐시만 둔다 */
   dataDir: process.env.DATA_DIR || (onServerless ? path.join(os.tmpdir(), "tdl-mi") : path.join(process.cwd(), "data")),
+  /** 웹 앱의 공개 주소 (예: https://tdl-trend.onrender.com). 메일의 인포그래픽 이미지 주소에 쓴다. 비우면 복사할 때 현재 접속 주소로 채운다 */
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "").replace(/\/$/, ""),
   /** 웹 접속 비밀번호 (비우면 잠금 없음) */
   appPassword: process.env.APP_PASSWORD ?? "",
   lookbackDays: Number(process.env.COLLECT_LOOKBACK_DAYS || 14),

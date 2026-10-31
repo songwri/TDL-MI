@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { issueLabel } from "@/config/brand";
 import { CATEGORIES, type ReportContent, type ViewerData } from "@/lib/types";
-import { Heat, InsightMap, Legend, RankBars, SegBar, TipRow, TrendBars, catColor, useTip, type SegItem } from "./parts";
+import { stripRich } from "@/lib/report/rich";
+import { Heat, InsightMap, Legend, RankBars, Rich, SegBar, TipRow, TrendBars, catColor, useTip, type SegItem } from "./parts";
 
 const NAV = [
   { id: "sec-summary", label: "핵심 요약" },
@@ -100,7 +101,6 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
   };
 
   const catItems: SegItem[] = cats.map((k) => ({ key: k, label: k, value: articles.filter((a) => a.category === k).length, color: catColor(k), active: active.has(k) }));
-  const kr = vis.filter((a) => a.region === "KR").length;
   const sources = new Set(vis.map((a) => a.source)).size;
 
   const refs = vis
@@ -162,16 +162,30 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
       </div>
 
       <div className="space-y-12 pb-12 pt-8">
+        {/* 이번 호 한 줄 결론 */}
+        {c.keyTakeaway && (
+          <div className="flex overflow-hidden rounded border border-[#f1d8d4] bg-[var(--rv-tint)]">
+            <span aria-hidden className="w-1.5 shrink-0 bg-[var(--rv-accent)]" />
+            <div className="px-5 py-4">
+              <p className="text-[11px] font-bold text-[var(--rv-accent)]">이번 호 한 줄 결론</p>
+              <p className="mt-1 text-lg font-bold leading-snug [text-wrap:balance]">{stripRich(c.keyTakeaway)}</p>
+            </div>
+          </div>
+        )}
+
         {/* 핵심 수치 */}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-[var(--rv-line)] bg-[var(--rv-line)] sm:grid-cols-4">
           {[
             { v: `${vis.length}건`, l: "선정 기사", s: `${sources}개 매체${filtering ? ` · 전체 ${articles.length}건` : ""}` },
             { v: `${shownThemes.length}개`, l: "핵심 주제", s: filtering ? `전체 ${c.themes.length}개` : "기사를 묶어 분석" },
-            { v: `${kr} : ${vis.length - kr}`, l: "국내 : 해외", s: "기사 수 비율" },
-            { v: stats ? `${stats.repeat.followUp}건` : "-", l: "지난 호 연관", s: stats ? `신규 ${stats.repeat.fresh}건 · 전체 기준` : "" },
+            { v: stats ? `${stats.repeat.followUp}건` : "-", l: "지난 호 연관", s: stats ? `이어지는 키워드 ${stats.topKeywords.filter((k) => k.seenBefore).length}개 · 전체 기준` : "" },
+            (() => {
+              const top = catItems.filter((i) => active.has(i.key)).sort((a, b) => b.value - a.value)[0];
+              return { v: top?.label ?? "-", l: "가장 많이 다룬 분야", s: top ? `${top.value}건 · ${Math.round((top.value / Math.max(vis.length, 1)) * 100)}%` : "" };
+            })(),
           ].map((k) => (
-            <div key={k.l} className="bg-white px-4 py-3">
-              <p className="text-3xl font-bold leading-9 tabular-nums">{k.v}</p>
+            <div key={k.l} className="min-w-0 bg-white px-4 py-3">
+              <p className={`font-bold ${k.v.length > 5 ? "text-lg leading-9" : "text-[26px] leading-9"}`}>{k.v}</p>
               <p className="text-xs font-bold text-[var(--rv-soft)]">{k.l}</p>
               <p className="text-[11px] text-[var(--rv-mute)]">{k.s}</p>
             </div>
@@ -183,7 +197,7 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
           <H2 id="sec-summary" no="■">핵심 요약</H2>
           <ul className="space-y-2 border-l-[3px] border-[var(--rv-accent)] bg-[#f6f5f2] px-5 py-4">
             {c.executiveSummary.map((s, i) => (
-              <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span>{s}</span></li>
+              <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span><Rich text={s} /></span></li>
             ))}
           </ul>
         </section>
@@ -201,28 +215,10 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
                 <Legend items={catItems} onPick={toggleCat} />
               </div>
             )}
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div>
-                <p className="mb-1.5 text-sm font-bold">국내·해외</p>
-                <SegBar tip={tip} height={20} items={stats.byRegion.map((r, i) => ({ key: r.label, label: r.label, value: r.count, color: i === 0 ? "#52514e" : "#a9a7a0" }))} />
-                <Legend items={stats.byRegion.map((r, i) => ({ key: r.label, label: r.label, value: r.count, color: i === 0 ? "#52514e" : "#a9a7a0" }))} />
-              </div>
-              <div>
-                <p className="mb-1.5 text-sm font-bold">지난 호와의 관계</p>
-                {(() => {
-                  const rep: SegItem[] = [
-                    { key: "f", label: "연관·후속", value: stats.repeat.followUp, color: "#a72b2b" },
-                    { key: "n", label: "신규 주제", value: stats.repeat.fresh, color: "#a9a7a0" },
-                    { key: "d", label: "중복 가능", value: stats.repeat.duplicate, color: "#d6d4cc" },
-                  ];
-                  return <><SegBar tip={tip} height={20} items={rep} /><Legend items={rep} /></>;
-                })()}
-              </div>
-            </div>
             {stats.topKeywords.length > 0 && (
               <div>
                 <p className="mb-1.5 text-sm font-bold">
-                  많이 언급된 기업·기술
+                  많이 다룬 기업·기술
                   {stats.trend.issues.length > 1 && (
                     <span className="ml-3 text-xs font-normal text-[var(--rv-soft)]">
                       <span aria-hidden className="mr-1 inline-block h-2.5 w-2.5 rounded-[2px] bg-[#a72b2b]" />지난 호에서도 등장
@@ -269,16 +265,22 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
                   <span className="mt-0.5 text-lg font-bold text-[var(--rv-accent)]">{i + 1}.</span>
                   <span className="flex-1">
                     <span className="block text-[17px] font-bold leading-snug">{t.title}</span>
-                    <span className="mt-1 block text-sm text-[var(--rv-soft)]">{t.lead}</span>
+                    {t.takeaway && (
+                      <span className="mt-2 inline-flex items-baseline gap-2 rounded-[3px] bg-[#ffeda8] px-2.5 py-1 text-sm font-bold">
+                        <span className="text-[11px] text-[#7a5b00]">핵심</span>
+                        {stripRich(t.takeaway)}
+                      </span>
+                    )}
+                    <span className="mt-2 block text-sm text-[var(--rv-soft)]">{t.lead}</span>
                   </span>
                   <span aria-hidden className={`mt-1 text-[var(--rv-mute)] transition-transform ${isOpen ? "rotate-180" : ""}`}>▾</span>
                 </button>
                 {isOpen && (
                   <div className="space-y-4 border-t border-[var(--rv-line)] px-5 pb-5 pt-4">
-                    {t.body.map((p, k) => <p key={k}>{p}</p>)}
+                    {t.body.map((p, k) => <p key={k}><Rich text={p} /></p>)}
                     <div>
                       <p className="text-sm font-bold">핵심 인사이트</p>
-                      <ul className="mt-1 space-y-1">{t.insights.map((x, k) => <li key={k} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span>{x}</li>)}</ul>
+                      <ul className="mt-1 space-y-1">{t.insights.map((x, k) => <li key={k} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span><Rich text={x} /></span></li>)}</ul>
                     </div>
                     {t.implications.length > 0 && (
                       <div className="border-l-[3px] border-[var(--rv-accent)] bg-[#f6f5f2] px-4 py-3">
@@ -319,8 +321,8 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
         {/* 추세 */}
         <section aria-labelledby="sec-trend" className="space-y-5">
           <H2 id="sec-trend" no="■">추세 분석</H2>
-          <p>{c.trend.overview}</p>
-          {c.trend.notes.length > 0 && <ul className="space-y-1">{c.trend.notes.map((n, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span>{n}</li>)}</ul>}
+          <p><Rich text={c.trend.overview} /></p>
+          {c.trend.notes.length > 0 && <ul className="space-y-1">{c.trend.notes.map((n, i) => <li key={i} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span><span><Rich text={n} /></span></li>)}</ul>}
           {stats && stats.trend.issues.length > 1 ? (
             <>
               <div>

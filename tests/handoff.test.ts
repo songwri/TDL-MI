@@ -43,6 +43,23 @@ describe("Claude Code 작성 의뢰서", () => {
     expect(saved.html).toContain("제5호");
     expect(saved.html).toContain('href="https://x.com/M1"');
     expect((await h.getHandoff(5))?.content?.headline).toBe(sampleContent.headline);
+
+    // 인포그래픽 이미지: 서명된 주소만 PNG 로 열림
+    const map = saved.html.match(/src="(\/api\/charts\/5\/map\.png\?[^"]+)"/)![1].replace(/&amp;/g, "&");
+    const { GET } = await import("@/app/api/charts/[issueNo]/[chart]/route");
+    const call = (url: string) => {
+      const u = new URL(url, "http://local");
+      const [, , , n, file] = u.pathname.split("/");
+      return GET(new Request(u), { params: Promise.resolve({ issueNo: n, chart: file }) });
+    };
+    const ok = await call(map);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("content-type")).toBe("image/png");
+    const bytes = new Uint8Array(await ok.arrayBuffer());
+    expect([...bytes.slice(1, 4)].map((b) => String.fromCharCode(b)).join("")).toBe("PNG");
+    expect((await call(map.replace(/s=[^&]+/, "s=forged"))).status).toBe(403);
+    expect((await call("/api/charts/5/nope.png?s=x")).status).toBe(404);
+    expect(saved.tables.html).not.toContain("<img"); // 예비 표 버전
     expect((await h.listHandoffs())[0].hasContent).toBe(true);
   });
 });

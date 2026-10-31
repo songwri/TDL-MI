@@ -59,3 +59,8 @@ export function downloadFile(name: string, content: string, type = "text/html;ch
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** 상대 주소 이미지(src="/api/charts/...")를 현재 접속 주소 기준 절대 주소로 바꾼다 (메일에서 열리도록) */
+export function absolutize(html: string): string {
+  return html.replace(/(src|href)="\/(?!\/)/g, `$1="${window.location.origin}/`);
+}

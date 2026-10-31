@@ -81,7 +81,6 @@ export function statsToText(s: ReportStats): string {
   const row = (label: string, counts: number[]) => `  - ${label}: ${counts.map((n, i) => `${issues[i]} ${n}건`).join(", ")}`;
   return `- 이번 호 선정 기사: ${s.total}건
 - 카테고리: ${s.byCategory.map((c) => `${c.label} ${c.count}건`).join(", ")}
-- 지역: ${s.byRegion.map((r) => `${r.label} ${r.count}건`).join(", ")}
 - 많이 언급된 기업·기술: ${s.topKeywords.map((k) => `${k.label} ${k.count}건`).join(", ") || "없음"}
 - 지난 호와의 관계: 신규 ${s.repeat.fresh}건, 후속·연관 ${s.repeat.followUp}건, 중복 가능 ${s.repeat.duplicate}건
 - 호별 카테고리 추이${s.trend.issues.length > 1 ? "" : " (비교할 지난 호 없음)"}:

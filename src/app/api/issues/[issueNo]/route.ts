@@ -1,5 +1,5 @@
 import { fail, ok } from "@/lib/api";
-import { buildViewer } from "@/lib/newsletter/render";
+import { renderAll } from "@/lib/newsletter/render";
 import { getArticles, getIssue } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ issueNo
     return ok({
       issue,
       articles: articles.map((a) => ({ ...a, content: undefined })),
-      viewer: issue.content ? buildViewer(issue.issueNo, issue.publishDate, articles) : null,
+      // 구조화 데이터가 있으면 최신 템플릿으로 다시 그림 (인포그래픽 이미지·표 버전 포함)
+      render: issue.content ? renderAll(issue.content, issue.issueNo, issue.publishDate, articles) : null,
     });
   } catch (e) {
     return fail(e);

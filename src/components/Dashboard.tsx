@@ -45,6 +45,7 @@ interface Generated {
   text: string;
   /** 인터랙티브 리포트 화면용. 예전에 저장된 초안에는 없을 수 있음 */
   viewer?: ViewerData;
+  tables?: { html: string; fragment: string };
   issueNo: number;
   publishDate: string;
   articleIds: string[];
@@ -267,7 +268,7 @@ export function Dashboard() {
     }
   };
 
-  const showHandoffResult = (r: { request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData }) => {
+  const showHandoffResult = (r: { request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData; tables: { html: string; fragment: string } }) => {
     const g: Generated = {
       content: r.content,
       mode: "claude-code",
@@ -275,6 +276,7 @@ export function Dashboard() {
       fragment: r.fragment,
       text: r.text,
       viewer: r.viewer,
+      tables: r.tables,
       issueNo: r.request.issueNo,
       publishDate: r.request.publishDate,
       articleIds: r.request.articleIds,
@@ -293,7 +295,7 @@ export function Dashboard() {
 
   const loadHandoff = async (n: number) => {
     try {
-      const r = await api<{ request: HandoffSummary; content: ReportContent | null; html: string; fragment: string; text: string; viewer: ViewerData }>(`/api/handoff/${n}`);
+      const r = await api<{ request: HandoffSummary; content: ReportContent | null; html: string; fragment: string; text: string; viewer: ViewerData; tables: { html: string; fragment: string } }>(`/api/handoff/${n}`);
       if (!r.content) return push(`제${n}호 작성본이 아직 없습니다. Claude Code에서 /write-report ${n} 를 실행하세요.`, "error");
       showHandoffResult({ ...r, content: r.content });
       push(`제${n}호 작성본을 불러왔습니다.`, "success");
@@ -305,7 +307,7 @@ export function Dashboard() {
   const submitPaste = async () => {
     if (pasteFor === null) return;
     try {
-      const r = await api<{ request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData }>(
+      const r = await api<{ request: HandoffSummary; content: ReportContent; html: string; fragment: string; text: string; viewer: ViewerData; tables: { html: string; fragment: string } }>(
         `/api/handoff/${pasteFor}/content`,
         { json: { json: pasteText } },
       );
@@ -324,7 +326,7 @@ export function Dashboard() {
     if (!gen) return;
     setRendering(true);
     try {
-      const r = await api<{ html: string; fragment: string; text: string; viewer: ViewerData }>("/api/newsletter/render", {
+      const r = await api<{ html: string; fragment: string; text: string; viewer: ViewerData; tables: { html: string; fragment: string } }>("/api/newsletter/render", {
         json: { content: gen.content, issueNo: gen.issueNo, publishDate: gen.publishDate, articleIds: gen.articleIds },
       });
       const g = { ...gen, ...r };
@@ -619,6 +621,7 @@ export function Dashboard() {
               html={gen.html}
               fragment={gen.fragment}
               text={gen.text}
+              tables={gen.tables}
               fileName={`TDL-Trend-제${gen.issueNo}호-${gen.publishDate}.html`}
               onToast={push}
               extraActions={publishButton}
