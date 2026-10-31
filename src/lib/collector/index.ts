@@ -49,7 +49,7 @@ async function enrich(item: RawItem): Promise<RawItem> {
   }
 }
 
-export function toArticle(item: RawItem, src: Pick<SourceDef, "name" | "region">, now = new Date()): Article {
+export function toArticle(item: RawItem, src: { id?: string; name: string; region: SourceDef["region"] }, now = new Date()): Article {
   const content = item.content ? truncate(item.content, MAX_CONTENT) : undefined;
   const summary = truncate(cleanText(item.summary || content || ""), 400);
   const text = `${item.title}\n${summary}\n${content ?? ""}`;
@@ -64,6 +64,7 @@ export function toArticle(item: RawItem, src: Pick<SourceDef, "name" | "region">
     summary,
     content,
     thumbnail: item.thumbnail,
+    channel: src.id,
     category: classify(`${item.title} ${item.title} ${summary}`, src.region),
     keywords: extractKeywords(text),
     selected: false,
@@ -118,4 +119,22 @@ export async function refreshArticles(opts: { days?: number; sourceIds?: string[
     if (stat) stat.added++;
   }
   return { added: added.length, duplicates, filtered, perSource, warning };
+}
+
+/** 채널 점검: 지금 접속되는지, 어떤 방식으로 수집하는지, 최근 기사 몇 건이 보이는지 */
+export async function checkSource(src: SourceDef) {
+  const started = Date.now();
+  let method: { type: "rss" | "html"; url: string; via?: string } = { type: src.type === "rss" ? "rss" : "html", url: src.url };
+  if ((src.type ?? "auto") === "auto") {
+    let r = resolvedCache.get(src.url);
+    if (!r) resolvedCache.set(src.url, (r = await resolveSource(src.url)));
+    method = { type: r.type, url: r.url, via: r.via };
+  }
+  const items = await fetchSourceItems(src);
+  return {
+    method,
+    count: items.length,
+    ms: Date.now() - started,
+    samples: items.slice(0, 5).map((i) => ({ title: i.title, link: i.link, publishedAt: i.publishedAt })),
+  };
 }

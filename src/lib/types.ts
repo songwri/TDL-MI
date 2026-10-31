@@ -24,6 +24,8 @@ export interface Article {
   thumbnail?: string;
   category: Category;
   keywords: string[];
+  /** 수집한 채널 ID (config/sources.ts 의 id). 예전 기사는 비어 있을 수 있음 */
+  channel?: string;
   /** 이번 호 후보로 체크됨 */
   selected: boolean;
   /** 발행된 호수 (발행 확정 시 기록) */

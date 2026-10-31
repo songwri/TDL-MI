@@ -87,7 +87,7 @@ scripts/   report.ts(CLI) · collect.ts · sources.ts · seed-demo.ts · render-
 2. 없으면 흔한 피드 경로: 국내 언론 CMS 공통 `/rss/allArticle.xml`, WordPress `/feed`, `/rss` 등
 3. 그래도 없으면 홈페이지 링크 중 기사처럼 생긴 주소(`articleView.html?idxno=`, `/article/…`, `/2026/10/…`, 긴 숫자 ID)를 골라 원문을 읽음
 
-새 사이트는 먼저 확인해 보세요.
+웹의 **수집 채널** 메뉴에서 채널 목록과 채널별 기사 수·최근 수집일을 보고, **점검** 버튼으로 지금 접속되는지 확인할 수 있습니다. 새 사이트는 먼저 확인해 보세요.
 
 ```bash
 npm run sources -- probe https://www.klnews.co.kr   # 수집 방식, 최근 기사 5건, 첫 기사 본문 길이

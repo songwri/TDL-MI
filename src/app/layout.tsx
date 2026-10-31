@@ -20,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <nav className="flex gap-4 text-sm text-slate-600">
               <Link href="/" className="hover:text-brand">대시보드</Link>
               <Link href="/issues" className="hover:text-brand">발행 이력 (MI 아카이브)</Link>
+              <Link href="/sources" className="hover:text-brand">수집 채널</Link>
             </nav>
           </div>
         </header>
