@@ -1,249 +1,684 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EXTERNAL_REPORTS } from "@/config/insights";
+import { COUNTRIES, SEGMENTS, type Segment, type Vendor } from "@/config/vendors";
 import { curveY, type InsightsData } from "@/lib/insights/compute";
 import type { Indicator } from "@/lib/indicators";
 import { catColor, useTip } from "@/components/report/parts";
 import { api } from "@/components/ui";
-import { HypeMap, IndicatorCard, MoverList, PeerHeat, SIGNAL_ORDER, SignalBar, WeeklyBars, pct, signalLabel } from "./charts";
+import { HypeMap, IndicatorCard, MoverList, PeerHeat, SignalBar, WeeklyBars, pct, signalLabel } from "./charts";
+import { FOCUS, PortfolioMatrix, pp } from "./Portfolio";
+import { WorldMap } from "./WorldMap";
 
+type V = Vendor & { fromSheet?: boolean };
+interface Payload {
+  insights: InsightsData;
+  indicators: Indicator[];
+  vendors: { vendors: V[]; sheetRows: number; warning?: string };
+}
+
+type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method";
+const VIEWS: { group: string; items: { id: ViewId; label: string; hint: string }[] }[] = [
+  { group: "지금", items: [
+    { id: "now", label: "최근 근황", hint: "최근 30일 물류기술 소식" },
+    { id: "portfolio", label: "LX Pantos 기술 포트폴리오", hint: "성숙도 × 관심도, 과거 → 최근" },
+    { id: "maturity", label: "기술 성숙도 곡선", hint: "하이프 사이클 형식" },
+  ] },
+  { group: "시장·경쟁", items: [
+    { id: "world", label: "글로벌 공급사 지도", hint: "어느 나라의 누가 무엇을" },
+    { id: "china", label: "중국 물류기술 기업", hint: "분야별 기업·순위 근거" },
+    { id: "peers", label: "국내 동종사 동향", hint: "LX판토스 vs 경쟁사" },
+  ] },
+  { group: "흐름·지표", items: [
+    { id: "flow", label: "키워드·주간 흐름", hint: "급상승 키워드, 12주 흐름" },
+    { id: "market", label: "물동량·운임 지표", hint: "공개 경제 지표" },
+    { id: "method", label: "방법론·데이터 출처", hint: "계산 방법, 입력 필요 항목" },
+  ] },
+];
+const ALL_IDS = VIEWS.flatMap((g) => g.items.map((i) => i.id));
 const day = (iso?: string) => (iso ? iso.slice(0, 10).replaceAll("-", ".") : "-");
-const REL_LABEL = { 3: "연관 높음", 2: "연관 중간", 1: "연관 낮음" } as const;
+const ko = (iso2: string) => COUNTRIES[iso2]?.ko ?? iso2;
+type TipApi = ReturnType<typeof useTip>;
 
-function Section({ id, title, desc, right, children }: { id: string; title: string; desc?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) {
+function Head({ title, lead, right }: { title: string; lead?: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <section aria-labelledby={id} className="min-w-0 rounded-lg border border-[var(--rv-line)] bg-white p-4 sm:p-5">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--rv-ink)] pb-2">
-        <div>
-          <h2 id={id} className="text-lg font-bold">
-            <span className="mr-2 text-[var(--rv-accent)]">■</span>
-            {title}
-          </h2>
-          {desc && <p className="mt-0.5 text-xs text-[var(--rv-soft)]">{desc}</p>}
-        </div>
-        {right}
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--rv-ink)] pb-3">
+      <div className="min-w-0">
+        <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+        {lead && <p className="mt-1 max-w-3xl text-sm text-[var(--rv-soft)]">{lead}</p>}
       </div>
+      {right}
+    </div>
+  );
+}
+
+function Card({ title, desc, children, right }: { title?: string; desc?: React.ReactNode; children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <section className="min-w-0 rounded-lg border border-[var(--rv-line)] bg-white p-4 sm:p-5">
+      {(title || right) && (
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+          <div>
+            {title && <h3 className="font-bold">{title}</h3>}
+            {desc && <p className="text-xs text-[var(--rv-soft)]">{desc}</p>}
+          </div>
+          {right}
+        </div>
+      )}
       {children}
     </section>
   );
 }
 
+function Toggle<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="inline-flex rounded border border-[var(--rv-line)] bg-white p-0.5 text-xs" role="group" aria-label={label}>
+      {options.map(([v, l]) => (
+        <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)} className={`rounded px-2.5 py-1 ${value === v ? "bg-[var(--rv-ink)] font-bold text-white" : "text-[var(--rv-soft)]"}`}>{l}</button>
+      ))}
+    </div>
+  );
+}
+
+const Conf = ({ c }: { c: Vendor["confidence"] }) => (
+  <span className={`whitespace-nowrap rounded px-1.5 py-px text-[10px] font-bold ${c === "확인" ? "bg-[#e8f1fb] text-[#104281]" : c === "일부 확인" ? "bg-[#f1f0ec] text-[#5c5755]" : "border border-dashed border-[#c9c7c0] text-[#898781]"}`}>{c}</span>
+);
+
 export function InsightsPage() {
   const tip = useTip();
+  const [view, setView] = useState<ViewId>("now");
   const [days, setDays] = useState(180);
-  const [data, setData] = useState<{ insights: InsightsData; indicators: Indicator[] } | null>(null);
+  const [q, setQ] = useState("");
+  const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<string>();
-  const [tableView, setTableView] = useState(false);
+
+  // 주소의 #보기 와 맞춤 (링크 공유·뒤로 가기)
+  useEffect(() => {
+    const sync = () => {
+      const h = window.location.hash.slice(1) as ViewId;
+      if (ALL_IDS.includes(h)) setView(h);
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+  const go = (id: ViewId) => {
+    setView(id);
+    history.replaceState(null, "", `#${id}`);
+    window.scrollTo({ top: 0 });
+  };
 
   useEffect(() => {
     setError(null);
-    api<{ insights: InsightsData; indicators: Indicator[] }>(`/api/insights?days=${days}`)
-      .then((d) => {
-        setData(d);
-        setSelected((s) => (s && d.insights.hype.some((h) => h.name === s) ? s : [...d.insights.hype].sort((a, b) => b.count - a.count)[0]?.name));
-      })
-      .catch((e) => setError((e as Error).message));
+    api<Payload>(`/api/insights?days=${days}`).then(setData).catch((e) => setError((e as Error).message));
   }, [days]);
 
-  if (error) return <p className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>;
-  if (!data) return <p className="p-8 text-center text-sm text-slate-500">수집 기사로 트렌드를 계산하는 중…</p>;
-
-  const { insights: d, indicators } = data;
-  const sel = d.hype.find((h) => h.name === selected);
-  const thin = d.coverage.inWindow < 60;
+  const query = q.trim().toLowerCase();
+  const current = VIEWS.flatMap((g) => g.items).find((i) => i.id === view)!;
+  const thin = data && data.insights.coverage.inWindow < 60 && !["world", "china", "method"].includes(view);
 
   return (
-    <div className="rv mx-auto max-w-[1180px] break-keep text-[15px] leading-7">
+    <div className="rv -mx-4 -my-5 grid min-h-[calc(100vh-53px)] break-keep text-[15px] leading-7 lg:grid-cols-[248px_1fr]">
       {tip.view}
 
-      {/* 머리 */}
-      <header className="mb-6 border-t-4 border-[var(--rv-accent)] pt-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* 사이드바: 보기 · 기간 · 검색 */}
+      <aside className="border-b border-[var(--rv-line)] bg-[#fbfaf8] lg:sticky lg:top-[53px] lg:h-[calc(100vh-53px)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+        <div className="space-y-5 p-4">
           <div>
-            <p className="text-xs font-bold tracking-widest text-[var(--rv-accent)]">LOGISTICS TREND INSIGHT</p>
-            <h1 className="text-[30px] font-bold leading-tight tracking-tight">물류 트렌드 인사이트</h1>
-            <p className="mt-1 text-sm text-[var(--rv-soft)]">
-              매일 수집하는 물류·로봇 기사 <b className="text-[var(--rv-ink)]">{d.coverage.total.toLocaleString()}건</b>을 코드가 세어 만든 화면입니다. 기간 내 {d.coverage.inWindow.toLocaleString()}건 · 수집 기간 {day(d.coverage.first)} ~ {day(d.coverage.last)}
-            </p>
+            <p className="text-[11px] font-bold tracking-widest text-[var(--rv-accent)]">LOGISTICS TECH INTELLIGENCE</p>
+            <p className="text-lg font-bold leading-tight">물류기술 인텔리전스</p>
+            <p className="text-[11px] text-[var(--rv-mute)]">{data ? `수집 기사 ${data.insights.coverage.total.toLocaleString()}건 · ${day(data.insights.coverage.last)} 기준` : "불러오는 중"}</p>
           </div>
-          <div className="inline-flex rounded border border-[var(--rv-line)] bg-white p-0.5 text-xs" role="group" aria-label="분석 기간">
-            {[90, 180, 365].map((n) => (
-              <button key={n} type="button" aria-pressed={days === n} onClick={() => setDays(n)} className={`rounded px-3 py-1.5 ${days === n ? "bg-[var(--rv-ink)] font-bold text-white" : "text-[var(--rv-soft)]"}`}>
-                최근 {n === 365 ? "1년" : `${n}일`}
-              </button>
-            ))}
-          </div>
-        </div>
-        {thin && (
-          <p className="mt-3 rounded border border-[#f1d8d4] bg-[var(--rv-tint)] px-3 py-2 text-xs text-[var(--rv-soft)]">
-            <b className="text-[var(--rv-accent)]">데이터 쌓는 중</b> · 기간 내 기사가 {d.coverage.inWindow}건이라 단계 위치와 증감이 크게 흔들릴 수 있습니다. 수집이 이어질수록 정확해집니다.
-          </p>
-        )}
-      </header>
 
-      <div className="space-y-6">
-        {/* 1. 기술 성숙도 맵 */}
-        <Section
-          id="hype"
-          title="기술 성숙도 맵"
-          desc="기사 속 신호(공개·투자·실증·도입·회의)로 각 기술이 어느 단계에 있는지 계산했습니다. 하이프 사이클 형식을 빌렸지만 Gartner 의 평가가 아니라 우리 수집 기사 기준입니다."
-          right={
-            <div className="inline-flex rounded border border-[var(--rv-line)] p-0.5 text-xs" role="group" aria-label="보기 방식">
-              {[false, true].map((t) => (
-                <button key={String(t)} type="button" aria-pressed={tableView === t} onClick={() => setTableView(t)} className={`rounded px-2.5 py-1 ${tableView === t ? "bg-[var(--rv-ink)] text-white" : "text-[var(--rv-soft)]"}`}>
-                  {t ? "표" : "맵"}
-                </button>
+          <label className="block lg:hidden">
+            <span className="sr-only">보기 선택</span>
+            <select value={view} onChange={(e) => go(e.target.value as ViewId)} className="w-full rounded border border-[var(--rv-line)] bg-white px-2 py-2 text-sm font-bold">
+              {VIEWS.map((g) => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.items.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
+                </optgroup>
               ))}
-            </div>
-          }
-        >
-          {d.hype.length === 0 ? (
-            <p className="py-10 text-center text-sm text-[var(--rv-mute)]">기간 내 추적 기술이 언급된 기사가 없습니다.</p>
-          ) : tableView ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
-                <thead>
-                  <tr className="bg-[#f4f3ef] text-left text-xs text-[var(--rv-soft)]">
-                    {["기술", "단계", "기사", "최근 30일", "속도", ...SIGNAL_ORDER.map(signalLabel)].map((h) => <th key={h} className="border border-[var(--rv-line)] px-2 py-1.5">{h}</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...d.hype].sort((a, b) => a.x - b.x).map((h) => (
-                    <tr key={h.name}>
-                      <td className="border border-[var(--rv-line)] px-2 py-1.5 font-medium"><span aria-hidden className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: catColor(h.category) }} />{h.name}</td>
-                      <td className="border border-[var(--rv-line)] px-2 py-1.5">{h.stage}{!h.confident && <span className="text-[var(--rv-mute)]"> (신호 적음)</span>}</td>
-                      {[h.count, h.recent, pct(h.momentum), ...SIGNAL_ORDER.map((k) => h.signals[k])].map((v, i) => <td key={i} className="border border-[var(--rv-line)] px-2 py-1.5 tabular-nums">{v}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <>
-              {/* 좁은 화면에서는 맵을 줄이지 않고 옆으로 밀어 본다 */}
-              <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
-                <div className="min-w-[760px]">
-                  <HypeMap points={d.hype} curve={curveY} selected={selected} onSelect={setSelected} tip={tip} />
-                </div>
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--rv-soft)]">
-                {[...new Set(d.hype.map((h) => h.category))].map((c) => (
-                  <span key={c} className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: catColor(c) }} />{c}</span>
-                ))}
-                <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-2 border-[#898781] bg-white" />속이 빈 점 = 신호 3건 미만</span>
-                <span>점 크기 = 기사 수 · 점을 누르면 근거 기사</span>
-              </div>
-            </>
-          )}
+            </select>
+          </label>
 
-          {sel && !tableView && (
-            <div className="mt-5 grid gap-5 rounded-md bg-[#f6f5f2] p-4 md:grid-cols-[1fr_1.4fr]">
-              <div>
-                <p className="text-xs font-bold text-[var(--rv-accent)]">선택한 기술</p>
-                <p className="text-xl font-bold">{sel.name}</p>
-                <p className="text-sm text-[var(--rv-soft)]">
-                  <b className="text-[var(--rv-ink)]">{sel.stage}</b> · 기사 {sel.count}건 · 최근 30일 {sel.recent}건 ({pct(sel.momentum)})
-                </p>
-                <p className="mb-2 mt-3 text-xs font-bold text-[var(--rv-soft)]">단계 신호 구성</p>
-                <SignalBar p={sel} tip={tip} />
-              </div>
-              <div>
-                <p className="mb-1 text-xs font-bold text-[var(--rv-soft)]">근거 기사 (최근순)</p>
-                <ul className="space-y-1.5 text-sm">
-                  {sel.articles.map((a) => (
-                    <li key={a.id} className="leading-snug">
-                      <a href={a.link} target="_blank" rel="noreferrer" className="underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
-                      <span className="ml-1 text-xs text-[var(--rv-mute)]">{a.source} · {day(a.publishedAt)}{a.signals.length ? ` · ${a.signals.map(signalLabel).join("·")}` : ""}</span>
+          <nav aria-label="인사이트 보기" className="hidden space-y-4 lg:block">
+            {VIEWS.map((g) => (
+              <div key={g.group}>
+                <p className="mb-1 px-2 text-[11px] font-bold text-[var(--rv-mute)]">{g.group}</p>
+                <ul>
+                  {g.items.map((i) => (
+                    <li key={i.id}>
+                      <button
+                        type="button"
+                        aria-current={view === i.id ? "page" : undefined}
+                        onClick={() => go(i.id)}
+                        className={`w-full rounded px-2 py-1.5 text-left text-sm ${view === i.id ? "bg-[var(--rv-ink)] font-bold text-white" : "text-[var(--rv-ink)] hover:bg-[#f1f0ec]"}`}
+                      >
+                        {i.label}
+                        <span className={`block text-[11px] font-normal ${view === i.id ? "text-white/70" : "text-[var(--rv-mute)]"}`}>{i.hint}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
               </div>
-            </div>
-          )}
-        </Section>
+            ))}
+          </nav>
 
-        {/* 2. CL사업부 우선 검토 보드 + 급상승 키워드 */}
-        <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
-          <Section id="board" title="CL사업부 우선 검토 보드" desc="열 = 계약물류 센터 운영과의 연관도(팀 설정값) · 열 안 순서 = 최근 30일 기사 수. 왼쪽 위에 있을수록 지금 볼 기술입니다.">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {d.board.map((col) => (
-                <div key={col.relevance} className="rounded-md bg-[#f6f5f2] p-2.5">
-                  <p className="mb-2 flex items-center justify-between text-xs font-bold">
-                    <span>{REL_LABEL[col.relevance]}</span>
-                    <span className="tabular-nums text-[var(--rv-mute)]">{col.items.length}</span>
-                  </p>
-                  <ul className="space-y-1.5">
-                    {col.items.length === 0 && <li className="py-2 text-center text-xs text-[var(--rv-mute)]">기간 내 언급 없음</li>}
-                    {col.items.map((it) => (
-                      <li key={it.name}>
-                        <button type="button" onClick={() => { setSelected(it.name); setTableView(false); document.getElementById("hype")?.scrollIntoView({ behavior: "smooth", block: "start" }); }} className="w-full rounded border border-[var(--rv-line)] bg-white px-2.5 py-2 text-left hover:border-[var(--rv-accent)]">
-                          <span className="flex items-center gap-1.5 text-sm font-bold"><span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: catColor(it.category) }} />{it.name}</span>
-                          <span className="mt-0.5 block text-[11px] text-[var(--rv-soft)]">{it.stage} · {it.count}건 · {pct(it.momentum)}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+          <div className="space-y-3 border-t border-[var(--rv-line)] pt-4">
+            <div>
+              <p className="mb-1 text-[11px] font-bold text-[var(--rv-mute)]">분석 기간</p>
+              <Toggle label="분석 기간" value={String(days)} onChange={(v) => setDays(Number(v))} options={[["90", "90일"], ["180", "180일"], ["365", "1년"]]} />
             </div>
-          </Section>
-
-          <Section id="movers" title="급상승 키워드" desc="최근 14일 기사 수 − 이전 8주 속도로 예상한 수. 막대는 최근 8주 주별 기사 수">
-            <MoverList rows={d.movers.rising} tip={tip} empty="최근 14일에 눈에 띄게 늘어난 키워드가 없습니다." />
-            <p className="mt-4 text-xs font-bold text-[var(--rv-soft)]">주춤한 키워드</p>
-            <MoverList rows={d.movers.falling} tip={tip} empty="이전보다 크게 줄어든 키워드가 없습니다." />
-          </Section>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-bold text-[var(--rv-mute)]">기업·기술 찾기</span>
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="예: Geek+, AMR, 셔틀" className="w-full rounded border border-[var(--rv-line)] bg-white px-2 py-1.5 text-sm" />
+            </label>
+            {query && <p className="text-[11px] text-[var(--rv-soft)]">최근 근황 · 공급사 지도 · 중국 기업 목록이 검색어로 좁혀집니다.</p>}
+          </div>
         </div>
+      </aside>
 
-        {/* 3. 동종사 레이더 */}
-        <Section id="peers" title="동종사 레이더: 누가 무엇을 하고 있나" desc="국내 물류·유통 기업이 언급된 기사를 단계 신호별로 셌습니다. 자사(LX판토스) 줄을 기준으로 비교해 보세요.">
-          <PeerHeat peers={d.peers} tip={tip} />
-        </Section>
+      <div className="min-w-0 px-4 py-6 lg:px-8">
+        {error && <p className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
+        {!data && !error && <p className="p-8 text-center text-sm text-[var(--rv-mute)]">수집 기사로 계산하는 중…</p>}
+        {data && (
+          <div className="mx-auto max-w-[1180px]">
+            {thin && (
+              <p className="mb-4 rounded border border-[#f1d8d4] bg-[var(--rv-tint)] px-3 py-2 text-xs text-[var(--rv-soft)]">
+                <b className="text-[var(--rv-accent)]">데이터 쌓는 중</b> · 분석 기간 내 기사 {data.insights.coverage.inWindow}건. 위치와 증감은 수집이 이어질수록 안정됩니다.
+              </p>
+            )}
+            {view === "now" && <NowView d={data.insights} query={query} />}
+            {view === "portfolio" && <PortfolioView d={data.insights} tip={tip} />}
+            {view === "maturity" && <MaturityView d={data.insights} tip={tip} />}
+            {view === "world" && <WorldView vendors={data.vendors.vendors} query={query} tip={tip} warning={data.vendors.warning} />}
+            {view === "china" && <ChinaView vendors={data.vendors.vendors} query={query} />}
+            {view === "peers" && <PeersView d={data.insights} tip={tip} />}
+            {view === "flow" && <FlowView d={data.insights} tip={tip} />}
+            {view === "market" && <MarketView indicators={data.indicators} tip={tip} />}
+            {view === "method" && <MethodView d={data.insights} vendors={data.vendors} />}
+            <p className="mt-8 text-[11px] text-[var(--rv-mute)]">{current.label} · 분석 기간 최근 {days}일 · 숫자는 수집 기사를 코드가 센 결과입니다(모델이 만든 수치 없음).</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* 4. 주간 카테고리 흐름 */}
-        <Section id="weekly" title="주간 카테고리 흐름" desc="최근 12주, 주별 수집 기사 수 (한국 시간 월요일 시작)">
+/* ── 최근 근황 ───────────────────────────── */
+
+function NowView({ d, query }: { d: InsightsData; query: string }) {
+  const match = (t: { title: string; titleKo?: string; techs: string[]; source: string }) => !query || `${t.title} ${t.titleKo ?? ""} ${t.techs.join(" ")} ${t.source}`.toLowerCase().includes(query);
+  return (
+    <>
+      <Head title="최근 근황" lead="최근 30일 동안 수집된 물류기술 기사의 흐름입니다. 직전 30일과 비교하고, 기사를 단계 신호(도입·실증·투자·공개·회의)별로 모았습니다." />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {d.now.kpis.map((k) => {
+          const diff = k.value - k.prev;
+          return (
+            <div key={k.key} className="rounded-lg border border-[var(--rv-line)] bg-white p-4">
+              <p className="text-xs font-bold text-[var(--rv-soft)]">{k.label}</p>
+              <p className="mt-1 text-[32px] font-bold leading-none tabular-nums">{k.value}</p>
+              <p className="mt-2 text-xs tabular-nums">
+                <b>{diff > 0 ? "▲" : diff < 0 ? "▼" : "–"} {Math.abs(diff)}</b> <span className="text-[var(--rv-mute)]">직전 30일 {k.prev}건</span>
+              </p>
+              <p className="text-[11px] text-[var(--rv-mute)]">{k.note}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {d.now.highlights.length > 0 && (
+        <section className="mt-4 rounded-lg border border-[var(--rv-line)] border-l-4 border-l-[var(--rv-accent)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--rv-accent)]">핵심 변화 (자동 집계)</p>
+          <ul className="mt-1 space-y-1">{d.now.highlights.map((h) => <li key={h} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span>{h}</li>)}</ul>
+        </section>
+      )}
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {d.now.feed.filter((g) => g.signal !== "doubt" || g.items.length).map((g) => {
+          const items = g.items.filter(match);
+          return (
+            <Card key={g.signal} title={signalLabel(g.signal)} desc={g.signal === "doubt" ? "중단·지연·철수 등 리스크 신호" : undefined}>
+              {items.length === 0 ? (
+                <p className="text-sm text-[var(--rv-mute)]">해당 기사 없음</p>
+              ) : (
+                <ul className="divide-y divide-[var(--rv-line)]">
+                  {items.map((a) => (
+                    <li key={a.id} className="py-2 text-sm leading-snug">
+                      <a href={a.link} target="_blank" rel="noreferrer" className="font-medium underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
+                      <p className="mt-0.5 text-[11px] text-[var(--rv-mute)]">
+                        {a.source} · {day(a.publishedAt)}
+                        {a.techs.length > 0 && <span className="ml-1 text-[var(--rv-soft)]">· {a.techs.join(" · ")}</span>}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/* ── LX Pantos 기술 포트폴리오 ───────────────────────────── */
+
+function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
+  const [onlyFocus, setOnlyFocus] = useState(false);
+  const [table, setTable] = useState(false);
+  const pf = d.portfolio;
+  const plotted = pf.points.filter((p) => p.recent.maturity !== null);
+  const noSignal = pf.points.filter((p) => p.recent.maturity === null);
+  const quadrant = (p: (typeof pf.points)[number]) =>
+    p.recent.maturity === null ? "-" : p.recent.share >= pf.median.share ? (p.recent.maturity >= pf.median.maturity ? "주류 · 도입 검토" : "기대 선행 · 실증 검증") : p.recent.maturity >= pf.median.maturity ? "안정 · 운영 최적화" : "관찰";
+  const actNow = plotted.filter((p) => p.relevance === 3 && quadrant(p) === "주류 · 도입 검토").map((p) => p.name);
+  const pilot = plotted.filter((p) => p.relevance >= 2 && quadrant(p) === "기대 선행 · 실증 검증").map((p) => p.name);
+  const td = "border border-[var(--rv-line)] px-2 py-1.5";
+  return (
+    <>
+      <Head
+        title="LX Pantos 기술 포트폴리오"
+        lead={<>기술마다 <b>성숙도</b>(기사 속 도입·실증 근거가 얼마나 쌓였나)와 <b>관심도</b>(시장의 언급 점유율)를 계산해 배치했습니다. 회색 작은 원은 지난 기간({day(pf.pastFrom)}~), 큰 원은 최근 기간({day(pf.recentFrom)}~)이며 화살표가 이동 방향입니다. <b style={{ color: FOCUS }}>파란 원</b>은 CL사업 연관 높음.</>}
+        right={
+          <div className="flex flex-wrap gap-2">
+            <Toggle label="표시 범위" value={onlyFocus ? "focus" : "all"} onChange={(v) => setOnlyFocus(v === "focus")} options={[["all", "전체 기술"], ["focus", "CL 연관 높음만"]]} />
+            <Toggle label="보기 방식" value={table ? "table" : "chart"} onChange={(v) => setTable(v === "table")} options={[["chart", "차트"], ["table", "표"]]} />
+          </div>
+        }
+      />
+      <div className="mb-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--rv-soft)]">지금 도입을 검토할 기술 <span className="font-normal">(CL 연관 높음 · 주류 사분면)</span></p>
+          <p className="mt-1 text-lg font-bold">{actNow.length ? actNow.join(", ") : "해당 없음"}</p>
+        </div>
+        <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--rv-soft)]">실증(PoC)으로 먼저 확인할 기술 <span className="font-normal">(연관 중간 이상 · 기대 선행 사분면)</span></p>
+          <p className="mt-1 text-lg font-bold">{pilot.length ? pilot.join(", ") : "해당 없음"}</p>
+        </div>
+      </div>
+      <Card>
+        {table ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-[#f4f3ef] text-left text-xs text-[var(--rv-soft)]">
+                  {["기술", "CL 연관", "사분면", "성숙도 (지난→최근)", "관심도 (지난→최근)", "기사 (지난→최근)", "회의 신호"].map((h) => <th key={h} className={td}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[...pf.points].sort((a, b) => b.recent.count - a.recent.count).filter((p) => !onlyFocus || p.relevance === 3).map((p) => (
+                  <tr key={p.name}>
+                    <td className={`${td} font-medium`}>{p.name}</td>
+                    <td className={td}>{["", "낮음", "중간", "높음"][p.relevance]}</td>
+                    <td className={td}>{quadrant(p)}</td>
+                    <td className={`${td} tabular-nums`}>{p.past.maturity === null ? "-" : pp(p.past.maturity)} → {p.recent.maturity === null ? "-" : pp(p.recent.maturity)}</td>
+                    <td className={`${td} tabular-nums`}>{pp(p.past.share)} → {pp(p.recent.share)}</td>
+                    <td className={`${td} tabular-nums`}>{p.past.count} → {p.recent.count}</td>
+                    <td className={`${td} tabular-nums`}>{p.doubtShare ? pp(p.doubtShare) : "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : plotted.length ? (
+          <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+            <div className="min-w-[760px]">
+              <PortfolioMatrix data={pf} onlyFocus={onlyFocus} tip={tip} />
+            </div>
+          </div>
+        ) : (
+          <p className="py-10 text-center text-sm text-[var(--rv-mute)]">최근 기간에 단계 신호가 있는 기술 기사가 없습니다.</p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--rv-soft)]">
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: FOCUS }} />CL사업 연관 높음</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-[#a9a7a0]" />연관 중간·낮음</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-[1.5px] border-[#898781] bg-white" />지난 기간 위치</span>
+          <span>원 크기 = 최근 기간 기사 수 · ! = 중단·지연 등 회의 신호 20% 이상</span>
+        </div>
+        {noSignal.length > 0 && <p className="mt-2 text-xs text-[var(--rv-mute)]">언급은 있으나 단계 신호가 없어 표시하지 않은 기술: {noSignal.map((p) => `${p.name}(${p.recent.count}건)`).join(", ")}</p>}
+      </Card>
+      <p className="mt-3 text-xs leading-relaxed text-[var(--rv-soft)]">
+        <b>왜 이 차트인가:</b> 트리맵은 &lsquo;얼마나 많이 다뤄졌나&rsquo;만, 하이프 사이클은 &lsquo;어느 단계인가&rsquo;만 보여 줍니다. 전략 판단에는 성숙도와 관심도를 함께 보고, 지난 기간에서 어디로 움직였는지가 필요해 두 축 버블과 이동 화살표를 택했습니다. 두 축 모두 기사에서 계산하는 값이라 근거 기사로 검증할 수 있습니다(계산식은 방법론 메뉴).
+      </p>
+    </>
+  );
+}
+
+/* ── 기술 성숙도 곡선 (보조) ───────────────────────────── */
+
+function MaturityView({ d, tip }: { d: InsightsData; tip: TipApi }) {
+  const [selected, setSelected] = useState<string | undefined>(() => [...d.hype].sort((a, b) => b.count - a.count)[0]?.name);
+  const sel = d.hype.find((h) => h.name === selected);
+  return (
+    <>
+      <Head title="기술 성숙도 곡선" lead="같은 기사 신호를 하이프 사이클 형식으로 본 화면입니다. Gartner의 평가가 아니라 우리 수집 기사 기준이며, 점을 누르면 근거 기사가 나옵니다." />
+      <Card>
+        {d.hype.length === 0 ? (
+          <p className="py-10 text-center text-sm text-[var(--rv-mute)]">기간 내 추적 기술이 언급된 기사가 없습니다.</p>
+        ) : (
+          <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
+            <div className="min-w-[760px]"><HypeMap points={d.hype} curve={curveY} selected={selected} onSelect={setSelected} tip={tip} /></div>
+          </div>
+        )}
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--rv-soft)]">
+          {[...new Set(d.hype.map((h) => h.category))].map((c) => <span key={c} className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: catColor(c) }} />{c}</span>)}
+          <span>속이 빈 점 = 신호 3건 미만 · 점 크기 = 기사 수</span>
+        </div>
+        {sel && (
+          <div className="mt-4 grid gap-5 rounded-md bg-[#f6f5f2] p-4 md:grid-cols-[1fr_1.4fr]">
+            <div>
+              <p className="text-xl font-bold">{sel.name}</p>
+              <p className="text-sm text-[var(--rv-soft)]"><b className="text-[var(--rv-ink)]">{sel.stage}</b> · 기사 {sel.count}건 · 최근 30일 {sel.recent}건 ({pct(sel.momentum)})</p>
+              <p className="mb-2 mt-3 text-xs font-bold text-[var(--rv-soft)]">단계 신호 구성</p>
+              <SignalBar p={sel} tip={tip} />
+            </div>
+            <ul className="space-y-1.5 text-sm">
+              {sel.articles.map((a) => (
+                <li key={a.id} className="leading-snug">
+                  <a href={a.link} target="_blank" rel="noreferrer" className="underline decoration-[var(--rv-line)] underline-offset-2">{a.titleKo ?? a.title}</a>
+                  <span className="ml-1 text-xs text-[var(--rv-mute)]">{a.source} · {day(a.publishedAt)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+/* ── 공급사 표 ───────────────────────────── */
+
+const vendorText = (v: V) => `${v.name} ${v.nameLocal ?? ""} ${v.solutions.join(" ")} ${v.segments.map((s) => SEGMENTS[s]).join(" ")} ${ko(v.country)} ${v.korea ?? ""}`.toLowerCase();
+const segShort = (s: Segment) => SEGMENTS[s].split(" (")[0];
+
+function VendorTable({ vendors, rankFirst }: { vendors: V[]; rankFirst?: boolean }) {
+  if (!vendors.length) return <p className="rounded border border-dashed border-[var(--rv-line)] p-6 text-center text-sm text-[var(--rv-mute)]">조건에 맞는 회사가 없습니다.</p>;
+  const cell = "border-b border-[var(--rv-line)] px-3 py-2.5";
+  const heads = rankFirst ? ["순위·근거", "회사", "분야", "대표 솔루션", "공급 범위·한국 사업", "출처"] : ["회사", "본사", "분야", "대표 솔루션", "순위·근거", "한국 사업", "출처"];
+  return (
+    <div className="overflow-x-auto rounded-lg border border-[var(--rv-line)] bg-white">
+      <table className="w-full min-w-[960px] border-collapse text-sm">
+        <thead>
+          <tr className="bg-[#f4f3ef] text-left text-xs text-[var(--rv-soft)]">{heads.map((h) => <th key={h} className="border-b border-[var(--rv-line)] px-3 py-2">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {vendors.map((v) => {
+            const rank = v.rank ? <><b>{v.rank.value}</b><span className="block text-[11px] text-[var(--rv-mute)]">{v.rank.basis}</span></> : <span className="text-[11px] text-[var(--rv-mute)]">공개 순위 없음</span>;
+            const company = (
+              <>
+                <b>{v.name}</b> <Conf c={v.confidence} />
+                {v.nameLocal && <span className="block text-xs text-[var(--rv-soft)]">{v.nameLocal}</span>}
+                {v.parent && <span className="block text-[11px] text-[var(--rv-mute)]">모회사 {v.parent}</span>}
+                {v.fromSheet && <span className="block text-[11px] text-[var(--rv-accent)]">시트 입력 반영</span>}
+              </>
+            );
+            const segs = <span className="text-xs">{v.segments.map(segShort).join(" · ")}</span>;
+            const sols = <span className="text-xs">{v.solutions.join(" · ")}</span>;
+            const srcs = (
+              <span className="flex flex-col gap-0.5 text-[11px]">
+                {v.sources.length ? v.sources.slice(0, 3).map((s) => <a key={s.url} href={s.url} target="_blank" rel="noreferrer" className="underline decoration-[var(--rv-line)]">{s.label}</a>) : <span className="text-[var(--rv-mute)]">출처 입력 필요</span>}
+              </span>
+            );
+            const korea = v.korea ? <span className="text-xs">{v.korea}</span> : <span className="text-xs text-[var(--rv-mute)]">확인 필요</span>;
+            return (
+              <tr key={v.name} className="align-top hover:bg-[#fbfaf8]">
+                {rankFirst ? (
+                  <>
+                    <td className={`${cell} w-[210px]`}>{rank}</td>
+                    <td className={`${cell} w-[170px]`}>{company}</td>
+                    <td className={cell}>{segs}</td>
+                    <td className={cell}>{sols}</td>
+                    <td className={`${cell} w-[300px] text-xs`}>
+                      {v.reach && <span className="block">{v.reach}</span>}
+                      {v.markets?.length ? <span className="block text-[var(--rv-soft)]">공급 확인: {v.markets.map(ko).join(", ")}</span> : null}
+                      <span className="mt-1 block"><b>한국</b> {korea}</span>
+                    </td>
+                    <td className={`${cell} w-[150px]`}>{srcs}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className={`${cell} w-[170px]`}>{company}</td>
+                    <td className={`${cell} whitespace-nowrap text-xs`}>{ko(v.country)}{v.city ? <span className="block text-[var(--rv-mute)]">{v.city}</span> : null}</td>
+                    <td className={cell}>{segs}</td>
+                    <td className={cell}>{sols}</td>
+                    <td className={`${cell} w-[180px]`}>{rank}</td>
+                    <td className={`${cell} w-[240px]`}>{korea}</td>
+                    <td className={`${cell} w-[150px]`}>{srcs}</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ── 글로벌 공급사 지도 ───────────────────────────── */
+
+function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: string; tip: TipApi; warning?: string }) {
+  const [mode, setMode] = useState<"hq" | "market">("hq");
+  const [seg, setSeg] = useState<Segment | "all">("all");
+  const [sel, setSel] = useState<string>();
+  const list = useMemo(() => vendors.filter((v) => (seg === "all" || v.segments.includes(seg)) && (!query || vendorText(v).includes(query))), [vendors, seg, query]);
+  const { counts, names } = useMemo(() => {
+    const counts = new Map<string, number>();
+    const names = new Map<string, string[]>();
+    for (const v of list) {
+      for (const k of new Set(mode === "hq" ? [v.country] : v.markets ?? [])) {
+        const id = COUNTRIES[k]?.id;
+        if (!id) continue;
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+        names.set(id, [...(names.get(id) ?? []), v.name]);
+      }
+    }
+    return { counts, names };
+  }, [list, mode]);
+  const iso2Sel = sel ? Object.entries(COUNTRIES).find(([, c]) => c.id === sel)?.[0] : undefined;
+  const shown = iso2Sel ? list.filter((v) => (mode === "hq" ? v.country === iso2Sel : v.markets?.includes(iso2Sel))) : list;
+  const byHq = [...new Set(list.map((v) => v.country))].map((c) => ({ c, n: list.filter((v) => v.country === c).length })).sort((a, b) => b.n - a.n);
+  return (
+    <>
+      <Head
+        title="글로벌 공급사 지도"
+        lead="어느 나라의 어떤 회사가 어떤 물류기술을 공급하는지 봅니다. 본사 기준과 공급 실적(출처로 확인된 국가만) 기준을 바꿔 볼 수 있습니다. 목록 = 웹 검색으로 확인한 기본값 + 팀이 시트 Vendors 탭에 입력한 내용."
+        right={<Toggle label="지도 기준" value={mode} onChange={(v) => { setMode(v); setSel(undefined); }} options={[["hq", "본사 국가"], ["market", "공급 국가"]]} />}
+      />
+      {warning && <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{warning}</p>}
+      <div className="mb-3 flex flex-wrap gap-1.5 text-xs" role="group" aria-label="분야">
+        {(["all", ...Object.keys(SEGMENTS)] as (Segment | "all")[]).map((s) => (
+          <button key={s} type="button" aria-pressed={seg === s} onClick={() => setSeg(s)} className={`rounded-full border px-2.5 py-1 ${seg === s ? "border-[var(--rv-ink)] bg-[var(--rv-ink)] text-white" : "border-[var(--rv-line)] bg-white text-[var(--rv-soft)]"}`}>
+            {s === "all" ? "전체 분야" : segShort(s)}
+          </button>
+        ))}
+      </div>
+      <Card>
+        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : "공급 실적 확인 회사 수"} selected={sel} onSelect={setSel} tip={tip} />
+        {mode === "market" && <p className="mt-2 text-xs text-[var(--rv-mute)]">공급 국가는 출처로 확인된 것만 표시합니다. 비어 있는 회사가 많으니 시트 Vendors 탭의 &lsquo;공급국가&rsquo; 칸을 채워 주세요.</p>}
+        <p className="mt-2 text-xs text-[var(--rv-soft)]">본사 국가별: {byHq.map((x) => `${ko(x.c)} ${x.n}`).join(" · ")}</p>
+      </Card>
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-bold">
+          {iso2Sel ? `${ko(iso2Sel)} ${mode === "hq" ? "본사" : "공급"} 기업 ${shown.length}곳` : `전체 ${shown.length}곳`}
+          {iso2Sel && <button type="button" onClick={() => setSel(undefined)} className="ml-2 text-xs font-normal text-[var(--rv-accent)] underline">전체 보기</button>}
+        </p>
+        <VendorTable vendors={shown} />
+      </div>
+    </>
+  );
+}
+
+/* ── 중국 물류기술 기업 ───────────────────────────── */
+
+function ChinaView({ vendors, query }: { vendors: V[]; query: string }) {
+  const [seg, setSeg] = useState<Segment | "all">("all");
+  const cn = vendors.filter((v) => v.country === "CN" || /midea|중국/i.test(v.parent ?? ""));
+  const segs = (Object.keys(SEGMENTS) as Segment[]).map((s) => ({ s, list: cn.filter((v) => v.segments.includes(s)) })).filter((x) => x.list.length).sort((a, b) => b.list.length - a.list.length);
+  const maxN = Math.max(...segs.map((x) => x.list.length), 1);
+  const list = cn.filter((v) => (seg === "all" || v.segments.includes(seg)) && (!query || vendorText(v).includes(query)));
+  const inKorea = cn.filter((v) => v.korea);
+  return (
+    <>
+      <Head title="중국 물류기술 기업" lead="Full-Stack SI, AMR, 셔틀·자동창고, 디지털 트윈 등 분야별로 중국 기업과 공급 솔루션을 정리했습니다. 중국은 권위 있는 공개 순위표를 찾지 못해, 순위는 상장 서류·회사 발표처럼 근거가 있을 때만 근거와 함께 적었습니다." />
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4"><p className="text-xs font-bold text-[var(--rv-soft)]">정리된 중국 기업</p><p className="text-[28px] font-bold tabular-nums">{cn.length}</p><p className="text-[11px] text-[var(--rv-mute)]">중국 자본이 소유한 해외 기업 포함 (예: Swisslog)</p></div>
+        <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4"><p className="text-xs font-bold text-[var(--rv-soft)]">한국 사업 확인</p><p className="text-[28px] font-bold tabular-nums">{inKorea.length}</p><p className="text-[11px] text-[var(--rv-mute)]">{inKorea.map((v) => v.name).join(", ") || "-"}</p></div>
+        <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4"><p className="text-xs font-bold text-[var(--rv-soft)]">출처 확인 상태</p><p className="mt-1 text-sm"><b>{cn.filter((v) => v.confidence === "확인").length}</b> 확인 · <b>{cn.filter((v) => v.confidence === "일부 확인").length}</b> 일부 확인 · <b>{cn.filter((v) => v.confidence === "입력 필요").length}</b> 입력 필요</p></div>
+      </div>
+      <Card title="분야별 기업 분포" desc="한 회사가 여러 분야에 들어갈 수 있습니다. 줄을 누르면 아래 목록이 그 분야로 좁혀집니다.">
+        <ul className="space-y-2">
+          {segs.map(({ s, list: l }) => (
+            <li key={s}>
+              <button type="button" onClick={() => setSeg(seg === s ? "all" : s)} aria-pressed={seg === s} className={`grid w-full grid-cols-[minmax(110px,200px)_1fr_28px] items-center gap-3 rounded px-1 py-0.5 text-left text-sm ${seg === s ? "bg-[var(--rv-tint)]" : "hover:bg-[#fbfaf8]"}`}>
+                <span className="truncate font-medium">{segShort(s)}</span>
+                <span className="flex h-3"><span className="h-3 rounded-r-[4px]" style={{ width: `${(l.length / maxN) * 100}%`, background: seg === s ? "#232021" : "#3987E5", minWidth: 4 }} /></span>
+                <span className="text-right text-xs font-bold tabular-nums">{l.length}</span>
+              </button>
+              <p className="pl-1 text-[11px] leading-snug text-[var(--rv-mute)]">{l.map((v) => (v.nameLocal ? `${v.name} ${v.nameLocal.split(" ")[0]}` : v.name)).join(" · ")}</p>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      <div className="mt-4">
+        <p className="mb-2 text-sm font-bold">
+          {seg === "all" ? "전체" : SEGMENTS[seg]} · {list.length}곳
+          {seg !== "all" && <button type="button" onClick={() => setSeg("all")} className="ml-2 text-xs font-normal text-[var(--rv-accent)] underline">전체 보기</button>}
+        </p>
+        <VendorTable vendors={[...list].sort((a, b) => Number(!!b.rank) - Number(!!a.rank) || Number(!!b.korea) - Number(!!a.korea))} rankFirst />
+      </div>
+    </>
+  );
+}
+
+/* ── 동종사 · 흐름 · 지표 ───────────────────────────── */
+
+function PeersView({ d, tip }: { d: InsightsData; tip: TipApi }) {
+  const self = d.peers.find((p) => p.self);
+  const top = [...d.peers].filter((p) => !p.self).sort((a, b) => b.total - a.total)[0];
+  return (
+    <>
+      <Head title="국내 동종사 동향" lead={`분석 기간에 국내 물류·유통 기업이 언급된 기사를 단계 신호별로 셌습니다.${top && top.total ? ` 기사가 가장 많은 곳은 ${top.name}(${top.total}건)` : ""}${self ? `, ${self.name}는 ${self.total}건입니다.` : ""}`} />
+      <Card><PeerHeat peers={d.peers} tip={tip} /></Card>
+      <div className="mt-4">
+        <Card title="CL사업부 우선 검토 보드" desc="열 = CL사업 연관도(팀 설정값) · 열 안 순서 = 최근 30일 기사 수">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {d.board.map((col) => (
+              <div key={col.relevance} className="rounded-md bg-[#f6f5f2] p-2.5">
+                <p className="mb-2 text-xs font-bold">{["", "연관 낮음", "연관 중간", "연관 높음"][col.relevance]} <span className="text-[var(--rv-mute)]">{col.items.length}</span></p>
+                <ul className="space-y-1.5">
+                  {col.items.map((it) => (
+                    <li key={it.name} className="rounded border border-[var(--rv-line)] bg-white px-2.5 py-1.5">
+                      <span className="text-sm font-bold">{it.name}</span>
+                      <span className="block text-[11px] text-[var(--rv-soft)]">{it.stage} · {it.count}건 · {pct(it.momentum)}</span>
+                    </li>
+                  ))}
+                  {col.items.length === 0 && <li className="py-2 text-center text-xs text-[var(--rv-mute)]">언급 없음</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </>
+  );
+}
+
+function FlowView({ d, tip }: { d: InsightsData; tip: TipApi }) {
+  return (
+    <>
+      <Head title="키워드·주간 흐름" lead="최근 2주에 늘어난 키워드와 12주 동안의 카테고리별 기사 흐름입니다." />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="급상승 키워드" desc="최근 14일 기사 수 − 이전 8주 속도로 예상한 수 · 막대는 주별 기사 수"><MoverList rows={d.movers.rising} tip={tip} empty="눈에 띄게 늘어난 키워드가 없습니다." /></Card>
+        <Card title="주춤한 키워드"><MoverList rows={d.movers.falling} tip={tip} empty="크게 줄어든 키워드가 없습니다." /></Card>
+      </div>
+      <div className="mt-4">
+        <Card title="주간 카테고리 흐름" desc="최근 12주 · 한국 시간 월요일 시작">
           {d.weekly.series.length ? (
             <>
               <WeeklyBars weekly={d.weekly} tip={tip} />
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--rv-soft)]">
-                {d.weekly.series.map((s) => (
-                  <span key={s.category} className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: catColor(s.category) }} />{s.category} <span className="tabular-nums">{s.counts.reduce((a, b) => a + b, 0)}건</span></span>
-                ))}
+                {d.weekly.series.map((s) => <span key={s.category} className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-[2px]" style={{ background: catColor(s.category) }} />{s.category} {s.counts.reduce((a, b) => a + b, 0)}건</span>)}
               </div>
             </>
-          ) : (
-            <p className="py-8 text-center text-sm text-[var(--rv-mute)]">최근 12주에 수집된 기사가 없습니다.</p>
-          )}
-        </Section>
-
-        {/* 5. 공개 지표 */}
-        <Section id="indicators" title="물동량·운임 공개 지표" desc="미국 세인트루이스 연준(FRED)의 무료 공개 데이터 · 매일 수집 때 갱신 · 월간 지표라 한두 달 늦게 반영됩니다">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {indicators.map((ind) => <IndicatorCard key={ind.id} ind={ind} tip={tip} />)}
-          </div>
-        </Section>
-
-        {/* 6. 외부 리포트 */}
-        <Section id="reports" title="함께 볼 외부 리포트" desc="수치는 옮기지 않고 원문 링크만 둡니다. 이 페이지의 맵과 비교해 보세요.">
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {EXTERNAL_REPORTS.map((r) => (
-              <li key={r.name}>
-                <a href={r.href} target="_blank" rel="noreferrer" className="block h-full rounded-md border border-[var(--rv-line)] p-3 hover:border-[var(--rv-accent)]">
-                  <p className="text-[11px] font-bold text-[var(--rv-accent)]">{r.by}</p>
-                  <p className="font-bold leading-snug">{r.name} ↗</p>
-                  <p className="mt-1 text-xs text-[var(--rv-soft)]">{r.what}</p>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Section>
-
-        <p className="pb-6 text-xs leading-relaxed text-[var(--rv-mute)]">
-          계산 방법: 단계 신호는 기사 제목·요약의 표현(예: 공개·출시 / 투자 유치 / 시범·실증 / 도입·증설·수주 / 중단·지연)으로 찾고, 기술의 위치는 신호 위치의 평균입니다. 숫자는 모두 수집 기사를 센 결과이며 언론 보도량이 많은 기술이 크게 보입니다. 설정은 <code>src/config/insights.ts</code>(추적 기술·신호 표현·동종사·CL사업 연관도)에서 바꿉니다.
-        </p>
+          ) : <p className="py-8 text-center text-sm text-[var(--rv-mute)]">최근 12주 기사가 없습니다.</p>}
+        </Card>
       </div>
-    </div>
+    </>
+  );
+}
+
+function MarketView({ indicators, tip }: { indicators: Indicator[]; tip: TipApi }) {
+  return (
+    <>
+      <Head title="물동량·운임 지표" lead="미국 세인트루이스 연준(FRED) 무료 공개 데이터입니다. 매일 기사 수집 때 갱신되며, 월간 지표라 한두 달 늦게 반영됩니다." />
+      <div className="grid gap-3 sm:grid-cols-2">{indicators.map((ind) => <IndicatorCard key={ind.id} ind={ind} tip={tip} />)}</div>
+      <h3 className="mb-2 mt-6 font-bold">함께 볼 외부 리포트 <span className="text-xs font-normal text-[var(--rv-mute)]">수치는 옮기지 않고 링크만</span></h3>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {EXTERNAL_REPORTS.map((r) => (
+          <li key={r.name}>
+            <a href={r.href} target="_blank" rel="noreferrer" className="block h-full rounded-md border border-[var(--rv-line)] bg-white p-3 hover:border-[var(--rv-ink)]">
+              <p className="text-[11px] font-bold text-[var(--rv-soft)]">{r.by}</p>
+              <p className="font-bold leading-snug">{r.name} ↗</p>
+              <p className="mt-1 text-xs text-[var(--rv-soft)]">{r.what}</p>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/* ── 방법론 ───────────────────────────── */
+
+function MethodView({ d, vendors }: { d: InsightsData; vendors: Payload["vendors"] }) {
+  const need = vendors.vendors.filter((v) => v.confidence !== "확인");
+  const noKorea = vendors.vendors.filter((v) => !v.korea && v.country !== "KR");
+  const noMarket = vendors.vendors.filter((v) => !v.markets?.length);
+  const rows: [string, string][] = [
+    ["성숙도", "기술이 언급된 기사의 단계 신호 가중 평균. 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1. 중단·지연 같은 회의 신호는 성숙도에 넣지 않고 경고(!)로 따로 표시"],
+    ["관심도", "기간 안 추적 기술 언급 합계 중 그 기술의 비율 (언론 보도 점유율)"],
+    ["과거 → 최근", "선택한 분석 기간을 반으로 나눠 앞쪽(과거)과 뒤쪽(최근)을 각각 계산"],
+    ["사분면 기준", "최근 기간 기술들의 관심도·성숙도 중앙값"],
+    ["단계 신호", "기사 제목·요약·번역 제목의 표현으로 판정 (도입·증설·수주 / 시범·실증 / 투자 유치·상장 / 공개·출시 / 중단·지연)"],
+    ["CL사업 연관도", "테크이노베이션팀 설정값 (src/config/insights.ts). 계산값이 아님"],
+    ["공급사·순위", "웹 검색으로 확인한 기본 목록 + 시트 Vendors 탭 입력. 순위는 공개 순위표(MMH 등)나 상장 서류 근거가 있을 때만"],
+  ];
+  return (
+    <>
+      <Head title="방법론·데이터 출처" lead="경영진 보고와 전문가 검토에서 숫자의 근거를 설명할 수 있도록 계산 방법과 한계를 적었습니다." />
+      <Card title="지표 정의">
+        <dl className="divide-y divide-[var(--rv-line)] text-sm">
+          {rows.map(([k, v]) => <div key={k} className="grid gap-1 py-2 sm:grid-cols-[140px_1fr]"><dt className="font-bold">{k}</dt><dd className="text-[var(--rv-soft)]">{v}</dd></div>)}
+        </dl>
+      </Card>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card title="데이터 범위와 한계">
+          <ul className="space-y-1.5 text-sm text-[var(--rv-soft)]">
+            <li>▪ 수집 기사 {d.coverage.total.toLocaleString()}건 ({day(d.coverage.first)} ~ {day(d.coverage.last)}), 분석 기간 내 {d.coverage.inWindow}건</li>
+            <li>▪ 언론 보도량을 세므로 홍보가 많은 기술·기업이 크게 보일 수 있습니다. 매출·설치 대수 같은 시장 데이터가 아닙니다.</li>
+            <li>▪ 신호 판정은 표현 일치 방식이라 문맥을 놓칠 수 있습니다. 근거 기사를 함께 확인하세요.</li>
+            <li>▪ 성숙도 곡선 화면은 Gartner 평가가 아니라 같은 기사 신호로 그린 것입니다.</li>
+          </ul>
+        </Card>
+        <Card title="팀이 채워 주면 좋은 정보" desc="구글 시트 Vendors 탭에 같은 회사명으로 한 줄을 추가하면 채운 칸만 덮어씁니다">
+          <ul className="space-y-1.5 text-sm">
+            <li><b>출처 보강</b> {need.length}곳: <span className="text-[var(--rv-soft)]">{need.map((v) => v.name).join(", ")}</span></li>
+            <li><b>한국 사업·고객 확인</b> {noKorea.length}곳 (LX판토스 관점 핵심)</li>
+            <li><b>공급 국가 입력</b> {noMarket.length}곳 (지도의 &lsquo;공급 국가&rsquo; 보기에 쓰임)</li>
+            <li><b>중국 기업 순위</b>: GGII(高工产业研究院)·中国物流与采购联合会 등의 분야별 순위표가 있으면 &lsquo;순위·순위 근거&rsquo; 칸에</li>
+            <li className="text-[var(--rv-mute)]">현재 시트에서 반영된 줄: {vendors.sheetRows}</li>
+          </ul>
+        </Card>
+      </div>
+      <div className="mt-4">
+        <Card title="Vendors 탭 칸 설명">
+          <p className="text-xs leading-relaxed text-[var(--rv-soft)]">회사명 · 현지명 · 본사국가(ISO2, 예: CN) · 도시 · 모회사 · 분야(; 구분: fullstack, asrs, amr, acr, sorter, picking, forklift, software 또는 한글 이름) · 대표 솔루션(;) · 공급국가(ISO2;) · 공급 범위 · 한국 사업 · 순위 · 순위 근거 · 출처 URL(;) · 확인 상태(확인/일부 확인/입력 필요) · 확인일</p>
+        </Card>
+      </div>
+    </>
   );
 }

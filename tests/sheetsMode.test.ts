@@ -27,7 +27,7 @@ describe("구글 시트가 원본인 웹 모드", () => {
     const store = await import("@/lib/store");
     const r1 = await store.addArticles([art("A1", "첫 기사"), art("A2", "둘째 기사")]);
     expect(r1.added).toHaveLength(2);
-    expect([...fake.tabs.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Indicators", "Newsletter_Issues", "Raw_Articles"]);
+    expect([...fake.tabs.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Indicators", "Newsletter_Issues", "Raw_Articles", "Vendors"]);
     expect(fake.tabs.get("Raw_Articles")!.map((r) => r[0])).toEqual(["ID", "A1", "A2"]);
     expect(fake.tabs.get("Article_Bodies")!.length).toBe(3);
 

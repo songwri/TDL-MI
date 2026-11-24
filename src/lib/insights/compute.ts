@@ -71,9 +71,61 @@ export interface InsightsData {
   weekly: { weeks: { start: string; label: string }[]; series: { category: Category; counts: number[] }[] };
   peers: PeerRow[];
   board: BoardColumn[];
+  portfolio: PortfolioData;
+  now: NowData;
+}
+
+/** 기간 하나의 위치: 관심도(추적 기술 언급 중 점유율) · 성숙도(도입·실증 신호 비중 지수) */
+export interface PeriodPos {
+  count: number;
+  share: number;
+  /** 0~1. 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1 의 가중 평균. 신호가 없으면 null */
+  maturity: number | null;
+}
+
+export interface PortfolioPoint {
+  name: string;
+  category: Category;
+  relevance: 1 | 2 | 3;
+  recent: PeriodPos;
+  past: PeriodPos;
+  /** 최근 기간 신호 중 회의·과제(중단·지연 등) 비중 */
+  doubtShare: number;
+  signals: Signals;
+}
+
+export interface PortfolioData {
+  recentFrom: string;
+  pastFrom: string;
+  points: PortfolioPoint[];
+  /** 사분면 기준선: 최근 기간 중앙값 */
+  median: { share: number; maturity: number };
+}
+
+export interface NowData {
+  kpis: { key: string; label: string; value: number; prev: number; note: string }[];
+  highlights: string[];
+  feed: { signal: StageKey; items: (ArticleRef & { techs: string[] })[] }[];
 }
 
 const DAY = 86_400_000;
+/** 성숙도 지수 가중치 (회의·과제는 성숙도가 아니라 별도 경고로 표시) */
+export const MATURITY_WEIGHT: Partial<Record<StageKey, number>> = { launch: 0, invest: 0.25, pilot: 0.6, adopt: 1 };
+
+export function maturityOf(signals: Signals): number | null {
+  let n = 0, sum = 0;
+  for (const [k, w] of Object.entries(MATURITY_WEIGHT) as [StageKey, number][]) {
+    n += signals[k];
+    sum += signals[k] * w;
+  }
+  return n ? sum / n : null;
+}
+
+const median = (xs: number[]) => {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+};
 const RECENT_DAYS = 30;
 const MOVER_DAYS = 14;
 
@@ -200,6 +252,75 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
       .map((h) => ({ name: h.name, category: h.category, stage: h.stage, count: h.count, momentum: h.momentum })),
   }));
 
+  /* LX판토스 기술 포트폴리오: 기간을 반으로 나눠 과거 → 최근 위치 변화 */
+  const half = from + (now - from) / 2;
+  const techNames = TRACKED_TECH.map((t) => t.name);
+  const periodStats = (lo: number, hi: number) => {
+    const ps = inWin.filter((p) => p.t >= lo && p.t < hi);
+    const per = new Map(techNames.map((n) => [n, { count: 0, signals: emptySignals() }]));
+    for (const p of ps) for (const n of techNames) if (p.names.has(n)) {
+      const e = per.get(n)!;
+      e.count++;
+      for (const sg of p.signals) e.signals[sg]++;
+    }
+    const total = [...per.values()].reduce((a, e) => a + e.count, 0) || 1;
+    return new Map([...per.entries()].map(([n, e]) => [n, { count: e.count, share: e.count / total, maturity: maturityOf(e.signals), signals: e.signals }]));
+  };
+  const rec = periodStats(half, now + DAY);
+  const pst = periodStats(from, half);
+  const points: PortfolioPoint[] = TRACKED_TECH.filter((t) => (rec.get(t.name)?.count ?? 0) > 0).map(({ name, category }) => {
+    const r = rec.get(name)!, q = pst.get(name)!;
+    const sigTotal = Object.values(r.signals).reduce((a, b) => a + b, 0);
+    return {
+      name, category, relevance: CL_RELEVANCE[name] ?? 1,
+      recent: { count: r.count, share: r.share, maturity: r.maturity },
+      past: { count: q.count, share: q.share, maturity: q.maturity },
+      doubtShare: sigTotal ? r.signals.doubt / sigTotal : 0,
+      signals: r.signals,
+    };
+  });
+  const portfolio: PortfolioData = {
+    recentFrom: new Date(half).toISOString(),
+    pastFrom: new Date(from).toISOString(),
+    points,
+    median: { share: median(points.map((p) => p.recent.share)), maturity: median(points.flatMap((p) => (p.recent.maturity === null ? [] : [p.recent.maturity]))) },
+  };
+
+  /* 최근 근황: 최근 30일 vs 그 전 30일 */
+  const last = all.filter((p) => p.t >= recentFrom && p.t <= now + DAY).sort((x, y) => y.t - x.t);
+  const prev = all.filter((p) => p.t >= recentFrom - RECENT_DAYS * DAY && p.t < recentFrom);
+  const withSig = (ps: Prepared[], k: StageKey) => ps.filter((p) => p.signals.includes(k)).length;
+  const techCount = (ps: Prepared[]) => {
+    const m = new Map<string, number>();
+    for (const p of ps) for (const n of techNames) if (p.names.has(n)) m.set(n, (m.get(n) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const topNow = techCount(last)[0];
+  const prevTech = new Map(techCount(prev));
+  const kpis = [
+    { key: "all", label: "최근 30일 기사", value: last.length, prev: prev.length, note: "수집된 물류·로봇 기사" },
+    { key: "adopt", label: "도입·확산 기사", value: withSig(last, "adopt"), prev: withSig(prev, "adopt"), note: "도입·증설·수주·계약 표현" },
+    { key: "pilot", label: "실증·시범 기사", value: withSig(last, "pilot"), prev: withSig(prev, "pilot"), note: "시범·실증·PoC 표현" },
+    { key: "invest", label: "투자 기사", value: withSig(last, "invest"), prev: withSig(prev, "invest"), note: "투자 유치·인수·상장 표현" },
+  ];
+  const highlights: string[] = [];
+  if (topNow) highlights.push(`최근 30일 가장 많이 다뤄진 기술은 ${topNow[0]}(${topNow[1]}건, 직전 30일 ${prevTech.get(topNow[0]) ?? 0}건)입니다.`);
+  const adoptTop = techCount(last.filter((p) => p.signals.includes("adopt")))[0];
+  if (adoptTop) highlights.push(`도입·확산 신호가 가장 많은 기술은 ${adoptTop[0]}(${adoptTop[1]}건)입니다.`);
+  const grow = techCount(last).map(([n, c]) => ({ n, c, d: c - (prevTech.get(n) ?? 0) })).filter((x) => x.d > 0 && x.c >= 2).sort((a, b) => b.d - a.d)[0];
+  if (grow && grow.n !== topNow?.[0]) highlights.push(`직전 30일보다 가장 많이 늘어난 기술은 ${grow.n}(+${grow.d}건)입니다.`);
+  const self = PEERS.find((p) => p.self);
+  if (self) {
+    const mine = last.filter((p) => p.names.has(self.name)).length;
+    const peerMax = PEERS.filter((p) => !p.self).map((p) => ({ n: p.name, c: last.filter((q) => q.names.has(p.name)).length })).sort((a, b) => b.c - a.c)[0];
+    if (peerMax && peerMax.c > 0) highlights.push(`동종사 중 최근 30일 기사가 가장 많은 곳은 ${peerMax.n}(${peerMax.c}건)이며, ${self.name} 관련 기사는 ${mine}건입니다.`);
+  }
+  const feed = (["adopt", "pilot", "invest", "launch", "doubt"] as StageKey[]).map((signal) => ({
+    signal,
+    items: last.filter((p) => p.signals.includes(signal)).slice(0, 6).map((p) => ({ ...ref(p), techs: techNames.filter((n) => p.names.has(n)) })),
+  }));
+  const nowData: NowData = { kpis, highlights, feed };
+
   const dates = all.map((p) => p.a.publishedAt).sort();
   return {
     generatedAt: new Date(now).toISOString(),
@@ -210,5 +331,7 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
     weekly,
     peers,
     board,
+    portfolio,
+    now: nowData,
   };
 }

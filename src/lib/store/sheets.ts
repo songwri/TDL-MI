@@ -2,14 +2,16 @@ import fs from "node:fs";
 import { auth as gauth, sheets as gsheets, type sheets_v4 } from "@googleapis/sheets";
 import { config, sheetsEnabled, sheetsVia } from "@/lib/config";
 import { createAppsScriptClient } from "./appsScript";
+import { VENDOR_HEADERS } from "@/config/vendors";
 import { CATEGORIES, type Article, type Category, type NewsletterIssue } from "@/lib/types";
 
 /** ── 시트 스키마 ─────────────────────────────────────────── */
 export const ARTICLE_SHEET = "Raw_Articles";
 export const ISSUE_SHEET = "Newsletter_Issues";
 export const BODY_SHEET = "Article_Bodies"; // 기사 본문 (작성 의뢰서용, 목록 조회와 분리)
-export const HANDOFF_SHEET = "Handoffs";
-export const INDICATOR_SHEET = "Indicators"; // 공개 경제 지표 (트렌드 인사이트 페이지) // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
+export const HANDOFF_SHEET = "Handoffs"; // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
+export const INDICATOR_SHEET = "Indicators"; // 공개 경제 지표 (트렌드 인사이트 페이지)
+export const VENDOR_SHEET = "Vendors"; // 물류기술 공급사 (팀이 직접 입력·보강)
 
 export const ARTICLE_HEADERS = [
   "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드", "수집채널", "제목(한글)",
@@ -76,7 +78,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
   const meta = await api.spreadsheets.get({ spreadsheetId: sid(), fields: "sheets.properties.title" });
   const existing = new Set(meta.data.sheets?.map((s) => s.properties?.title) ?? []);
   const created: string[] = [];
-  const requests = [ARTICLE_SHEET, ISSUE_SHEET, BODY_SHEET, HANDOFF_SHEET, INDICATOR_SHEET]
+  const requests = [ARTICLE_SHEET, ISSUE_SHEET, BODY_SHEET, HANDOFF_SHEET, INDICATOR_SHEET, VENDOR_SHEET]
     .filter((t) => !existing.has(t))
     .map((title) => {
       created.push(title);
@@ -95,6 +97,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
         { range: `${BODY_SHEET}!A1`, values: [[...BODY_HEADERS]] },
         { range: `${HANDOFF_SHEET}!A1`, values: [[...HANDOFF_HEADERS]] },
         { range: `${INDICATOR_SHEET}!A1`, values: [[...INDICATOR_HEADERS]] },
+        { range: `${VENDOR_SHEET}!A1`, values: [[...VENDOR_HEADERS]] },
       ],
     },
   });
@@ -268,6 +271,11 @@ export async function upsertIndicatorRow(r: IndicatorRow) {
   const row = (await idRowIndex(INDICATOR_SHEET)).get(r.id);
   if (row) await getClient().spreadsheets.values.update({ spreadsheetId: sid(), range: `${INDICATOR_SHEET}!A${row}`, valueInputOption: "RAW", requestBody: { values } });
   else await appendRows(INDICATOR_SHEET, values);
+}
+
+/** 공급사 탭: 팀이 입력한 줄 그대로 (빈 회사명 제외) */
+export async function listVendorRows(): Promise<string[][]> {
+  return (await readRows(VENDOR_SHEET)).filter((r) => r[0]?.trim());
 }
 
 async function idRowIndex(sheet: string): Promise<Map<string, number>> {

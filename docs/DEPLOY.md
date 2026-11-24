@@ -51,7 +51,7 @@
 >
 > 다음 수집(매일 08:00 또는 웹의 수집 버튼)부터 새 기사에 번역이 붙고, 최근 기사 중 번역이 없던 것도 한 번에 100건씩 채워집니다. 시트 Raw_Articles 에 **제목(한글)** 열이 자동으로 생깁니다.
 
-시트 탭(Raw_Articles, Newsletter_Issues, Article_Bodies, Handoffs, Indicators 5개)은 만들 필요가 없습니다. 웹이 처음 접속할 때 자동으로 만들고, 웹의 **발행 이력 → 📗 연결 확인 · 시트 초기화** 버튼으로도 만들 수 있습니다.
+시트 탭(Raw_Articles, Newsletter_Issues, Article_Bodies, Handoffs, Indicators, Vendors 6개)은 만들 필요가 없습니다. Vendors 탭은 팀이 공급사 정보(한국 사업, 공급 국가, 순위 근거 등)를 직접 입력·보강하는 곳입니다. 웹이 처음 접속할 때 자동으로 만들고, 웹의 **발행 이력 → 📗 연결 확인 · 시트 초기화** 버튼으로도 만들 수 있습니다.
 
 ---
 
