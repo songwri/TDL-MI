@@ -41,3 +41,14 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
           DAYS: ${{ inputs.days }}
         run: npm run collect -- "${DAYS:-14}"
+      - name: Public logistics indicators (FRED, free)
+        # 트렌드 인사이트 페이지의 공개 지표. 실패해도 기사 수집 결과에는 영향 없음
+        continue-on-error: true
+        env:
+          STORE_MODE: sheets
+          DATA_DIR: ${{ runner.temp }}/tdl-mi
+          SHEETS_WEBAPP_URL: ${{ secrets.SHEETS_WEBAPP_URL }}
+          SHEETS_WEBAPP_TOKEN: ${{ secrets.SHEETS_WEBAPP_TOKEN }}
+          GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+        run: npm run indicators

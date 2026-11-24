@@ -8,7 +8,8 @@ import { CATEGORIES, type Article, type Category, type NewsletterIssue } from "@
 export const ARTICLE_SHEET = "Raw_Articles";
 export const ISSUE_SHEET = "Newsletter_Issues";
 export const BODY_SHEET = "Article_Bodies"; // 기사 본문 (작성 의뢰서용, 목록 조회와 분리)
-export const HANDOFF_SHEET = "Handoffs"; // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
+export const HANDOFF_SHEET = "Handoffs";
+export const INDICATOR_SHEET = "Indicators"; // 공개 경제 지표 (트렌드 인사이트 페이지) // 작성 의뢰서·작성본 (웹 서버에는 저장하지 않기 위함)
 
 export const ARTICLE_HEADERS = [
   "ID", "수집일", "발행일", "언론사", "제목", "링크", "요약", "카테고리", "선정여부", "지역", "썸네일", "키워드", "수집채널", "제목(한글)",
@@ -57,6 +58,7 @@ function getClient(): sheets_v4.Sheets {
 const sid = () => config.spreadsheetId;
 
 export const BODY_HEADERS = ["ID", "본문"] as const;
+export const INDICATOR_HEADERS = ["시리즈ID", "이름", "갱신일시", "관측값(JSON)"] as const;
 export const HANDOFF_HEADERS = ["호수", "작성 의뢰(JSON)", "작성본(JSON)", "작성본(이어짐)", "의뢰 저장일시", "작성본 저장일시"] as const;
 
 let schemaReady = false;
@@ -74,7 +76,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
   const meta = await api.spreadsheets.get({ spreadsheetId: sid(), fields: "sheets.properties.title" });
   const existing = new Set(meta.data.sheets?.map((s) => s.properties?.title) ?? []);
   const created: string[] = [];
-  const requests = [ARTICLE_SHEET, ISSUE_SHEET, BODY_SHEET, HANDOFF_SHEET]
+  const requests = [ARTICLE_SHEET, ISSUE_SHEET, BODY_SHEET, HANDOFF_SHEET, INDICATOR_SHEET]
     .filter((t) => !existing.has(t))
     .map((title) => {
       created.push(title);
@@ -92,6 +94,7 @@ export async function ensureSchema(): Promise<{ created: string[] }> {
         { range: `${ISSUE_SHEET}!A1`, values: [[...ISSUE_HEADERS]] },
         { range: `${BODY_SHEET}!A1`, values: [[...BODY_HEADERS]] },
         { range: `${HANDOFF_SHEET}!A1`, values: [[...HANDOFF_HEADERS]] },
+        { range: `${INDICATOR_SHEET}!A1`, values: [[...INDICATOR_HEADERS]] },
       ],
     },
   });
@@ -246,6 +249,25 @@ export async function upsertHandoffRow(h: HandoffRow) {
       requestBody: { values: [handoffToRow(h)] },
     });
   } else await appendRows(HANDOFF_SHEET, [handoffToRow(h)]);
+}
+
+/** 공개 지표: 시리즈마다 한 줄 (관측값은 JSON) */
+export interface IndicatorRow {
+  id: string;
+  name: string;
+  updatedAt: string;
+  json: string;
+}
+
+export async function listIndicatorRows(): Promise<IndicatorRow[]> {
+  return (await readRows(INDICATOR_SHEET)).filter((r) => r[0]).map((r) => ({ id: r[0], name: r[1] ?? "", updatedAt: r[2] ?? "", json: r[3] ?? "" }));
+}
+
+export async function upsertIndicatorRow(r: IndicatorRow) {
+  const values = [[r.id, r.name, r.updatedAt, r.json.slice(0, CELL_LIMIT)]];
+  const row = (await idRowIndex(INDICATOR_SHEET)).get(r.id);
+  if (row) await getClient().spreadsheets.values.update({ spreadsheetId: sid(), range: `${INDICATOR_SHEET}!A${row}`, valueInputOption: "RAW", requestBody: { values } });
+  else await appendRows(INDICATOR_SHEET, values);
 }
 
 async function idRowIndex(sheet: string): Promise<Map<string, number>> {

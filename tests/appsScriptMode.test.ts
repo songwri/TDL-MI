@@ -37,7 +37,7 @@ describe("Apps Script 방식으로 웹 모드 전체 흐름 (구글 클라우드
 
     const r1 = await store.addArticles([art("A1", "=HYPERLINK(\"x\") 위험한 제목"), art("A2", "둘째 기사"), art("A3", "셋째 기사")]);
     expect(r1.added).toHaveLength(3);
-    expect([...srv.sheets.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Newsletter_Issues", "Raw_Articles"]);
+    expect([...srv.sheets.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Indicators", "Newsletter_Issues", "Raw_Articles"]);
 
     const again = await store.addArticles([art("A1", "=HYPERLINK(\"x\") 위험한 제목"), art("A4", "넷째 기사")]);
     expect(again.added.map((a) => a.id)).toEqual(["A4"]);

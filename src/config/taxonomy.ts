@@ -112,6 +112,7 @@ export const ENTITIES: EntityDef[] = [
   { canonical: "컬리", aliases: ["컬리", "kurly"], kind: "company" },
   { canonical: "LG CNS", aliases: ["lg cns", "lg씨엔에스"], kind: "company" },
   { canonical: "삼성SDS", aliases: ["삼성sds", "samsung sds"], kind: "company" },
+  { canonical: "LX판토스", aliases: ["lx판토스", "lx 판토스", "lx pantos", "판토스", "pantos"], kind: "company" },
   { canonical: "현대위아", aliases: ["현대위아"], kind: "company" },
   { canonical: "트위니", aliases: ["트위니", "twinny"], kind: "company" },
   { canonical: "시스콘", aliases: ["시스콘", "syscon"], kind: "company" },

@@ -12,4 +12,5 @@ CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 �
 - 수집 본문의 기자 서명·저작권 고지·사이트 UI 문구는 `stripBoilerplate`(`src/lib/utils/text.ts`)로 거른다.
 - 템플릿(`src/lib/email/template.ts`)은 뼈대 table + 인라인 스타일. class·div·SVG 금지, 이미지는 인포그래픽에만(width·height·alt 필수).
 - 웹 인터랙티브 리포트(`src/components/report/`)는 메일 HTML 과 같은 데이터(ReportContent + ViewerData)를 쓴다. 차트 색은 `src/config/brand.ts` 의 검증된 팔레트(카테고리 색은 항목에 고정, 브랜드 레드는 강조 한 가지에만)
+- 트렌드 인사이트(`/insights`, `src/lib/insights/compute.ts`): 수집 기사로 기술 성숙도 맵(하이프 사이클 형식, 우리 기사 기준이며 Gartner 평가 아님)·우선 검토 보드·급상승 키워드·동종사 레이더·주간 흐름을 계산. 공개 지표는 FRED CSV(`src/lib/indicators`, 시트 Indicators 탭). 설정은 `src/config/insights.ts`. 외부 리포트 수치는 옮기지 않고 링크만
 - 확인: `npm test`, `npm run typecheck`, `npm run lint`

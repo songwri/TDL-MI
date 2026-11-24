@@ -17,13 +17,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="font-sans antialiased">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex max-w-[1600px] items-center gap-6 px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-bold text-brand">
+          <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
+            <Link href="/" className="flex shrink-0 items-center gap-2 font-bold text-brand">
               <span className="text-lg font-bold tracking-tight">TDL Trend</span>
-              <span className="rounded bg-brand/10 px-1.5 py-0.5 text-xs font-medium">테크이노베이션 · Market Intelligence Report</span>
+              <span className="hidden rounded bg-brand/10 px-1.5 py-0.5 text-xs font-medium sm:inline">테크이노베이션 · Market Intelligence Report</span>
             </Link>
-            <nav className="flex gap-4 text-sm text-slate-600">
+            <nav className="flex flex-wrap gap-x-4 gap-y-1 whitespace-nowrap text-sm text-slate-600">
               <Link href="/" className="hover:text-brand">대시보드</Link>
+              <Link href="/insights" className="hover:text-brand">트렌드 인사이트</Link>
               <Link href="/issues" className="hover:text-brand">발행 이력 (MI 아카이브)</Link>
               <Link href="/sources" className="hover:text-brand">수집 채널</Link>
             </nav>

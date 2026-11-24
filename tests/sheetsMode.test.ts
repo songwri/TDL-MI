@@ -27,7 +27,7 @@ describe("구글 시트가 원본인 웹 모드", () => {
     const store = await import("@/lib/store");
     const r1 = await store.addArticles([art("A1", "첫 기사"), art("A2", "둘째 기사")]);
     expect(r1.added).toHaveLength(2);
-    expect([...fake.tabs.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Newsletter_Issues", "Raw_Articles"]);
+    expect([...fake.tabs.keys()].sort()).toEqual(["Article_Bodies", "Handoffs", "Indicators", "Newsletter_Issues", "Raw_Articles"]);
     expect(fake.tabs.get("Raw_Articles")!.map((r) => r[0])).toEqual(["ID", "A1", "A2"]);
     expect(fake.tabs.get("Article_Bodies")!.length).toBe(3);
 
@@ -93,5 +93,25 @@ describe("구글 시트가 원본인 웹 모드", () => {
     sheets.__setClient(broken.client);
     await expect(store.addArticles([art("Z9", "새 기사")])).rejects.toThrow(/구글 시트에 저장하지 못했습니다/);
     sheets.__setClient(fake.client);
+  });
+});
+
+describe("공개 지표가 시트 Indicators 탭에 저장", () => {
+  it("받은 지표는 저장·조회, 실패한 지표는 결과에만 남고 빈 카드로 표시", async () => {
+    const { refreshIndicators, listIndicators } = await import("@/lib/indicators");
+    const fakeFetch = (async (url: string) => {
+      if (url.includes("PCU481112481112")) return new Response("not found", { status: 404 });
+      return new Response("observation_date,X\n2025-09-01,100\n2026-09-01,103.5\n");
+    }) as unknown as typeof fetch;
+    const r = await refreshIndicators(fakeFetch);
+    expect(r.filter((x) => x.ok)).toHaveLength(3);
+    expect(r.find((x) => !x.ok)?.error).toMatch(/404/);
+    expect(fake.tabs.get("Indicators")![0]).toEqual(["시리즈ID", "이름", "갱신일시", "관측값(JSON)"]);
+    const list = await listIndicators();
+    expect(list[0]).toMatchObject({ id: "TSIFRGHT", latest: { date: "2026-09-01", value: 103.5 }, yoy: 3.5 });
+    expect(list.find((i) => i.id === "PCU481112481112")?.points).toEqual([]);
+    // 다시 받으면 같은 줄을 고친다 (줄이 늘지 않음)
+    await refreshIndicators(fakeFetch);
+    expect(fake.tabs.get("Indicators")!.length).toBe(4);
   });
 });
