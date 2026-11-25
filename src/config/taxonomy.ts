@@ -105,7 +105,7 @@ export const ENTITIES: EntityDef[] = [
   { canonical: "NVIDIA", aliases: ["nvidia", "엔비디아", "isaac", "omniverse"], kind: "company" },
   // 국내
   { canonical: "쿠팡", aliases: ["쿠팡", "coupang"], kind: "company" },
-  { canonical: "CJ대한통운", aliases: ["cj대한통운", "cj 대한통운", "cj logistics"], kind: "company" },
+  { canonical: "CJ대한통운", aliases: ["cj대한통운", "cj 대한통운", "대한통운", "cj logistics"], kind: "company" },
   { canonical: "한진", aliases: ["한진", "hanjin"], kind: "company" },
   { canonical: "롯데글로벌로지스", aliases: ["롯데글로벌로지스", "롯데 글로벌로지스"], kind: "company" },
   { canonical: "현대글로비스", aliases: ["현대글로비스", "hyundai glovis"], kind: "company" },

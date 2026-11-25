@@ -56,3 +56,22 @@ const PERSONAL_NEWS = /빙모상|빙부상|장인상|장모상|부친상|모친�
 export function isPersonalNews(title: string): boolean {
   return PERSONAL_NEWS.test(title);
 }
+
+/**
+ * 기사 제목이 "회사명, …" 처럼 회사가 맨 앞에 오고 쉼표(·콤마·가운뎃점)가 뒤따르면 그 회사의 기사로 본다.
+ * 예) "네이버, 물류 자회사 …", "CJ대한통운, 새 센터 …" → 앞의 회사 (등록된 회사면 canonical 이름)
+ */
+export function leadingSubject(title: string): string | null {
+  const m = title.trim().replace(/^\[[^\]]*\]\s*/, "").match(/^(.{1,24}?)\s*[,，、·]\s*\S/);
+  if (!m) return null;
+  const head = ` ${m[1].toLowerCase()} `;
+  const e = ENTITIES.find((x) => x.kind === "company" && x.aliases.some((a) => containsTerm(head, a)));
+  return e ? e.canonical : null;
+}
+
+/** 제목·요약 안에 그 회사(별칭 포함)가 나오는지 */
+export function mentionsEntity(textLower: string, canonical: string): boolean {
+  const e = ENTITIES.find((x) => x.canonical === canonical);
+  const lower = ` ${textLower} `;
+  return e ? e.aliases.some((a) => containsTerm(lower, a)) : lower.includes(canonical.toLowerCase());
+}
