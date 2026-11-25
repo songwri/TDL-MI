@@ -47,3 +47,12 @@ export function isRelevant(text: string): boolean {
   const lower = ` ${text.toLowerCase()} `;
   return RELEVANCE_KEYWORDS.some((k) => containsTerm(lower, k));
 }
+
+/**
+ * 비즈니스와 무관한 개인 경조사·부고 기사 (예: "○○○ 빙모상", "장남 결혼"). 수집에서 제외한다.
+ * 인사발령·선임 같은 조직 소식은 제외 대상이 아니다.
+ */
+const PERSONAL_NEWS = /빙모상|빙부상|장인상|장모상|부친상|모친상|부모상|조부상|조모상|시부상|시모상|본인상|배우자상|별세(?!계)|부고|부음|타계|영결식|발인|결혼식|장남\s*결혼|차남\s*결혼|장녀\s*결혼|차녀\s*결혼|자녀\s*결혼|혼사|\[\s*(?:부고|부음|결혼|경조)\s*\]|\[\s*인사\s*\].*(?:상|혼)\b/;
+export function isPersonalNews(title: string): boolean {
+  return PERSONAL_NEWS.test(title);
+}

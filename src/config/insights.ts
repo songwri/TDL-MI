@@ -34,7 +34,7 @@ export const TRACKED_TECH: { name: string; category: Category }[] = [
 export const STAGE_SIGNALS = [
   { key: "launch", label: "공개·개발", pos: 0.12, re: /공개|출시|발표|선보|개발|시연|unveil|launch|introduc|debut|prototype|demo|reveal/i },
   { key: "invest", label: "투자·기대", pos: 0.3, re: /투자\s*유치|펀딩|시리즈\s*[a-e]\b|상장|기업가치|인수|raises|raised|funding|valuation|\bipo\b|acquir|investment round/i },
-  { key: "doubt", label: "회의·과제", pos: 0.52, re: /중단|철수|지연|적자|부진|우려|감원|파산|리콜|한계|halt|paus|delay|layoff|bankrupt|shut\s*down|struggl|recall|setback|scal(?:e|ing) back/i },
+  { key: "doubt", label: "리스크·과제", pos: 0.52, re: /중단|철수|지연|적자|부진|우려|감원|파산|리콜|한계|반발|갈등|파업|논란|규제|제동|무산|취소|사고|화재|피해|보류|halt|paus|delay|backlash|strike|protest|opposition|lawsuit|layoff|bankrupt|shut\s*down|struggl|recall|setback|scal(?:e|ing) back/i },
   { key: "pilot", label: "실증·시범", pos: 0.7, re: /시범|실증|파일럿|\bpoc\b|테스트|검증|pilot|trial|testing|proof of concept/i },
   { key: "adopt", label: "도입·확산", pos: 0.88, re: /도입|확대|증설|양산|수주|공급\s*계약|구축|가동|상용화|deploy|roll(?:s|ed|ing)?\s*out|scal(?:e|es|ing)\s*up|\bordered\b|contract|install|go(?:es)?\s*live|expand/i },
 ] as const;

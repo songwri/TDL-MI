@@ -254,7 +254,7 @@ function NowView({ d, query, tip }: { d: InsightsData; query: string; tip: TipAp
   };
   return (
     <>
-      <Head title="최근 근황" lead="분석 기간 기사를 대표 신호(도입·실증·투자·공개·회의)로 나눴습니다. 원그래프 조각을 누르면 해당 기사 묶음을 표시합니다." />
+      <Head title="최근 근황" lead="분석 기간 기사를 대표 신호(도입·실증·투자·공개·리스크)로 나눴습니다. 원그래프 조각을 누르면 해당 기사 묶음을 표시합니다." />
       <section className="grid items-center gap-6 rounded-lg border border-[var(--rv-line)] bg-white p-5 md:grid-cols-[260px_1fr]">
         <div className="mx-auto w-full max-w-[260px]">
           <SignalDonut mix={d.now.mix} selected={pick} onPick={choose} tip={tip} />
@@ -371,7 +371,7 @@ function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <thead>
                 <tr className="bg-[#f4f3ef] text-left text-xs text-[var(--rv-soft)]">
-                  {["기술", "CL 연관", "사분면", "성숙도 (지난→최근)", "관심도 (지난→최근)", "기사 (지난→최근)", "회의 신호"].map((h) => <th key={h} className={td}>{h}</th>)}
+                  {["기술", "CL 연관", "사분면", "성숙도 (지난→최근)", "관심도 (지난→최근)", "기사 (지난→최근)", "리스크 신호"].map((h) => <th key={h} className={td}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -402,7 +402,7 @@ function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
           <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: FOCUS }} />CL사업 연관 높음</span>
           <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full bg-[#a9a7a0]" />연관 중간·낮음</span>
           <span className="inline-flex items-center gap-1.5"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full border-[1.5px] border-[#898781] bg-white" />지난 기간 위치</span>
-          <span>원 크기 = 최근 기간 기사 수 · ! = 중단·지연 등 회의 신호 20% 이상</span>
+          <span>원 크기 = 최근 기간 기사 수 · ! = 중단·지연 등 리스크 신호 20% 이상</span>
         </div>
         {noSignal.length > 0 && <p className="mt-2 text-xs text-[var(--rv-mute)]">언급은 있으나 단계 신호가 없어 표시하지 않은 기술: {noSignal.map((p) => `${p.name}(${p.recent.count}건)`).join(", ")}</p>}
       </Card>
@@ -922,11 +922,11 @@ function MethodView({ d, vendors }: { d: InsightsData; vendors: Payload["vendors
   const noKorea = vendors.vendors.filter((v) => !v.korea && v.country !== "KR");
   const noMarket = vendors.vendors.filter((v) => !v.markets?.length);
   const rows: [string, string][] = [
-    ["성숙도", "기술이 언급된 기사의 단계 신호 가중 평균. 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1. 중단·지연 같은 회의 신호는 성숙도에 넣지 않고 경고(!)로 따로 표시"],
+    ["성숙도", "기술이 언급된 기사의 단계 신호 가중 평균. 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1. 중단·지연 같은 리스크 신호는 성숙도에 넣지 않고 경고(!)로 따로 표시"],
     ["관심도", "기간 안 추적 기술 언급 합계 중 그 기술의 비율 (언론 보도 점유율)"],
     ["과거 → 최근", "선택한 분석 기간을 반으로 나눠 앞쪽(과거)과 뒤쪽(최근)을 각각 계산"],
     ["사분면 기준", "최근 기간 기술들의 관심도·성숙도 중앙값. 세로(관심도)는 제곱근 눈금이라 한두 기술이 커도 나머지가 바닥에 눌리지 않음"],
-    ["곡선 단계", "평균이 아니라 우세한 신호로 판정: 회의(중단·지연) 신호 25% 이상(3건 이상)이면 검증의 골 · 시범+도입 증거가 75% 이상이면 생산성 안정, 50~75%면 실증 확산 · 공개+투자가 우세하면 기사가 충분할 때 기대 정점, 적으면 기술 태동. 툴팁에 판정 근거가 나옴"],
+    ["곡선 단계", "평균이 아니라 우세한 신호로 판정: 리스크(중단·지연) 신호 25% 이상(3건 이상)이면 검증의 골 · 시범+도입 증거가 75% 이상이면 생산성 안정, 50~75%면 실증 확산 · 공개+투자가 우세하면 기사가 충분할 때 기대 정점, 적으면 기술 태동. 툴팁에 판정 근거가 나옴"],
     ["단계 신호", "기사 제목·요약·번역 제목의 표현으로 판정 (도입·증설·수주 / 시범·실증 / 투자 유치·상장 / 공개·출시 / 중단·지연)"],
     ["CL사업 연관도", "팀 설정값 (src/config/insights.ts). 계산값이 아님"],
     ["공급사·순위", "웹 검색으로 확인한 기본 목록 + 시트 Vendors 탭 입력. 순위는 공개 순위표(MMH 등)나 상장 서류 근거가 있을 때만"],

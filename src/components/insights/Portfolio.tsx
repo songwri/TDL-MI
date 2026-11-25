@@ -186,7 +186,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
                 { label: "최근 기사", value: `${p.recent.count}건`, delta: deltaOf(p.recent.count, p.past.count, "건") },
               ]}
             >
-              {p.doubtShare >= 0.2 && <p className="font-bold text-[var(--rv-ink)]">! 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
+              {p.doubtShare >= 0.2 && <p className="font-bold text-[var(--rv-ink)]">! 신호의 {pp(p.doubtShare)}가 중단·지연 등 리스크 신호</p>}
               {near.length > 0 && <p>같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
               {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 옮겨 그림 · 작은 점이 실제 위치</p>}
               <p className="text-[var(--rv-mute)]">변화는 지난 기간 대비</p>

@@ -13,7 +13,7 @@ const art = (title: string, d: number, extra: Partial<Article> = {}): Article =>
 });
 
 describe("트렌드 인사이트 계산 (수집 기사만으로)", () => {
-  it("단계 신호: 제목·요약의 표현으로 공개·투자·실증·도입·회의를 찾음", () => {
+  it("단계 신호: 제목·요약의 표현으로 공개·투자·실증·도입·리스크를 찾음", () => {
     expect(detectSignals("A사, 신형 AMR 공개")).toEqual(["launch"]);
     expect(detectSignals("Agility Robotics raises $400M")).toEqual(["invest"]);
     expect(detectSignals("CJ대한통운, 곤지암에 AMR 200대 추가 도입")).toEqual(["adopt"]);
@@ -58,14 +58,22 @@ describe("트렌드 인사이트 계산 (수집 기사만으로)", () => {
   });
 
   it("동종사 레이더: 자사(LX판토스) 강조, 사전이 바뀌어도 예전 기사에서 다시 찾음", () => {
-    const arts = [art("LX판토스, 신규 풀필먼트센터에 AMR 도입", 2), art("한진, 자동화 물류센터 구축", 8), art("한진 택배 로봇 시범 운영", 20)];
+    const arts = [art("LX판토스, 신규 풀필먼트센터에 AMR 도입", 2), art("한진, AMR 구축", 8), art("한진 AMR 시범 운영", 20), art("한진, 택배 요금 확대", 25)];
     const r = computeInsights(arts, { now: NOW });
     const self = r.peers.find((p) => p.self)!;
     expect(self.name).toBe("LX판토스");
     expect(self.total).toBe(1);
     expect(self.latest?.title).toContain("LX판토스");
     const hanjin = r.peers.find((p) => p.name === "한진")!;
-    expect(hanjin.signals).toMatchObject({ adopt: 1, pilot: 1 });
+    expect(hanjin.signals).toMatchObject({ adopt: 1, pilot: 1 }); // 기술(AMR) 언급 기사만 단계로 센다
+    expect(hanjin.total).toBe(3);
+  });
+
+  it("기술 위주 분류: 추적 기술이 없는 기사는 도입·확대 같은 말이 있어도 단계 신호가 없음, 노조 반발은 리스크", () => {
+    const r = computeInsights([art("쿠팡, 물류센터 확대 도입", 3), art("택배 속도 경쟁, 택배노조 강력 반발", 4), art("AMR 도입 노조 반발", 5)], { now: NOW });
+    expect(r.now.mix.find((m) => m.key === "none")!.count).toBe(2);
+    expect(r.now.mix.find((m) => m.key === "doubt")!.count).toBe(1);
+    expect(detectSignals("택배노조 강력 반발")).toContain("doubt");
   });
 
   it("급상승 키워드: 최근 14일이 이전 속도보다 많은 것", () => {
@@ -111,7 +119,7 @@ describe("공개 지표 (FRED CSV)", () => {
 });
 
 describe("LX판토스 기술 포트폴리오 · 최근 근황", () => {
-  it("성숙도 지수: 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1, 회의 신호는 제외", async () => {
+  it("성숙도 지수: 공개 0 · 투자 0.25 · 실증 0.6 · 도입 1, 리스크 신호는 제외", async () => {
     const { maturityOf } = await import("@/lib/insights/compute");
     expect(maturityOf({ launch: 1, invest: 0, doubt: 5, pilot: 0, adopt: 1 })).toBe(0.5);
     expect(maturityOf({ launch: 0, invest: 0, doubt: 3, pilot: 0, adopt: 0 })).toBeNull();
@@ -132,7 +140,7 @@ describe("LX판토스 기술 포트폴리오 · 최근 근황", () => {
     const sorter = r.portfolio.points.find((p) => p.name === "소터")!;
     expect(sorter.recent).toEqual({ count: 1, share: 1 / 6, maturity: 0.6 });
     const drone = r.portfolio.points.find((p) => p.name === "드론 배송")!;
-    expect(drone.recent.maturity).toBeNull(); // 회의 신호만 있으면 성숙도 없음
+    expect(drone.recent.maturity).toBeNull(); // 리스크 신호만 있으면 성숙도 없음
     expect(drone.doubtShare).toBe(1);
     expect(r.portfolio.median.maturity).toBe(0.6); // [1, 0, 0.6] 의 중앙값
   });
@@ -148,7 +156,7 @@ describe("LX판토스 기술 포트폴리오 · 최근 근황", () => {
 });
 
 describe("최근 근황 원그래프: 기사마다 대표 신호 하나", () => {
-  it("회의 > 도입 > 실증 > 투자 > 공개 순서로 대표 신호, 원그래프 합 = 기간 기사 수, 묶음 건수 = 조각", async () => {
+  it("리스크 > 도입 > 실증 > 투자 > 공개 순서로 대표 신호, 원그래프 합 = 기간 기사 수, 묶음 건수 = 조각", async () => {
     const { primarySignal } = await import("@/lib/insights/compute");
     expect(primarySignal(["pilot", "doubt"])).toBe("doubt");
     expect(primarySignal(["launch", "adopt"])).toBe("adopt");
@@ -159,7 +167,7 @@ describe("최근 근황 원그래프: 기사마다 대표 신호 하나", () => 
     expect(mix).toMatchObject({ doubt: 1, adopt: 2, none: 1, pilot: 0 });
     expect(r.now.mix.reduce((n, m) => n + m.count, 0)).toBe(4);
     expect(r.now.feed.find((g) => g.signal === "adopt")!.count).toBe(2);
-    expect(r.now.feed.find((g) => g.signal === "pilot")!.count).toBe(0); // 지연 기사는 회의 묶음에만
+    expect(r.now.feed.find((g) => g.signal === "pilot")!.count).toBe(0); // 지연 기사는 리스크 묶음에만
   });
 
   it("동종업계: 회사별 기사 목록 (최신순)", () => {
@@ -187,17 +195,17 @@ describe("하이프 사이클 단계 판정 (평균이 아니라 우세한 신�
   const sig = (o: Partial<Record<StageKey, number>>): Signals => ({ launch: 0, invest: 0, pilot: 0, adopt: 0, doubt: 0, ...o });
 
   it("공개·투자·시범·도입이 고루 섞인 기술을 가운데(검증의 골)로 몰지 않음", () => {
-    // 예전 방식(위치 평균)은 x=0.50 → 검증의 골이었다. 회의 신호는 5%뿐이다.
+    // 예전 방식(위치 평균)은 x=0.50 → 검증의 골이었다. 리스크 신호는 5%뿐이다.
     const c = classifyStage(sig({ launch: 10, invest: 10, pilot: 10, adopt: 10, doubt: 2 }), 40, 8);
     expect(c.stage).not.toBe("검증의 골");
     expect(c.stage).toBe("실증 확산");
   });
 
-  it("검증의 골은 회의(중단·지연) 신호가 25% 이상이고 3건 이상일 때만", () => {
+  it("검증의 골은 리스크(중단·지연) 신호가 25% 이상이고 3건 이상일 때만", () => {
     expect(classifyStage(sig({ launch: 4, invest: 2, pilot: 3, adopt: 3, doubt: 6 }), 18, 8).stage).toBe("검증의 골");
     expect(classifyStage(sig({ launch: 4, invest: 2, pilot: 3, adopt: 3, doubt: 2 }), 14, 8).stage).not.toBe("검증의 골"); // 2건
     expect(classifyStage(sig({ launch: 10, invest: 10, pilot: 5, adopt: 5, doubt: 5 }), 35, 8).stage).not.toBe("검증의 골"); // 14%
-    // 회의가 많을수록 골 깊숙이
+    // 리스크가 많을수록 골 깊숙이
     expect(classifyStage(sig({ pilot: 2, doubt: 8 }), 10, 8).x).toBeGreaterThan(classifyStage(sig({ pilot: 6, doubt: 3 }), 9, 8).x);
   });
 

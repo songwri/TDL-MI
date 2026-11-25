@@ -1,6 +1,6 @@
 import { SOURCES, type SourceDef } from "@/config/sources";
 import { config } from "@/lib/config";
-import { classify, extractKeywords, isRelevant } from "@/lib/mi/matcher";
+import { classify, extractKeywords, isPersonalNews, isRelevant } from "@/lib/mi/matcher";
 import { addArticles, getAllArticles, setTitlesKo } from "@/lib/store";
 import { needsKoTitle, withKoTitles } from "@/lib/translate";
 import type { Article, RefreshResult } from "@/lib/types";
@@ -100,6 +100,11 @@ export async function refreshArticles(opts: { days?: number; sourceIds?: string[
       const enriched = src.enrich ? await mapLimit(fresh, 4, enrich) : fresh;
       for (const item of enriched) {
         if (item.publishedAt && new Date(item.publishedAt).getTime() < since) {
+          filtered++;
+          continue;
+        }
+        // 특정 회사 임직원의 경조사·부고 등 비즈니스와 무관한 개인 소식은 제외 (인사발령은 유지)
+        if (isPersonalNews(`${item.title} ${item.summary ?? ""}`.slice(0, 300))) {
           filtered++;
           continue;
         }

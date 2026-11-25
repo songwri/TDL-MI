@@ -97,7 +97,7 @@ export interface PortfolioPoint {
   relevance: 1 | 2 | 3;
   recent: PeriodPos;
   past: PeriodPos;
-  /** 최근 기간 신호 중 회의·과제(중단·지연 등) 비중 */
+  /** 최근 기간 신호 중 리스크·과제(중단·지연 등) 비중 */
   doubtShare: number;
   signals: Signals;
 }
@@ -119,12 +119,12 @@ export interface NowData {
   feed: { signal: StageKey; count: number; items: (ArticleRef & { techs: string[] })[] }[];
 }
 
-/** 대표 신호: 회의(리스크) > 도입 > 실증 > 투자 > 공개. 예) "시범 운영 지연" → 회의·과제 */
+/** 대표 신호: 리스크 > 도입 > 실증 > 투자 > 공개. 예) "시범 운영 지연" → 리스크·과제 */
 export const PRIMARY_ORDER: StageKey[] = ["doubt", "adopt", "pilot", "invest", "launch"];
 export const primarySignal = (signals: StageKey[]): StageKey | "none" => PRIMARY_ORDER.find((k) => signals.includes(k)) ?? "none";
 
 const DAY = 86_400_000;
-/** 성숙도 지수 가중치 (회의·과제는 성숙도가 아니라 별도 경고로 표시) */
+/** 성숙도 지수 가중치 (리스크·과제는 성숙도가 아니라 별도 경고로 표시) */
 export const MATURITY_WEIGHT: Partial<Record<StageKey, number>> = { launch: 0, invest: 0.25, pilot: 0.6, adopt: 1 };
 
 export function maturityOf(signals: Signals): number | null {
@@ -165,7 +165,7 @@ export interface StageCall {
  * 예전에는 신호 위치의 평균으로 정했는데, 공개·투자(앞쪽)와 도입(뒤쪽) 기사가 섞이면 평균이 늘 가운데(검증의 골)로 쏠렸다.
  * 이제는 '무엇이 우세한가'로 단계를 먼저 정하고, 단계 안에서의 위치만 비율로 정한다.
  *
- *   회의(중단·지연 등) 신호가 25% 이상이고 3건 이상 → 검증의 골
+ *   리스크(중단·지연 등) 신호가 25% 이상이고 3건 이상 → 검증의 골
  *   그 밖에는 증거 비율 = (시범+도입) ÷ (공개+투자+시범+도입)
  *     75% 이상 → 생산성 안정 · 50~75% → 실증 확산
  *     50% 미만(공개·투자가 우세) → 기사가 충분히 많으면 기대 정점, 적으면 기술 태동
@@ -178,12 +178,12 @@ export function classifyStage(sig: Signals, count: number, medianCount: number):
   const proof = sig.pilot + sig.adopt;
   const dShare = sig.doubt / S;
   const ratio = proof / Math.max(hype + proof, 1);
-  const mix = `공개·투자 ${pctOf(hype)} · 시범·도입 ${pctOf(proof)} · 회의 ${pctOf(sig.doubt)}`;
+  const mix = `공개·투자 ${pctOf(hype)} · 시범·도입 ${pctOf(proof)} · 리스크 ${pctOf(sig.doubt)}`;
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
   if (sig.doubt >= 3 && dShare >= 0.25) {
-    const x = 0.45 + clamp((dShare - 0.25) / 0.35, 0, 1) * 0.13; // 회의 비중이 클수록 골 깊숙이
-    return { x, stage: stageOf(x), why: `회의 신호 비중 ${pctOf(sig.doubt)} (25% 이상) · ${mix}` };
+    const x = 0.45 + clamp((dShare - 0.25) / 0.35, 0, 1) * 0.13; // 리스크 비중이 클수록 골 깊숙이
+    return { x, stage: stageOf(x), why: `리스크 신호 비중 ${pctOf(sig.doubt)} (25% 이상) · ${mix}` };
   }
   if (ratio >= 0.75) {
     const x = 0.82 + clamp((ratio - 0.75) / 0.25, 0, 1) * 0.15;
@@ -224,6 +224,8 @@ interface Prepared {
   t: number;
   names: Set<string>;
   signals: StageKey[];
+  /** 제목·요약(소문자): 본문 속 지나가는 언급과 구분하기 위함 */
+  headline: string;
 }
 
 function prepare(articles: Article[]): Prepared[] {
@@ -232,7 +234,9 @@ function prepare(articles: Article[]): Prepared[] {
       const text = `${a.title} ${a.titleKo ?? ""} ${a.summary}`;
       // 사전이 바뀌어도 예전 기사에 반영되도록 제목·요약에서 다시 찾고, 수집 때 본문까지 보고 찾은 키워드를 합친다
       const names = new Set([...a.keywords, ...extractKeywords(text)]);
-      return { a, t: new Date(a.publishedAt).getTime(), names, signals: detectSignals(text) };
+      // 기술 위주 분류: 추적 기술이 언급된 기사만 단계 신호를 센다 (기업·행사 이야기에 섞인 '도입·확대' 같은 말이 기술 단계로 잡히지 않게)
+      const techy = TRACKED_TECH.some((t) => names.has(t.name));
+      return { a, t: new Date(a.publishedAt).getTime(), names, signals: techy ? detectSignals(text) : [], headline: text.toLowerCase() };
     })
     .filter((p) => !Number.isNaN(p.t));
 }
@@ -310,7 +314,9 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
 
   /* 동종사 레이더 */
   const peers: PeerRow[] = PEERS.map(({ name, self }) => {
-    const hits = inWin.filter((p) => p.names.has(name));
+    // 동종사: 제목·요약에 이름이 나온 기사만 (본문 끝에 스쳐 지나가는 언급은 제외)
+    const needle = name.toLowerCase();
+    const hits = inWin.filter((p) => p.names.has(name) && p.headline.includes(needle));
     const signals = emptySignals();
     for (const h of hits) for (const s of h.signals) signals[s]++;
     return { name, self: !!self, total: hits.length, signals, latest: hits[0] ? ref(hits[0]) : undefined, articles: hits.slice(0, 30).map(ref) };

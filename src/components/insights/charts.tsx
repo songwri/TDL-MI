@@ -9,7 +9,7 @@ import { TipRow, catColor, rampColor, type useTip } from "@/components/report/pa
 
 type TipApi = ReturnType<typeof useTip>;
 
-/** 단계 신호 색: 성숙 순서대로 파랑이 진해지고, '회의·과제'만 회색 (색과 함께 항상 이름 표시) */
+/** 단계 신호 색: 성숙 순서대로 파랑이 진해지고, '리스크·과제'만 회색 (색과 함께 항상 이름 표시) */
 export const SIGNAL_COLOR: Record<StageKey, string> = {
   launch: RAMP[1],
   invest: RAMP[2],
@@ -264,7 +264,7 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
 /** 단계 신호 구성 막대 (선택한 기술) */
 export function SignalBar({ p, tip }: { p: HypePoint; tip: TipApi }) {
   const items = SIGNAL_ORDER.filter((k) => p.signals[k] > 0);
-  if (!p.signalTotal) return <p className="text-sm text-[var(--rv-mute)]">기사에서 단계 신호(공개·투자·실증·도입·회의)를 찾지 못했습니다. 언급만 있는 상태로 보고 &lsquo;기술 태동&rsquo;에 둡니다.</p>;
+  if (!p.signalTotal) return <p className="text-sm text-[var(--rv-mute)]">기사에서 단계 신호(공개·투자·실증·도입·리스크)를 찾지 못했습니다. 언급만 있는 상태로 보고 &lsquo;기술 태동&rsquo;에 둡니다.</p>;
   return (
     <div>
       <div className="flex h-7 gap-[2px] overflow-hidden rounded-[4px]">
