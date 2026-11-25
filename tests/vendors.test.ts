@@ -37,3 +37,25 @@ describe("공급사 목록 (기본값 + 시트 Vendors 탭)", () => {
     expect(merged.length).toBe(VENDORS.length + 1);
   });
 });
+
+describe("매출·적용 사례 칸", () => {
+  it("시트의 매출과 레퍼런스(고객|국가|내용|연도|URL ;)를 읽고, 기본 사례 뒤에 붙임", () => {
+    const merged = mergeVendors(VENDORS, [
+      row({ 회사명: "Geek+", 매출: "RMB 3.2B", "매출 연도": "2025", "매출 근거": "연차보고서", "레퍼런스(고객|국가|내용|연도|URL ;)": "쿠팡|kr|AMR 도입|2025|https://x.test/a; 고객B||설명" }),
+    ]);
+    const g = merged.find((v) => v.name === "Geek+")!;
+    expect(g.revenue).toEqual({ value: "RMB 3.2B", year: "2025", basis: "연차보고서" });
+    expect(g.references!.slice(-2)).toEqual([
+      { customer: "쿠팡", country: "KR", detail: "AMR 도입", year: "2025", url: "https://x.test/a" },
+      { customer: "고객B", country: undefined, detail: "설명", year: undefined, url: undefined },
+    ]);
+    expect(g.references!.length).toBeGreaterThan(2); // 기본 사례(CJ대한통운 등) 유지
+  });
+
+  it("기본 매출·사례에는 모두 근거 표시", () => {
+    for (const v of VENDORS) {
+      if (v.revenue) expect(v.revenue.basis, v.name).toBeTruthy();
+      for (const r of v.references ?? []) expect(r.url, `${v.name} ${r.customer}`).toMatch(/^https:\/\//);
+    }
+  });
+});

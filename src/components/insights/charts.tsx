@@ -29,7 +29,8 @@ const PW = W - L - R, PH = H - T - B;
 const px = (x: number) => L + x * PW;
 const py = (y: number) => T + (1 - y) * PH;
 
-const MIN_GAP = 0.045;
+/** 곡선 위 점 사이 최소 간격 (가장 큰 점 지름 + 여백) */
+const MIN_GAP = (2 * 17 + 10) / PW;
 /** 글자 폭 추정 (한글 12.5px, 영문·숫자 7.4px) */
 const textW = (t: string) => [...t].reduce((n, ch) => n + (/[\u3131-\uD79D]/.test(ch) ? 13.2 : 8), 0);
 type Box = { x0: number; y0: number; x1: number; y1: number };
@@ -105,8 +106,9 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
       <line x1={L} x2={L + PW} y1={T + PH} y2={T + PH} stroke="#c9c7c0" />
       <text x={L + PW} y={T + PH + 48} textAnchor="end" fontSize="12" fill="#898781">성숙도 (기사 속 공개 → 투자 → 실증 → 도입 신호) →</text>
       <text transform={`translate(${L - 30} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#898781">관심·기대 ↑</text>
-      <path d={path} fill="none" stroke="#232021" strokeWidth="2" opacity="0.8" />
-      {placed.map(({ p, cx, cy, r, label }) => {
+      <path d={path} pathLength={1} fill="none" stroke="#232021" strokeWidth="2" opacity="0.8" className="draw-in" />
+      {placed.map(({ p, cx, cy, r, label }, idx) => {
+        const near = points.filter((q) => q !== p && Math.abs(q.x - p.x) < 0.02).map((q) => q.name);
         const color = catColor(p.category);
         const sel = p.name === selected;
         const body = (
@@ -115,6 +117,7 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
             <TipRow value={p.stage} label={p.confident ? "현재 단계" : "현재 단계 (신호 적음)"} />
             <TipRow value={`${p.count}건`} label={`기간 내 기사 · 최근 30일 ${p.recent}건`} />
             <TipRow value={pct(p.momentum)} label="최근 30일 속도 (이전 대비)" />
+            {near.length > 0 && <p className="text-[var(--rv-soft)]">같은 단계 위치: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b> (겹치지 않게 곡선을 따라 벌려 그림)</p>}
             <div className="mt-1 flex flex-wrap gap-x-2 text-[var(--rv-soft)]">
               {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k}><span style={{ color: SIGNAL_COLOR[k] }}>■</span> {signalLabel(k)} {p.signals[k]}</span>)}
             </div>
@@ -136,7 +139,7 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
           >
             <circle cx={cx} cy={cy} r={r + 10} fill="transparent" />
             {sel && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke="#232021" strokeWidth="2" />}
-            <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} />
+            <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />
             {label.lead !== undefined && <line x1={cx} x2={cx} y1={label.lead} y2={cy - r - 2} stroke="#898781" strokeWidth="1" />}
             <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight={sel ? 800 : 600} fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>
           </g>
@@ -183,6 +186,69 @@ export const SignalLegend = () => (
     ))}
   </div>
 );
+
+/* ── 기사 구성 원그래프 (대표 신호) ───────────────────────── */
+
+export const MIX_COLOR: Record<StageKey | "none", string> = { ...SIGNAL_COLOR, none: "#e4e0dc" };
+export const mixLabel = (k: StageKey | "none") => (k === "none" ? "신호 없음" : signalLabel(k));
+
+const arc = (cx: number, cy: number, r0: number, r1: number, a0: number, a1: number) => {
+  const p = (r: number, a: number) => `${cx + r * Math.sin(a)} ${cy - r * Math.cos(a)}`;
+  const large = a1 - a0 > Math.PI ? 1 : 0;
+  return `M${p(r1, a0)} A${r1} ${r1} 0 ${large} 1 ${p(r1, a1)} L${p(r0, a1)} A${r0} ${r0} 0 ${large} 0 ${p(r0, a0)} Z`;
+};
+
+/** 원그래프 (가운데가 빈 도넛). 조각을 누르면 onPick, 선택 조각은 바깥으로 살짝 나온다 */
+export function SignalDonut({ mix, selected, onPick, tip }: { mix: { key: StageKey | "none"; count: number }[]; selected?: StageKey | "none"; onPick: (k?: StageKey | "none") => void; tip: TipApi }) {
+  const total = mix.reduce((n, m) => n + m.count, 0);
+  const S = 240, C = S / 2, R1 = 108, R0 = 66;
+  let a = 0;
+  const parts = mix.filter((m) => m.count > 0).map((m) => {
+    const a0 = a;
+    a += (m.count / Math.max(total, 1)) * Math.PI * 2;
+    return { ...m, a0, a1: a };
+  });
+  const sel = parts.find((p) => p.key === selected);
+  return (
+    <svg viewBox={`0 0 ${S} ${S}`} className="block h-auto w-full max-w-[260px]" role="img" aria-label={`기사 구성: ${parts.map((p) => `${mixLabel(p.key)} ${p.count}건`).join(", ")}`}>
+      <g className="pop-in">
+        {parts.length === 1 ? (
+          <circle cx={C} cy={C} r={(R0 + R1) / 2} fill="none" stroke={MIX_COLOR[parts[0].key]} strokeWidth={R1 - R0} />
+        ) : (
+          parts.map((p) => {
+            const mid = (p.a0 + p.a1) / 2;
+            const on = p.key === selected;
+            const dx = on ? Math.sin(mid) * 7 : 0, dy = on ? -Math.cos(mid) * 7 : 0;
+            const body = <><TipRow value={`${p.count}건 · ${Math.round((p.count / total) * 100)}%`} label={mixLabel(p.key)} color={MIX_COLOR[p.key]} /><p className="mt-1 text-[var(--rv-soft)]">누르면 아래 해당 묶음을 표시합니다</p></>;
+            return (
+              <path
+                key={p.key}
+                d={arc(C, C, R0, R1, p.a0, p.a1)}
+                fill={MIX_COLOR[p.key]}
+                stroke="#fff"
+                strokeWidth="2"
+                tabIndex={0}
+                role="button"
+                aria-pressed={on}
+                aria-label={`${mixLabel(p.key)} ${p.count}건`}
+                className="cursor-pointer outline-none transition-transform duration-300 ease-out"
+                style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: selected && !on ? 0.45 : 1 }}
+                onClick={() => onPick(on ? undefined : p.key)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPick(on ? undefined : p.key)}
+                onPointerMove={(e) => tip.show(e, body)}
+                onPointerLeave={tip.hide}
+                onFocus={(e) => tip.show(e, body)}
+                onBlur={tip.hide}
+              />
+            );
+          })
+        )}
+      </g>
+      <text x={C} y={C - 4} textAnchor="middle" className="font-display" fontSize="34" fontWeight="800" fill="#1c1a19">{sel ? sel.count : total}</text>
+      <text x={C} y={C + 20} textAnchor="middle" fontSize="12" fill="#57524f">{sel ? `${mixLabel(sel.key)} · ${Math.round((sel.count / total) * 100)}%` : "분석 기간 기사"}</text>
+    </svg>
+  );
+}
 
 /* ── 작은 막대 (주별 기사 수) ───────────────────────────── */
 
@@ -276,62 +342,66 @@ export function WeeklyBars({ weekly, tip }: { weekly: InsightsData["weekly"]; ti
 
 /* ── 동종사 레이더 ───────────────────────────── */
 
-export function PeerHeat({ peers, tip }: { peers: InsightsData["peers"]; tip: TipApi }) {
+/**
+ * 동종업계 레이더: 줄 = 기업, 칸 = 단계 신호별 기사 수.
+ * 줄에 마우스를 올리면 테두리가 강조되고, 누르면 그 회사 기사 목록이 아래에 열린다.
+ */
+export function PeerBoard({ peers, selected, onSelect, tip }: { peers: InsightsData["peers"]; selected?: string; onSelect: (name?: string) => void; tip: TipApi }) {
   const max = Math.max(...peers.flatMap((p) => SIGNAL_ORDER.map((k) => p.signals[k])), 1);
+  const cols = "grid-cols-[minmax(140px,1.4fr)_repeat(5,minmax(64px,1fr))_64px]";
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-separate border-spacing-[2px] text-sm">
-        <thead>
-          <tr className="text-xs text-[var(--rv-soft)]">
-            <th className="px-2 py-1 text-left font-bold">기업</th>
-            {SIGNAL_ORDER.map((k) => <th key={k} className="w-[82px] px-1 py-1 font-bold">{signalLabel(k)}</th>)}
-            <th className="w-[56px] px-1 py-1 font-bold">전체</th>
-            <th className="px-2 py-1 text-left font-bold">가장 최근 기사</th>
-          </tr>
-        </thead>
-        <tbody>
-          {peers.map((p) => (
-            <tr key={p.name}>
-              <td className={`whitespace-nowrap rounded-[3px] px-2 py-1.5 ${p.self ? "border-l-4 border-[var(--rv-accent)] bg-[var(--rv-tint)] font-bold" : ""}`}>
-                {p.name} {p.self && <span className="ml-1 rounded bg-[var(--rv-accent)] px-1 py-px text-[10px] font-bold text-white">자사</span>}
-              </td>
-              {SIGNAL_ORDER.map((k) => {
-                const v = p.signals[k];
-                const bg = rampColor(v, max);
-                return (
-                  <td
-                    key={k}
-                    tabIndex={0}
-                    className="rounded-[3px] text-center text-xs font-bold tabular-nums"
-                    style={{ background: bg, color: v && (RAMP as readonly string[]).indexOf(bg) >= 3 ? "#fff" : "#232021" }}
-                    onPointerMove={(e) => tip.show(e, <TipRow value={`${v}건`} label={`${p.name} · ${signalLabel(k)}`} color={SIGNAL_COLOR[k]} />)}
-                    onPointerLeave={tip.hide}
-                    onFocus={(e) => tip.show(e, <TipRow value={`${v}건`} label={`${p.name} · ${signalLabel(k)}`} />)}
-                    onBlur={tip.hide}
-                  >
-                    {v || ""}
-                  </td>
-                );
-              })}
-              <td className="text-center text-xs font-bold tabular-nums text-[var(--rv-soft)]">{p.total}</td>
-              <td className="max-w-[340px] px-2 text-xs">
-                {p.latest ? (
-                  <a href={p.latest.link} target="_blank" rel="noreferrer" className="line-clamp-1 underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]" title={p.latest.title}>
-                    {p.latest.titleKo ?? p.latest.title} <span className="text-[var(--rv-mute)]">· {p.latest.publishedAt.slice(5, 10).replace("-", "/")}</span>
-                  </a>
-                ) : (
-                  <span className="text-[var(--rv-mute)]">기간 내 기사 없음</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="mt-2 flex items-center gap-1.5 text-xs text-[var(--rv-soft)]">
-        <span>적음</span>
-        {RAMP.map((c) => <span key={c} aria-hidden className="inline-block h-2.5 w-4 rounded-[2px]" style={{ background: c }} />)}
-        <span>많음</span>
-        <span className="ml-3">칸 = 그 기업이 언급된 기사 중 해당 신호가 있는 기사 수</span>
+      <div className="min-w-[640px]" role="table" aria-label="기업별 단계 신호 기사 수">
+        <div role="row" className={`grid ${cols} gap-[2px] px-1 pb-1 text-xs font-bold text-[var(--rv-soft)]`}>
+          <span role="columnheader" className="px-2">기업</span>
+          {SIGNAL_ORDER.map((k) => <span role="columnheader" key={k} className="text-center">{signalLabel(k)}</span>)}
+          <span role="columnheader" className="text-center">전체</span>
+        </div>
+        <div className="space-y-1">
+          {peers.map((p) => {
+            const on = p.name === selected;
+            return (
+              <button
+                key={p.name}
+                type="button"
+                role="row"
+                aria-expanded={on}
+                onClick={() => onSelect(on ? undefined : p.name)}
+                className={`peer-row grid w-full ${cols} items-stretch gap-[2px] rounded-md border-2 p-[2px] text-left text-sm transition-[border-color,box-shadow] ${on ? "border-[var(--rv-ink)] shadow-[0_6px_18px_-12px_rgb(28_26_25/0.6)]" : "border-transparent hover:border-[var(--rv-ink)]"}`}
+              >
+                <span role="cell" className={`flex items-center gap-1.5 rounded-[3px] px-2 py-1.5 ${p.self ? "bg-[var(--rv-tint)] font-bold" : ""}`}>
+                  {p.self && <span aria-hidden className="h-4 w-1 rounded-full bg-[var(--rv-accent)]" />}
+                  {p.name}
+                  {p.self && <span className="rounded bg-[var(--rv-accent)] px-1 py-px text-[10px] font-bold text-white">자사</span>}
+                  <span aria-hidden className={`ml-auto text-[var(--rv-mute)] transition-transform ${on ? "rotate-180" : ""}`}>▾</span>
+                </span>
+                {SIGNAL_ORDER.map((k) => {
+                  const v = p.signals[k];
+                  const bg = rampColor(v, max);
+                  return (
+                    <span
+                      role="cell"
+                      key={k}
+                      className="flex items-center justify-center rounded-[3px] text-xs font-bold tabular-nums"
+                      style={{ background: bg, color: v && (RAMP as readonly string[]).indexOf(bg) >= 3 ? "#fff" : "#232021" }}
+                      onPointerMove={(e) => tip.show(e, <TipRow value={`${v}건`} label={`${p.name} · ${signalLabel(k)}`} color={SIGNAL_COLOR[k]} />)}
+                      onPointerLeave={tip.hide}
+                    >
+                      {v || ""}
+                    </span>
+                  );
+                })}
+                <span role="cell" className="flex items-center justify-center text-xs font-bold tabular-nums text-[var(--rv-soft)]">{p.total}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-[var(--rv-soft)]">
+          <span>적음</span>
+          {RAMP.map((c) => <span key={c} aria-hidden className="inline-block h-2.5 w-4 rounded-[2px]" style={{ background: c }} />)}
+          <span>많음</span>
+          <span className="ml-3">칸 = 그 기업이 언급된 기사 중 해당 신호가 있는 기사 수 · 줄을 누르면 기사 목록</span>
+        </div>
       </div>
     </div>
   );

@@ -382,8 +382,15 @@ export function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
-        {/* ── 기사 목록 ── */}
-        <section className="space-y-3">
+        {/* ── 수집 기사함: 매일 쌓이는 기사에서 후보를 고르는 곳 ── */}
+        <section aria-labelledby="inbox-title" className="min-w-0 space-y-3 rounded-xl border border-[var(--line)] bg-[var(--wash)] p-3 sm:p-4">
+          <div className="flex flex-wrap items-end justify-between gap-2 px-1">
+            <div>
+              <p className="font-display text-[11px] font-bold tracking-[0.14em] text-[var(--mute)]">NEWS INBOX</p>
+              <h2 id="inbox-title" className="text-lg font-bold leading-tight">수집 기사함</h2>
+            </div>
+            <p className="text-xs text-[var(--soft)]">매일 08:00 자동 수집 · 체크한 기사가 오른쪽 작성 데스크에 담깁니다</p>
+          </div>
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
             <Button variant="primary" onClick={refresh} disabled={refreshing}>
               {refreshing ? `⏳ ${refreshNote || "수집 중…"}` : "🔄 기사 최신화"}
@@ -459,9 +466,16 @@ export function Dashboard() {
         </section>
 
         {/* ── 작성 패널 ── */}
-        <aside className="space-y-4 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto">
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="font-bold text-brand">제{issueNo}호 작성</h2>
+        <aside aria-labelledby="desk-title" className="self-start overflow-hidden rounded-xl border border-[var(--ink)] bg-white shadow-[0_18px_40px_-28px_rgb(28_26_25/0.55)] lg:sticky lg:top-[calc(var(--header-total,60px)+16px)] lg:max-h-[calc(100vh-var(--header-total,60px)-32px)] lg:overflow-y-auto">
+          {/* 작성 데스크 머리: 받은 기사함과 다른 '문서' 느낌 */}
+          <div className="sticky top-0 z-10 flex items-end justify-between gap-2 bg-[var(--ink)] px-4 py-3 text-white">
+            <div>
+              <p className="font-display text-[11px] font-bold tracking-[0.14em] text-white/60">EDITING DESK</p>
+              <h2 id="desk-title" className="text-lg font-bold leading-tight">제{issueNo}호 작성</h2>
+            </div>
+            <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs tabular-nums">기사 {selected.length}/{MAX_SELECT}</span>
+          </div>
+          <div className="space-y-3 border-b border-[var(--line)] p-4">
             <div className="grid grid-cols-2 gap-2 text-sm">
               <label className="space-y-1">
                 <span className="text-xs font-semibold text-slate-600">호수</span>
@@ -527,8 +541,8 @@ export function Dashboard() {
             )}
           </div>
 
-          <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="font-bold text-brand">리포트 작성 현황</h2>
+          <div className="space-y-3 bg-[var(--canvas)] p-4">
+            <h3 className="font-bold">리포트 작성 현황</h3>
             <ol className="space-y-1 text-xs text-slate-600">
               <li><b className="text-slate-800">1.</b> 위에서 기사를 고르고 <b>작성 의뢰 저장</b></li>
               <li><b className="text-slate-800">2.</b> 작성 담당자가 Claude Code에서 <code className="rounded bg-slate-100 px-1">/write-report 호수</code> 실행</li>
@@ -581,7 +595,7 @@ export function Dashboard() {
             )}
             <Button variant="ghost" className="w-full text-xs" onClick={load}>↻ 새로고침</Button>
           </div>
-          <p className="px-1 text-xs text-slate-500">
+          <p className="px-4 pb-4 text-xs text-slate-500">
             기사의 <b>제N호 후속·연관</b> 태그는 최근 6개월 발행분과 비교한 결과입니다. 전체 이력은{" "}
             <Link href="/issues" className="text-brand underline">발행 이력</Link>에서 확인하세요.
           </p>

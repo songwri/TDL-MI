@@ -24,6 +24,42 @@ const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y
  * 가로 = 성숙도(기사 속 도입·실증 신호 비중), 세로 = 관심도(추적 기술 언급 점유율), 크기 = 최근 기사 수.
  * 회색 작은 원 → 큰 원: 지난 기간 → 최근 기간 이동. 사분면 기준선 = 최근 기간 중앙값.
  */
+/**
+ * 겹침 풀기: 원끼리 겹치면 서로 밀어내고, 실제 위치로 약하게 당긴다 (최대 몇십 px 이동).
+ * 옮겨진 원은 실제 위치에 작은 점 + 가는 선을 남겨, 값은 그대로 읽히게 한다.
+ */
+function relax<T extends { tx: number; ty: number; r: number }>(nodes: T[]): (T & { cx: number; cy: number })[] {
+  const n = nodes.map((d, i) => ({ ...d, cx: d.tx + (i % 3) * 0.01, cy: d.ty + (i % 2) * 0.01 }));
+  for (let it = 0; it < 160; it++) {
+    for (let i = 0; i < n.length; i++)
+      for (let j = i + 1; j < n.length; j++) {
+        const a = n[i], b = n[j];
+        let dx = b.cx - a.cx, dy = b.cy - a.cy;
+        let d = Math.hypot(dx, dy);
+        const min = a.r + b.r + 3;
+        if (d >= min) continue;
+        if (d < 1e-6) {
+          const ang = (j * 2.4) % (Math.PI * 2);
+          dx = Math.cos(ang);
+          dy = Math.sin(ang);
+          d = 1;
+        }
+        const push = (min - d) / 2;
+        a.cx -= (dx / d) * push;
+        a.cy -= (dy / d) * push;
+        b.cx += (dx / d) * push;
+        b.cy += (dy / d) * push;
+      }
+    for (const d of n) {
+      d.cx += (d.tx - d.cx) * 0.04;
+      d.cy += (d.ty - d.cy) * 0.04;
+      d.cx = Math.min(Math.max(d.cx, L + d.r + 2), L + PW - d.r - 2);
+      d.cy = Math.min(Math.max(d.cy, T + d.r + 2), T + PH - d.r - 2);
+    }
+  }
+  return n;
+}
+
 export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData; onlyFocus: boolean; tip: TipApi }) {
   const pts = data.points.filter((p) => p.recent.maturity !== null && (!onlyFocus || p.relevance === 3));
   const maxShare = Math.max(...pts.flatMap((p) => [p.recent.share, p.past.maturity !== null ? p.past.share : 0]), 0.05) * 1.15;
@@ -33,7 +69,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
   const mx = x(data.median.maturity), my = y(data.median.share);
 
   const placed = useMemo(() => {
-    const dots = pts.map((p) => ({ p, cx: x(p.recent.maturity!), cy: y(p.recent.share), r: Math.min(22, 6 + Math.sqrt(p.recent.count) * 3) }));
+    const dots = relax(pts.map((p) => ({ p, tx: x(p.recent.maturity!), ty: y(p.recent.share), r: Math.min(22, 6 + Math.sqrt(p.recent.count) * 3) })));
     const taken: Box[] = dots.map((d) => ({ x0: d.cx - d.r, y0: d.cy - d.r, x1: d.cx + d.r, y1: d.cy + d.r }));
     const labels = new Map<string, { x: number; y: number; anchor: "start" | "end" | "middle" }>();
     for (const d of [...dots].sort((a, b) => b.p.recent.count - a.p.recent.count)) {
@@ -57,7 +93,9 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
         labels.set(d.p.name, ok);
       }
     }
-    return dots.map((d) => ({ ...d, label: labels.get(d.p.name) }));
+    // 실제 위치가 거의 같은 항목들 (툴팁에서 함께 보여 줌)
+    const near = (d: (typeof dots)[number]) => dots.filter((o) => o !== d && Math.hypot(o.tx - d.tx, o.ty - d.ty) < 14).map((o) => o.p.name);
+    return dots.map((d) => ({ ...d, label: labels.get(d.p.name), near: near(d), moved: Math.hypot(d.cx - d.tx, d.cy - d.ty) > 3 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pts.map((p) => p.name).join(), maxShare]);
 
@@ -69,7 +107,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
   ];
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`LX판토스 기술 포트폴리오: ${pts.map((p) => `${p.name} 성숙도 ${pp(p.recent.maturity!)} 관심도 ${pp(p.recent.share)}`).join(", ")}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`기술 포지션 맵: ${pts.map((p) => `${p.name} 성숙도 ${pp(p.recent.maturity!)} 관심도 ${pp(p.recent.share)}`).join(", ")}`}>
       <defs>
         <marker id="pf-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0 0 L8 4 L0 8 z" fill="#898781" />
@@ -118,7 +156,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
           </g>
         ) : null,
       )}
-      {placed.map(({ p, cx, cy, r, label }) => {
+      {placed.map(({ p, cx, cy, r, label, near, moved, tx, ty }, i) => {
         const body = (
           <>
             <p className="font-bold">{p.name} <span className="font-normal text-[var(--rv-soft)]">· CL 연관 {p.relevance === 3 ? "높음" : p.relevance === 2 ? "중간" : "낮음"}</span></p>
@@ -126,12 +164,20 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
             <TipRow value={pp(p.recent.share)} label={`관심도 (지난 기간 ${pp(p.past.share)})`} />
             <TipRow value={`${p.recent.count}건`} label={`최근 기간 기사 (지난 기간 ${p.past.count}건)`} />
             {p.doubtShare >= 0.2 && <p className="mt-1 font-bold text-[var(--rv-ink)]">▲ 주의: 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
+            {near.length > 0 && <p className="mt-1 text-[var(--rv-soft)]">같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
+            {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 옮겨 그림 · 작은 점이 실제 위치</p>}
           </>
         );
         return (
-          <g key={p.name} tabIndex={0} className="outline-none" onPointerMove={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.show(e, body)} onBlur={tip.hide}>
+          <g key={p.name} tabIndex={0} className="pf-node outline-none" onPointerMove={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.show(e, body)} onBlur={tip.hide}>
+            {moved && (
+              <>
+                <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
+                <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
+              </>
+            )}
             <circle cx={cx} cy={cy} r={r + 8} fill="transparent" />
-            <circle cx={cx} cy={cy} r={r} fill={colorOf(p)} fillOpacity={0.9} stroke="#fff" strokeWidth="2" />
+            <circle cx={cx} cy={cy} r={r} fill={colorOf(p)} fillOpacity={0.92} stroke="#fff" strokeWidth="2" className="pf-dot pop-in" style={{ animationDelay: `${i * 40}ms` }} />
             {p.doubtShare >= 0.2 && <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">!</text>}
             {label && <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight="700" fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>}
           </g>

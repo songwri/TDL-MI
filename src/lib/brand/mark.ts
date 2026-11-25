@@ -12,13 +12,12 @@ export const MARK_PATH = "/brand/tdl-trend-report.png";
 export const MARK_DISPLAY = { width: 150, height: 69 } as const;
 export const MARK_ALT = "TDL TREND REPORT";
 
-export function markSvg(): string {
-  const { width: W, height: H, bg, fg, accent } = MARK;
-  const x = 4;
-  const y = 4;
+/** TDL 글자 도형 (가로 192 × 세로 60, 획 16). 메일 PNG 와 웹 로고가 같은 모양을 쓴다 */
+export const LETTERS = { width: 192, height: 60 } as const;
+export function markLetters(x = 0, y = 0): string {
   const S = 16; // 획 두께
-  const h = 60; // 글자 높이
-  const letters =
+  const h = LETTERS.height;
+  return (
     // T
     `<rect x="${x}" y="${y}" width="58" height="${S}"/>` +
     `<rect x="${x + 21}" y="${y}" width="${S}" height="${h}"/>` +
@@ -27,12 +26,20 @@ export function markSvg(): string {
     `M${x + 68 + S} ${y + S} V${y + h - S} H${x + 108} Q${x + 114} ${y + h - S} ${x + 114} ${y + h - S - 6} V${y + S + 6} Q${x + 114} ${y + S} ${x + 108} ${y + S} Z"/>` +
     // L
     `<rect x="${x + 140}" y="${y}" width="${S}" height="${h}"/>` +
-    `<rect x="${x + 140}" y="${y + h - S}" width="52" height="${S}"/>`;
-  const right = x + 192;
+    `<rect x="${x + 140}" y="${y + h - S}" width="52" height="${S}"/>`
+  );
+}
+
+export function markSvg(): string {
+  const { width: W, height: H, bg, fg, accent } = MARK;
+  const x = 4;
+  const y = 4;
+  const h = LETTERS.height;
+  const right = x + LETTERS.width;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${MARK_ALT}">` +
     `<rect width="${W}" height="${H}" fill="${bg}"/>` +
-    `<g fill="${fg}">${letters}</g>` +
+    `<g fill="${fg}">${markLetters(x, y)}</g>` +
     `<rect x="${x}" y="${y + h + 17}" width="22" height="4" fill="${accent}"/>` +
     `<text x="${right}" y="${y + h + 24}" text-anchor="end" font-family="Pretendard" font-weight="700" font-size="14" letter-spacing="2.2" fill="${fg}">TREND REPORT</text>` +
     `</svg>`

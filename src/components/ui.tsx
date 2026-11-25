@@ -88,6 +88,10 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown 
     headers: init?.json !== undefined ? { "Content-Type": "application/json" } : init?.headers,
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
   });
+  // 로그인이 풀렸으면(30일 경과·비밀번호 변경) 로그인 화면으로
+  if (res.status === 401 && typeof window !== "undefined" && !url.startsWith("/api/login")) {
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { error?: string }).error ?? `요청 실패 (${res.status})`);
   return data as T;

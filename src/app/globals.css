@@ -1,32 +1,100 @@
 @import "tailwindcss";
+@import "wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.css";
+@import "@fontsource-variable/archivo/wdth.css";
+
+/*
+ * 화면 토큰 (사내 업무 도구: 밝은 한 가지 테마로 고정)
+ * 글꼴: 한글 본문 Wanted Sans · 영문 라벨·숫자 Archivo Expanded (TDL LAB 로고의 넓은 글자와 맞춤)
+ * 중립색은 브랜드 레드 쪽으로 아주 약간 따뜻하게
+ */
+:root {
+  --header-h: 60px;
+  --header-total: 60px;
+  --ink: #1c1a19;
+  --soft: #57524f;
+  --mute: #8b8682;
+  --line: #e4e0dc;
+  --wash: #f3f0ed;
+  --canvas: #f7f5f3;
+  --paper: #ffffff;
+  --brand: #a72b2b;
+  --brand-tint: #fbf1ef;
+  color-scheme: light;
+}
 
 @theme inline {
   --color-brand: #a72b2b;
   --color-brand-dark: #7e1f1f;
   --color-accent: #4f86b8;
-  --font-sans: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-sans: "Wanted Sans Variable", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-display: "Archivo Variable", "Wanted Sans Variable", "Malgun Gothic", sans-serif;
 }
 
 body {
-  background: #f7f4f3;
-  color: #2b2324;
+  background: var(--canvas);
+  color: var(--ink);
+  font-feature-settings: "ss01";
 }
+.font-display { font-family: var(--font-display); font-stretch: 112%; }
+h1, h2, h3 { text-wrap: balance; }
 
-/* ── 리포트 화면(인터랙티브): 데이터 시각화 토큰 ─────────────────── */
+/* ── 상단 메뉴: 책갈피 표시 ─────────────────── */
+.nav-bookmark {
+  position: absolute;
+  top: 0;
+  width: 14px;
+  height: 18px;
+  background: var(--brand);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  transition: left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: bookmark-drop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.nav-underline {
+  position: absolute;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--ink);
+  transition: left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes bookmark-drop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+/* ── 화면 전환·등장 (끝난 상태가 기본: 애니메이션이 없어도 내용은 보임) ─────── */
+.view-enter { animation: view-enter 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes view-enter { from { opacity: 0.001; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.pop-in { transform-box: fill-box; transform-origin: center; animation: pop-in 0.5s cubic-bezier(0.2, 0.9, 0.25, 1.2) both; }
+@keyframes pop-in { from { transform: scale(0.4); opacity: 0.001; } to { transform: none; opacity: 1; } }
+.draw-in { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw-in 0.9s ease-out 0.15s forwards; }
+@keyframes draw-in { to { stroke-dashoffset: 0; } }
+.lift { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.lift:hover { transform: translateY(-1px); box-shadow: 0 6px 18px -10px rgb(28 26 25 / 0.35); }
+
+/* ── 리포트·인사이트 화면(인터랙티브): 데이터 시각화 토큰 ─────────────────── */
 .rv {
-  --rv-ink: #232021;
-  --rv-soft: #5c5755;
-  --rv-mute: #898781;
-  --rv-line: #e1e0d9;
+  --rv-ink: var(--ink);
+  --rv-soft: var(--soft);
+  --rv-mute: var(--mute);
+  --rv-line: var(--line);
   --rv-surface: #fcfcfb;
-  --rv-accent: #a72b2b;
-  --rv-tint: #fbf1ef;
+  --rv-accent: var(--brand);
+  --rv-tint: var(--brand-tint);
   --rv-gray: #a9a7a0;
-  font-family: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: var(--rv-ink);
 }
 .rv ::selection { background: #f1d8d4; }
 .rv button:focus-visible, .rv a:focus-visible, .rv [tabindex]:focus-visible { outline: 2px solid var(--rv-accent); outline-offset: 2px; }
-.rv-seg { transition: opacity 0.15s, transform 0.15s; }
+.rv-seg { transition: opacity 0.15s, transform 0.15s, filter 0.15s; }
 .rv-seg:hover, .rv-seg:focus-visible { filter: brightness(1.08); }
-@media (prefers-reduced-motion: reduce) { .rv-seg { transition: none; } .rv * { scroll-behavior: auto !important; } }
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rv-seg, .nav-bookmark, .nav-underline, .lift { transition: none; }
+  .view-enter, .pop-in, .nav-bookmark { animation: none; }
+  .draw-in { animation: none; stroke-dashoffset: 0; }
+  .rv * { scroll-behavior: auto !important; }
+}
+
+/* 버블 맵: 마우스를 올린 원을 앞으로 + 테두리 강조 */
+.pf-node:hover .pf-dot, .pf-node:focus-visible .pf-dot { stroke: var(--ink); stroke-width: 2.5px; }
+.peer-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

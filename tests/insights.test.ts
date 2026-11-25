@@ -144,3 +144,24 @@ describe("LX판토스 기술 포트폴리오 · 최근 근황", () => {
     expect(r.now.highlights[0]).toContain("AMR(2건, 직전 30일 0건)");
   });
 });
+
+describe("최근 근황 원그래프: 기사마다 대표 신호 하나", () => {
+  it("회의 > 도입 > 실증 > 투자 > 공개 순서로 대표 신호, 원그래프 합 = 기간 기사 수, 묶음 건수 = 조각", async () => {
+    const { primarySignal } = await import("@/lib/insights/compute");
+    expect(primarySignal(["pilot", "doubt"])).toBe("doubt");
+    expect(primarySignal(["launch", "adopt"])).toBe("adopt");
+    expect(primarySignal([])).toBe("none");
+    const arts = [art("드론 배송 시범 운영 지연", 3), art("AMR 도입", 4), art("AMR 공개 후 도입 확대", 5), art("물류 컨퍼런스 개최", 6)];
+    const r = computeInsights(arts, { now: NOW });
+    const mix = Object.fromEntries(r.now.mix.map((m) => [m.key, m.count]));
+    expect(mix).toMatchObject({ doubt: 1, adopt: 2, none: 1, pilot: 0 });
+    expect(r.now.mix.reduce((n, m) => n + m.count, 0)).toBe(4);
+    expect(r.now.feed.find((g) => g.signal === "adopt")!.count).toBe(2);
+    expect(r.now.feed.find((g) => g.signal === "pilot")!.count).toBe(0); // 지연 기사는 회의 묶음에만
+  });
+
+  it("동종업계: 회사별 기사 목록 (최신순)", () => {
+    const r = computeInsights([art("한진 자동화 센터 구축", 9), art("한진 로봇 시범", 2)], { now: NOW });
+    expect(r.peers.find((p) => p.name === "한진")!.articles.map((a) => a.title)).toEqual(["한진 로봇 시범", "한진 자동화 센터 구축"]);
+  });
+});

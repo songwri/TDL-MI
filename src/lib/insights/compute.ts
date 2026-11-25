@@ -55,6 +55,8 @@ export interface PeerRow {
   total: number;
   signals: Signals;
   latest?: ArticleRef;
+  /** 기간 내 그 회사 기사 (최신순, 최대 30건) */
+  articles: ArticleRef[];
 }
 
 export interface BoardColumn {
@@ -105,8 +107,15 @@ export interface PortfolioData {
 export interface NowData {
   kpis: { key: string; label: string; value: number; prev: number; note: string }[];
   highlights: string[];
-  feed: { signal: StageKey; items: (ArticleRef & { techs: string[] })[] }[];
+  /** 분석 기간 기사 구성: 기사마다 대표 신호 하나 (원그래프와 아래 묶음이 같은 기준) */
+  mix: { key: StageKey | "none"; count: number }[];
+  /** 대표 신호별 최신 기사 (count = 그 묶음 전체 기사 수) */
+  feed: { signal: StageKey; count: number; items: (ArticleRef & { techs: string[] })[] }[];
 }
+
+/** 대표 신호: 회의(리스크) > 도입 > 실증 > 투자 > 공개. 예) "시범 운영 지연" → 회의·과제 */
+export const PRIMARY_ORDER: StageKey[] = ["doubt", "adopt", "pilot", "invest", "launch"];
+export const primarySignal = (signals: StageKey[]): StageKey | "none" => PRIMARY_ORDER.find((k) => signals.includes(k)) ?? "none";
 
 const DAY = 86_400_000;
 /** 성숙도 지수 가중치 (회의·과제는 성숙도가 아니라 별도 경고로 표시) */
@@ -240,7 +249,7 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
     const hits = inWin.filter((p) => p.names.has(name));
     const signals = emptySignals();
     for (const h of hits) for (const s of h.signals) signals[s]++;
-    return { name, self: !!self, total: hits.length, signals, latest: hits[0] ? ref(hits[0]) : undefined };
+    return { name, self: !!self, total: hits.length, signals, latest: hits[0] ? ref(hits[0]) : undefined, articles: hits.slice(0, 30).map(ref) };
   });
 
   /* CL사업부 우선 검토 보드: 연관도 열 × 모멘텀 순 */
@@ -313,13 +322,19 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
   if (self) {
     const mine = last.filter((p) => p.names.has(self.name)).length;
     const peerMax = PEERS.filter((p) => !p.self).map((p) => ({ n: p.name, c: last.filter((q) => q.names.has(p.name)).length })).sort((a, b) => b.c - a.c)[0];
-    if (peerMax && peerMax.c > 0) highlights.push(`동종사 중 최근 30일 기사가 가장 많은 곳은 ${peerMax.n}(${peerMax.c}건)이며, ${self.name} 관련 기사는 ${mine}건입니다.`);
+    if (peerMax && peerMax.c > 0) highlights.push(`동종업계 중 최근 30일 기사가 가장 많은 곳은 ${peerMax.n}(${peerMax.c}건)이며, ${self.name} 관련 기사는 ${mine}건입니다.`);
   }
-  const feed = (["adopt", "pilot", "invest", "launch", "doubt"] as StageKey[]).map((signal) => ({
-    signal,
-    items: last.filter((p) => p.signals.includes(signal)).slice(0, 6).map((p) => ({ ...ref(p), techs: techNames.filter((n) => p.names.has(n)) })),
-  }));
-  const nowData: NowData = { kpis, highlights, feed };
+  const byPrimary = new Map<StageKey | "none", Prepared[]>();
+  for (const p of inWin) {
+    const k = primarySignal(p.signals);
+    byPrimary.set(k, [...(byPrimary.get(k) ?? []), p]);
+  }
+  const mix = ([...PRIMARY_ORDER, "none"] as (StageKey | "none")[]).map((key) => ({ key, count: byPrimary.get(key)?.length ?? 0 }));
+  const feed = (["adopt", "pilot", "invest", "launch", "doubt"] as StageKey[]).map((signal) => {
+    const ps = byPrimary.get(signal) ?? [];
+    return { signal, count: ps.length, items: ps.slice(0, 8).map((p) => ({ ...ref(p), techs: techNames.filter((n) => p.names.has(n)) })) };
+  });
+  const nowData: NowData = { kpis, highlights, mix, feed };
 
   const dates = all.map((p) => p.a.publishedAt).sort();
   return {

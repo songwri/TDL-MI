@@ -34,6 +34,13 @@ export function rowToVendor(r: string[]): Partial<Vendor> & { name: string } {
   const c = at("확인 상태") as Confidence;
   if (CONF.includes(c)) out.confidence = c;
   set("checkedAt", at("확인일"));
+  if (at("매출")) out.revenue = { value: at("매출"), year: at("매출 연도"), basis: at("매출 근거") };
+  const refs = at("레퍼런스(고객|국가|내용|연도|URL ;)")
+    .split(";")
+    .map((x) => x.split("|").map((f) => f.trim()))
+    .filter((f) => f[0])
+    .map(([customer, country, detail, year, url]) => ({ customer, country: country ? country.toUpperCase() : undefined, detail: detail ?? "", year: year || undefined, url: url || undefined }));
+  if (refs.length) out.references = refs;
   return out;
 }
 
@@ -45,7 +52,7 @@ export function mergeVendors(base: Vendor[], rows: string[][]): (Vendor & { from
     const key = p.name.toLowerCase();
     const prev = byName.get(key);
     // 대소문자만 다른 회사명은 같은 회사로 보고 기본 표기를 유지
-    if (prev) byName.set(key, { ...prev, ...p, name: prev.name, sources: [...(prev.sources ?? []), ...(p.sources ?? [])], fromSheet: true });
+    if (prev) byName.set(key, { ...prev, ...p, name: prev.name, sources: [...(prev.sources ?? []), ...(p.sources ?? [])], references: [...(prev.references ?? []), ...(p.references ?? [])], fromSheet: true });
     else if (p.country) byName.set(key, { segments: [], solutions: [], sources: [], confidence: "입력 필요", checkedAt: "", ...p, country: p.country, fromSheet: true });
   }
   return [...byName.values()];

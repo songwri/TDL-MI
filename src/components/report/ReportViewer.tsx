@@ -133,7 +133,7 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
       </header>
 
       {/* 목차 + 필터: 아래 모든 내용이 이 줄의 선택에 맞춰 바뀜 */}
-      <div className="sticky top-[53px] z-20 -mx-1 border-y border-[var(--rv-line)] bg-white/95 px-1 py-2 backdrop-blur">
+      <div className="sticky top-[var(--header-total,60px)] z-20 -mx-1 border-y border-[var(--rv-line)] bg-white/95 px-1 py-2 backdrop-blur">
         <nav aria-label="목차" className="flex gap-1 overflow-x-auto text-sm">
           {NAV.map((n) => (
             <a key={n.id} href={`#${n.id}`} aria-current={current === n.id ? "true" : undefined} className={`whitespace-nowrap rounded px-2.5 py-1 ${current === n.id ? "bg-[var(--rv-ink)] font-bold text-white" : "text-[var(--rv-soft)] hover:bg-[#f1f0ec]"}`}>
