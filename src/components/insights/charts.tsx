@@ -93,6 +93,21 @@ function layoutPoints(points: HypePoint[], curve: (x: number) => number) {
 export function HypeMap({ points, curve, selected, onSelect, tip }: { points: HypePoint[]; curve: (x: number) => number; selected?: string; onSelect: (name: string) => void; tip: TipApi }) {
   const path = useMemo(() => Array.from({ length: 101 }, (_, i) => `${i ? "L" : "M"}${px(i / 100).toFixed(1)} ${py(curve(i / 100)).toFixed(1)}`).join(" "), [curve]);
   const placed = useMemo(() => layoutPoints(points, curve), [points, curve]);
+  /** 단계 이름(바탕 글씨) 높이: 곡선·점·이름표와 겹치지 않는 자리 (위 → 가운데 → 아래 순서로 찾음) */
+  const stageMarkY = useMemo(
+    () =>
+      CURVE_STAGES.map((st) => {
+        const xa = px(st.from) + 8, xb = px(st.to) - 8;
+        const curveYs = Array.from({ length: 24 }, (_, k) => py(curve(st.from + ((st.to - st.from) * k) / 23)));
+        const free = (y: number) => {
+          const top = y - 22, bottom = y + 6;
+          if (curveYs.some((cy) => cy > top - 6 && cy < bottom + 6)) return false;
+          return !placed.some((d) => d.cx + d.r > xa && d.cx - d.r < xb && d.cy + d.r + 20 > top && d.cy - d.r - 22 < bottom);
+        };
+        return [T + 34, T + 70, T + PH * 0.45, T + PH * 0.62, T + PH - 10].find(free) ?? T + PH - 10;
+      }),
+    [curve, placed],
+  );
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`기술 성숙도 맵: ${points.map((p) => `${p.name} ${p.stage}`).join(", ")}`}>
@@ -118,7 +133,7 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
         <g key={s.label}>
           {i % 2 === 1 && <rect x={px(s.from)} y={T} width={px(s.to) - px(s.from)} height={PH} fill="#1c1a19" fillOpacity="0.025" />}
           {i > 0 && <line x1={px(s.from)} x2={px(s.from)} y1={T} y2={T + PH} stroke="#e1e0d9" strokeDasharray="3 4" />}
-          <text aria-hidden x={px((s.from + s.to) / 2)} y={T + 34} textAnchor="middle" fontSize="24" fontWeight="800" fill="#1c1a19" fillOpacity="0.07" pointerEvents="none">{s.label}</text>
+          <text aria-hidden x={px((s.from + s.to) / 2)} y={stageMarkY[i]} textAnchor="middle" fontSize="24" fontWeight="800" fill="#1c1a19" fillOpacity="0.09" pointerEvents="none">{s.label}</text>
           <text x={px((s.from + s.to) / 2)} y={T + PH + 24} textAnchor="middle" fontSize="13" fontWeight="700" fill="#5c5755">{s.label}</text>
         </g>
       ))}

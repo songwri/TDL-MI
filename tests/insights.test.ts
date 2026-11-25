@@ -165,3 +165,11 @@ describe("최근 근황 원그래프: 기사마다 대표 신호 하나", () => 
     expect(r.peers.find((p) => p.name === "한진")!.articles.map((a) => a.title)).toEqual(["한진 로봇 시범", "한진 자동화 센터 구축"]);
   });
 });
+
+describe("외부 리포트: 수집 기사 속 기관 언급", () => {
+  it("Gartner·DHL·McKinsey 언급 기사를 따로 모음 (한글 표기 포함)", () => {
+    const r = computeInsights([art("가트너, 공급망 기술 하이프 사이클 발표", 2), art("DHL expands robotics", 3), art("맥킨지 공급망 설문", 4), art("AMR 도입", 5)], { now: NOW });
+    expect(Object.fromEntries(r.external.map((e) => [e.id, e.count]))).toEqual({ gartner: 1, dhl: 1, mckinsey: 1 });
+    expect(r.external.find((e) => e.id === "dhl")!.articles[0].title).toBe("DHL expands robotics");
+  });
+});

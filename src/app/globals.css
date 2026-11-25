@@ -98,3 +98,6 @@ h1, h2, h3 { text-wrap: balance; }
 /* 버블 맵: 마우스를 올린 원을 앞으로 + 테두리 강조 */
 .pf-node:hover .pf-dot, .pf-node:focus-visible .pf-dot { stroke: var(--ink); stroke-width: 2.5px; }
 .peer-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* 지도: 나라를 눌러도 네모 테두리 없이, 키보드 이동 때만 굵은 외곽선 */
+.wm-country:focus-visible { stroke: var(--ink); stroke-width: 2px; }

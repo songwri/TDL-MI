@@ -1,4 +1,4 @@
-import { CL_RELEVANCE, CURVE_STAGES, PEERS, STAGE_SIGNALS, TRACKED_TECH, type StageKey } from "@/config/insights";
+import { CL_RELEVANCE, CURVE_STAGES, EXTERNAL_SOURCES, PEERS, STAGE_SIGNALS, TRACKED_TECH, type StageKey } from "@/config/insights";
 import { extractKeywords } from "@/lib/mi/matcher";
 import { CATEGORIES, type Article, type Category } from "@/lib/types";
 
@@ -77,6 +77,8 @@ export interface InsightsData {
   board: BoardColumn[];
   portfolio: PortfolioData;
   now: NowData;
+  /** 외부 기관(Gartner·DHL·McKinsey)을 언급한 수집 기사 (분석 기간, 최신순 최대 20건) */
+  external: { id: string; count: number; articles: ArticleRef[] }[];
 }
 
 /** 기간 하나의 위치: 관심도(추적 기술 언급 중 점유율) · 성숙도(도입·실증 신호 비중 지수) */
@@ -352,5 +354,9 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
     board,
     portfolio,
     now: nowData,
+    external: EXTERNAL_SOURCES.map(({ id, match }) => {
+      const hits = inWin.filter((p) => match.test(`${p.a.title} ${p.a.titleKo ?? ""} ${p.a.summary}`));
+      return { id, count: hits.length, articles: hits.slice(0, 20).map(ref) };
+    }),
   };
 }

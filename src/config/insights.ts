@@ -82,11 +82,116 @@ export const FRED_SERIES = [
   { id: "PCU481112481112", name: "항공화물 운임 물가", note: "미국 생산자물가 · 항공 운임 흐름", unit: "지수" },
 ] as const;
 
-/** 외부 리포트 바로가기 (수치는 옮기지 않고 링크만. 주소는 팀이 고칠 수 있음) */
-export const EXTERNAL_REPORTS = [
-  { name: "Gartner Hype Cycle (Supply Chain)", by: "Gartner", what: "공급망 기술의 기대·성숙 단계. 이 페이지의 기술 성숙도 맵과 비교해 보기", href: "https://www.gartner.com/en/supply-chain" },
-  { name: "Logistics Trend Radar", by: "DHL", what: "물류 트렌드 40여 개의 영향도·도입 시점 지도", href: "https://www.dhl.com/global-en/home/insights-and-innovation/insights/logistics-trend-radar.html" },
-  { name: "Operations · Supply Chain Insights", by: "McKinsey", what: "디지털 물류 설문·공급망 리서치 모음", href: "https://www.mckinsey.com/capabilities/operations/our-insights" },
-  { name: "MHI Annual Industry Report", by: "MHI", what: "물류 자동화 도입률·투자 의향 연례 설문", href: "https://www.mhi.org/publications/report" },
-  { name: "KCCI 한국형 컨테이너 운임지수", by: "한국해양진흥공사", what: "부산발 컨테이너 운임 주간 지수", href: "https://www.kobc.or.kr" },
-] as const;
+/**
+ * 외부 리포트 (사이드바 '외부 리포트'). 유료·로그인 본문은 가져올 수 없어서
+ *   1) 공개된 최신 발표의 핵심 사실(날짜·출처 링크 포함, 수치는 발표에 적힌 그대로)
+ *   2) Gartner 는 공개 발표의 기술 단계 ↔ 우리 기사 기준 단계 비교
+ *   3) 우리 수집 기사 중 해당 기관을 언급한 기사 (자동, 매일 갱신)
+ * 을 보여 준다. 새 발표가 나오면 facts 를 고친다 (checkedAt 갱신).
+ */
+export interface ExternalSource {
+  id: "gartner" | "dhl" | "mckinsey";
+  name: string;
+  by: string;
+  href: string;
+  /** 수집 기사에서 이 기관 언급을 찾는 표현 */
+  match: RegExp;
+  checkedAt: string;
+  facts: { date: string; title: string; points: string[]; url: string }[];
+  /** 공개 발표에 나온 기술 단계 (우리 추적 기술 이름과 연결) */
+  compare?: { tech: string; theirs: string; note: string; url: string }[];
+  note?: string;
+}
+
+const G_ROBOTS_2024 = "https://www.gartner.com/en/newsroom/press-releases/2024-11-12-gartner-hype-cycle-reveals-rising-adoption-and-fast-growing-market-for-advanced-mobile-robots-for-supply-chains";
+
+export const EXTERNAL_SOURCES: ExternalSource[] = [
+  {
+    id: "gartner",
+    name: "Gartner Hype Cycle",
+    by: "Gartner",
+    href: "https://www.gartner.com/en/supply-chain",
+    match: /gartner|가트너/i,
+    checkedAt: "2026-11-25",
+    note: "Hype Cycle 본문은 Gartner 고객 전용이라, 공개 보도자료에 나온 내용만 옮겼습니다.",
+    facts: [
+      {
+        date: "2025-11-12",
+        title: "공급망 계획 기술 하이프 사이클 2025",
+        points: ["자율 계획(Autonomous planning)이 '기대 정점'을 지나, 공급망 계획에서 가장 영향력 큰 흐름 중 하나로 부상"],
+        url: "https://www.gartner.com/en/newsroom/press-releases/2025-11-12-gartner-says-autonomous-planning-has-passed-the-peak-of-inflated-expectations-on-supply-chain-planning-technology-hype-cycle",
+      },
+      {
+        date: "2025-09-29",
+        title: "공급망 전략 하이프 사이클 2025",
+        points: ["공급망 사이버보안이 '기대 정점'에 위치"],
+        url: "https://www.gartner.com/en/newsroom/press-releases/2025-09-29-gartner-says-supply-chain-cybersecurity-is-at-peak-of-inflated-expectations",
+      },
+      {
+        date: "2025-07-24",
+        title: "Hype Cycle for Supply Chain Execution and Logistics Technologies, 2025",
+        points: ["물류·실행 기술의 성숙도·위험도를 다룬 최신판 발행 (기술별 위치는 고객 전용)"],
+        url: "https://www.gartner.com/en/supply-chain",
+      },
+      {
+        date: "2024-11-12",
+        title: "공급망용 모바일 로봇·드론 하이프 사이클 2024",
+        points: [
+          "운반용 AMR, 통로 내 피킹 로봇, 이동형 Goods-to-Person 이 '계몽 단계(Slope of Enlightenment)'로 이동 중",
+          "휴머노이드 로봇이 처음으로 '기술 태동(Innovation Trigger)'에 진입, 주류 도입까지 10년 이상 전망",
+        ],
+        url: G_ROBOTS_2024,
+      },
+    ],
+    compare: [
+      { tech: "AMR", theirs: "계몽 단계로 이동 중", note: "운반용 AMR (2024)", url: G_ROBOTS_2024 },
+      { tech: "Goods-to-Person", theirs: "계몽 단계로 이동 중", note: "이동형 G2P (2024)", url: G_ROBOTS_2024 },
+      { tech: "피스피킹", theirs: "계몽 단계로 이동 중", note: "통로 내 피킹 로봇 (2024)", url: G_ROBOTS_2024 },
+      { tech: "휴머노이드", theirs: "기술 태동", note: "주류 도입 10년 이상 (2024)", url: G_ROBOTS_2024 },
+    ],
+  },
+  {
+    id: "dhl",
+    name: "DHL Logistics Trend Radar",
+    by: "DHL",
+    href: "https://www.dhl.com/logistics-trend-radar",
+    match: /\bdhl\b/i,
+    checkedAt: "2026-11-25",
+    note: "약 2년마다 새 판이 나옵니다. 트렌드 40개 전체와 영향도·도입 시점은 DHL 사이트의 대화형 레이더에서 볼 수 있습니다.",
+    facts: [
+      {
+        date: "2024",
+        title: "Logistics Trend Radar 7.0",
+        points: [
+          "트렌드 40개 (사회·비즈니스 17, 기술 23), 각 트렌드에 영향도(높음·낮음)와 도입 예상 시점 표시",
+          "AI 신흥 트렌드 5개: Generative AI, AI Ethics, Audio AI, Computer Vision, Advanced Analytics",
+          "지속가능성 중점: Renewable Energy Infrastructure, Sustainable Fuels",
+          "로보틱스·IoT·디지털 백본 묶음이 계속 물류에 큰 영향, 사회·비즈니스 쪽은 E-commerce Evolution 등",
+        ],
+        url: "https://aircargoweek.com/dhl-logistics-trend-radar-7-0-unveils-emerging-ai-trends-and-sustainable-solutions",
+      },
+    ],
+  },
+  {
+    id: "mckinsey",
+    name: "McKinsey Operations · Supply Chain Insights",
+    by: "McKinsey",
+    href: "https://www.mckinsey.com/capabilities/operations/our-insights",
+    match: /mckinsey|맥킨지/i,
+    checkedAt: "2026-11-25",
+    facts: [
+      {
+        date: "2025",
+        title: "Supply chain risk pulse 2025 (공급망 리더 약 100명 설문)",
+        points: [
+          "관세가 최대 관심사, 대응은 재고 이동·공급사 협상·니어쇼어링 같은 단기 조치 위주",
+          "관세 비용의 고객 전가 비율 가중 평균 45%, 응답자 43%가 3년 안에 미국 내 생산 비중 확대 계획",
+          "대부분 1차 협력사까지만 리스크 파악, 2차 협력사 매핑 58% (그중 절반 미만만 정기 접촉)",
+          "리스크 대비 재고 버퍼는 3년째 축소 (현금 흐름 압박)",
+          "생성형 AI 활용 상위: 수요 예측, 재고 최적화, 공급 계획",
+        ],
+        url: "https://www.mckinsey.com/capabilities/operations/our-insights/supply-chain-risk-survey",
+      },
+    ],
+  },
+];

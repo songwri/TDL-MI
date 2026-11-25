@@ -104,6 +104,41 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
     { x: L + PW - 10, y: T + PH - 26, anchor: "end" as const, t: "안정 · 운영 최적화", s: "도입은 보편, 화제성은 낮음" },
   ];
 
+  /**
+   * 사분면 바탕 글씨 자리: 각 사분면 안 9곳 중 원·이름표와 가장 덜 겹치는 곳 (같으면 가운데 우선).
+   * 원에 가려 안 보이는 일이 없게 한다.
+   */
+  const watermarks = useMemo(() => {
+    const quads = [
+      { x0: L, x1: mx, y0: T, y1: my, q: Q[0] },
+      { x0: mx, x1: L + PW, y0: T, y1: my, q: Q[1] },
+      { x0: L, x1: mx, y0: my, y1: T + PH, q: Q[2] },
+      { x0: mx, x1: L + PW, y0: my, y1: T + PH, q: Q[3] },
+    ];
+    const obstacles: Box[] = placed.flatMap((d) => [
+      { x0: d.cx - d.r - 4, y0: d.cy - d.r - 4, x1: d.cx + d.r + 4, y1: d.cy + d.r + 4 },
+      ...(d.label ? [{ x0: d.label.anchor === "end" ? d.label.x - textW(d.p.name) : d.label.anchor === "middle" ? d.label.x - textW(d.p.name) / 2 : d.label.x, y0: d.label.y - 13, x1: d.label.anchor === "end" ? d.label.x : d.label.anchor === "middle" ? d.label.x + textW(d.p.name) / 2 : d.label.x + textW(d.p.name), y1: d.label.y + 4 }] : []),
+    ]);
+    const overlap = (a: Box, b: Box) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+    return quads.map(({ x0, x1, y0, y1, q }) => {
+      const size = Math.min(30, Math.max(16, (x1 - x0) / 11));
+      const w = Math.max([...q.t].length * size * 0.92, [...q.s].length * 13 * 0.9);
+      const h = size + 22;
+      let best = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 + size / 3, score: Infinity };
+      for (const fy of [0.5, 0.3, 0.72, 0.18, 0.86])
+        for (const fx of [0.5, 0.3, 0.7]) {
+          const x = x0 + (x1 - x0) * fx;
+          const y = y0 + (y1 - y0) * fy + size / 3;
+          const box = { x0: x - w / 2, x1: x + w / 2, y0: y - size, y1: y - size + h };
+          if (box.x0 < x0 + 4 || box.x1 > x1 - 4 || box.y0 < y0 + 4 || box.y1 > y1 - 4) continue;
+          const score = obstacles.reduce((n, o) => n + overlap(box, o), 0);
+          if (score < best.score - 1) best = { x, y, score };
+        }
+      return { x: best.x, y: best.y, size, q };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placed, mx, my]);
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`기술 포지션 맵: ${pts.map((p) => `${p.name} 성숙도 ${pp(p.recent.maturity!)} 관심도 ${pp(p.recent.share)}`).join(", ")}`}>
       <defs>
@@ -133,19 +168,12 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
       {/* 사분면: 배경 면 + 큰 워터마크 글씨 (설명이 바탕에 깔린 느낌) */}
       <rect x={L} y={T} width={PW} height={PH} fill="url(#pf-floor)" />
       <rect x={mx} y={T} width={L + PW - mx} height={my - T} fill="#A72B2B" fillOpacity="0.035" />
-      {(
-        [
-          { cx: (L + mx) / 2, cy: (T + my) / 2, q: Q[0] },
-          { cx: (mx + L + PW) / 2, cy: (T + my) / 2, q: Q[1] },
-          { cx: (L + mx) / 2, cy: (my + T + PH) / 2, q: Q[2] },
-          { cx: (mx + L + PW) / 2, cy: (my + T + PH) / 2, q: Q[3] },
-        ] as const
-      ).map(({ cx, cy, q }) => (
+      {watermarks.map(({ x: wx, y: wy, size, q }) => (
         <g key={q.t} aria-hidden pointerEvents="none">
-          <text x={cx} y={cy} textAnchor="middle" fontSize={Math.min(34, Math.max(18, (mx - L) / 9))} fontWeight="800" fill="#1c1a19" fillOpacity="0.06" style={{ letterSpacing: "-0.5px" }}>
+          <text x={wx} y={wy} textAnchor="middle" fontSize={size} fontWeight="800" fill="#1c1a19" fillOpacity="0.08" style={{ letterSpacing: "-0.5px" }}>
             {q.t}
           </text>
-          <text x={cx} y={cy + 24} textAnchor="middle" fontSize="13" fill="#1c1a19" fillOpacity="0.16">{q.s}</text>
+          <text x={wx} y={wy + size * 0.75} textAnchor="middle" fontSize="13" fill="#1c1a19" fillOpacity="0.28">{q.s}</text>
         </g>
       ))}
       <line x1={mx} x2={mx} y1={T} y2={T + PH} stroke="#c9c7c0" strokeDasharray="4 4" />

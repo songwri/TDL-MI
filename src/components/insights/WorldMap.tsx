@@ -14,21 +14,19 @@ type Country = Feature<Geometry, { name: string }> & { id?: string | number };
 
 const W = 960, H = 480;
 const topo = world as unknown as Topology<{ countries: GeometryCollection<{ name: string }> }>;
-const COUNTRIES = (feature(topo, topo.objects.countries) as FeatureCollection<Geometry, { name: string }>).features.filter((f) => String((f as Country).id) !== "010") as Country[];
+/**
+ * 국가 도형. 남극 제외. 프랑스 도형에 들어 있는 해외 영토(남미의 프랑스령 기아나)는 본토와 헷갈리므로 뺀다.
+ */
+const COUNTRIES = (feature(topo, topo.objects.countries) as FeatureCollection<Geometry, { name: string }>).features
+  .filter((f) => String((f as Country).id) !== "010")
+  .map((f) => {
+    if (String((f as Country).id) !== "250" || f.geometry.type !== "MultiPolygon") return f;
+    const coordinates = f.geometry.coordinates.filter((poly) => poly[0][0][0] > -30);
+    return { ...f, geometry: { ...f.geometry, coordinates } };
+  }) as Country[];
 const projection = geoNaturalEarth1().fitExtent([[4, 4], [W - 4, H - 4]], { type: "FeatureCollection", features: COUNTRIES } as FeatureCollection);
 const path = geoPath(projection);
 const PATHS = COUNTRIES.map((c) => ({ id: String(c.id), name: c.properties.name, d: path(c) ?? "" }));
-
-/** 같은 좌표의 점은 한 번만 (본사 표시가 우선) */
-function dedupe<T extends { p: [number, number]; hq: boolean }>(pts: T[]): T[] {
-  const m = new Map<string, T>();
-  for (const x of pts) {
-    const k = x.p.join();
-    const prev = m.get(k);
-    if (!prev || (x.hq && !prev.hq)) m.set(k, x);
-  }
-  return [...m.values()];
-}
 
 /** 회사 수 → 파랑 한 가지 색 (많을수록 진함). 0 은 바탕 회색 */
 const fill = (n: number, max: number) => (n <= 0 ? "#ecebe6" : RAMP[Math.min(RAMP.length - 1, 1 + Math.floor(((n - 1) / Math.max(max - 1, 1)) * (RAMP.length - 2)))]);
@@ -40,10 +38,7 @@ export function WorldMap({
   selected,
   onSelect,
   tip,
-  routes = [],
 }: {
-  /** 본사 → 공급·적용 국가 경로선 ([경도, 위도] 쌍). 지구 곡면을 따르는 선으로 그린다 */
-  routes?: { key: string; from: [number, number]; to: [number, number]; label: string }[];
   /** world-atlas 국가 번호 → 회사 수 */
   counts: Map<string, number>;
   /** 국가 번호 → 툴팁에 보여 줄 회사 이름들 */
@@ -76,7 +71,7 @@ export function WorldMap({
               fill={fill(n, max)}
               stroke={sel ? "#232021" : "#fff"}
               strokeWidth={sel ? 1.6 : 0.6}
-              className={n ? "cursor-pointer" : ""}
+              className={`outline-none ${n ? "wm-country cursor-pointer" : ""}`}
               tabIndex={n ? 0 : -1}
               role={n ? "button" : undefined}
               aria-label={n ? `${c.name} ${n}개사` : undefined}
@@ -92,42 +87,6 @@ export function WorldMap({
             />
           );
         })}
-        {/* 경로선: 본사 → 공급·적용 국가 (브랜드 레드 한 가지) */}
-        <g pointerEvents="none">
-          {routes.map((r, i) => (
-            <path
-              key={r.key}
-              d={path({ type: "LineString", coordinates: [r.from, r.to] }) ?? ""}
-              pathLength={1}
-              fill="none"
-              stroke="#A72B2B"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              opacity="0.75"
-              className="draw-in"
-              style={{ animationDelay: `${Math.min(i, 20) * 40}ms` }}
-            />
-          ))}
-        </g>
-        {routes.length > 0 && (
-          <g>
-            {dedupe(routes.flatMap((r) => [{ p: r.from, hq: true, label: r.label.split(" → ")[0] }, { p: r.to, hq: false, label: r.label.split(" → ")[1] }])).map((pt) => {
-              const [x, y] = projection(pt.p) ?? [0, 0];
-              return pt.hq ? (
-                <circle key={`h${pt.p}`} cx={x} cy={y} r={4} fill="#1c1a19" stroke="#fff" strokeWidth="1.5" className="pop-in"><title>{pt.label} (본사)</title></circle>
-              ) : (
-                <g key={`m${pt.p}`} transform={`translate(${x} ${y})`}>
-                  {/* 애니메이션은 안쪽 묶음에만 (바깥 translate 를 덮어쓰지 않도록) */}
-                  <g className="pop-in">
-                    <path d="M0 0 C -6 -8 -9 -12 -9 -16 A 9 9 0 1 1 9 -16 C 9 -12 6 -8 0 0 Z" fill="#A72B2B" stroke="#fff" strokeWidth="1.5" />
-                    <circle cy={-16} r={3} fill="#fff" />
-                  </g>
-                  <title>{pt.label}</title>
-                </g>
-              );
-            })}
-          </g>
-        )}
       </svg>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-[var(--rv-soft)]">
         <span>{label}</span>

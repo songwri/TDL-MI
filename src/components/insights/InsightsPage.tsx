@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EXTERNAL_REPORTS } from "@/config/insights";
+import { EXTERNAL_SOURCES, type ExternalSource } from "@/config/insights";
 import { COUNTRIES, SEGMENTS, type Segment, type Vendor } from "@/config/vendors";
 import { curveY, type InsightsData } from "@/lib/insights/compute";
 import type { Indicator } from "@/lib/indicators";
@@ -19,7 +19,7 @@ interface Payload {
   vendors: { vendors: V[]; sheetRows: number; warning?: string };
 }
 
-type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method";
+type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method" | "ext-gartner" | "ext-dhl" | "ext-mckinsey";
 const VIEWS: { group: string; items: { id: ViewId; label: string }[] }[] = [
   { group: "기술 동향", items: [
     { id: "now", label: "최근 근황" },
@@ -35,6 +35,11 @@ const VIEWS: { group: string; items: { id: ViewId; label: string }[] }[] = [
     { id: "flow", label: "키워드·주간 흐름" },
     { id: "market", label: "물동량·운임 지표" },
     { id: "method", label: "방법론·데이터 출처" },
+  ] },
+  { group: "외부 리포트", items: [
+    { id: "ext-gartner", label: "Gartner Hype Cycle" },
+    { id: "ext-dhl", label: "DHL Trend Radar" },
+    { id: "ext-mckinsey", label: "McKinsey Supply Chain Insights" },
   ] },
 ];
 const ALL_IDS = VIEWS.flatMap((g) => g.items.map((i) => i.id));
@@ -198,6 +203,7 @@ export function InsightsPage() {
             {view === "flow" && <FlowView d={data.insights} tip={tip} />}
             {view === "market" && <MarketView indicators={data.indicators} tip={tip} />}
             {view === "method" && <MethodView d={data.insights} vendors={data.vendors} />}
+            {view.startsWith("ext-") && <ExternalView id={view.slice(4) as ExternalSource["id"]} d={data.insights} />}
             <p className="mt-8 text-[11px] text-[var(--rv-mute)]">{current.label} · 분석 기간 최근 {days}일 · 숫자는 수집 기사를 코드가 센 결과입니다(모델이 만든 수치 없음).</p>
           </div>
         )}
@@ -512,23 +518,6 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
     return { counts, names };
   }, [list, mode]);
   const iso2Sel = sel ? Object.entries(COUNTRIES).find(([, c]) => c.id === sel)?.[0] : undefined;
-  // 경로선: 공급·적용 사례 보기에서는 모두, 본사 보기에서는 고른 나라 회사들의 공급선만
-  const routes = useMemo(() => {
-    if (mode === "hq" && !iso2Sel) return [];
-    const out: { key: string; from: [number, number]; to: [number, number]; label: string }[] = [];
-    for (const v of list) {
-      const from = COUNTRIES[v.country]?.ll;
-      if (!from) continue;
-      const targets = mode === "ref" ? (v.references ?? []).map((r) => r.country ?? "") : v.markets ?? [];
-      for (const t of new Set(targets)) {
-        const to = COUNTRIES[t]?.ll;
-        if (!to || t === v.country) continue;
-        if (iso2Sel && v.country !== iso2Sel && t !== iso2Sel) continue;
-        out.push({ key: `${v.name}-${t}`, from, to, label: `${ko(v.country)} ${v.name} → ${ko(t)}` });
-      }
-    }
-    return out;
-  }, [list, mode, iso2Sel]);
   const inCountry = (v: V) => (mode === "hq" ? v.country === iso2Sel : mode === "market" ? !!v.markets?.includes(iso2Sel!) : !!v.references?.some((r) => r.country === iso2Sel));
   const shown = iso2Sel ? list.filter(inCountry) : list;
   const byHq = [...new Set(list.map((v) => v.country))].map((c) => ({ c, n: list.filter((v) => v.country === c).length })).sort((a, b) => b.n - a.n);
@@ -548,8 +537,7 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
         ))}
       </div>
       <Card>
-        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : mode === "market" ? "공급 실적 확인 회사 수" : "적용 사례가 있는 회사 수"} selected={sel} onSelect={setSel} tip={tip} routes={routes} />
-        {routes.length > 0 && <p className="mt-2 text-xs text-[var(--rv-soft)]"><span aria-hidden className="mr-1 inline-block h-[2px] w-5 translate-y-[-3px] bg-[#A72B2B]" />본사 → {mode === "ref" ? "적용 사례" : "공급 확인"} 국가 {routes.length}개 경로 · 검은 점 = 본사, 빨간 핀 = 공급·적용 국가{mode === "hq" ? " (고른 나라 회사)" : ""}</p>}
+        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : mode === "market" ? "공급 실적 확인 회사 수" : "적용 사례가 있는 회사 수"} selected={sel} onSelect={setSel} tip={tip} />
         {mode === "market" && <p className="mt-2 text-xs text-[var(--rv-mute)]">공급 국가는 출처로 확인된 것만 표시합니다. 비어 있는 회사가 많으니 시트 Vendors 탭의 &lsquo;공급국가&rsquo; 칸을 채워 주세요.</p>}
         <p className="mt-2 text-xs text-[var(--rv-soft)]">본사 국가별: {byHq.map((x) => `${ko(x.c)} ${x.n}`).join(" · ")}</p>
       </Card>
@@ -766,18 +754,83 @@ function MarketView({ indicators, tip }: { indicators: Indicator[]; tip: TipApi 
     <>
       <Head title="물동량·운임 지표" lead="미국 연준(FRED) 무료 공개 데이터입니다. 매일 수집 때 갱신되며, 월간 지표라 한두 달 늦게 반영됩니다." />
       <div className="grid gap-3 sm:grid-cols-2">{indicators.map((ind) => <IndicatorCard key={ind.id} ind={ind} tip={tip} />)}</div>
-      <h3 className="mb-2 mt-6 font-bold">함께 볼 외부 리포트 <span className="text-xs font-normal text-[var(--rv-mute)]">수치는 옮기지 않고 링크만</span></h3>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {EXTERNAL_REPORTS.map((r) => (
-          <li key={r.name}>
-            <a href={r.href} target="_blank" rel="noreferrer" className="block h-full rounded-md border border-[var(--rv-line)] bg-white p-3 hover:border-[var(--rv-ink)]">
-              <p className="text-[11px] font-bold text-[var(--rv-soft)]">{r.by}</p>
-              <p className="font-bold leading-snug">{r.name} ↗</p>
-              <p className="mt-1 text-xs text-[var(--rv-soft)]">{r.what}</p>
-            </a>
-          </li>
-        ))}
-      </ul>
+    </>
+  );
+}
+
+/* ── 외부 리포트 (Gartner · DHL · McKinsey) ───────────────────────────── */
+
+function ExternalView({ id, d }: { id: ExternalSource["id"]; d: InsightsData }) {
+  const src = EXTERNAL_SOURCES.find((x) => x.id === id)!;
+  const mentions = d.external.find((x) => x.id === id);
+  const ours = (tech: string) => d.hype.find((h) => h.name === tech);
+  return (
+    <>
+      <Head
+        title={src.name}
+        lead={<>공개된 최신 발표의 핵심과, 우리 수집 기사 속 {src.by} 언급을 함께 봅니다. 발표 내용 확인일 {src.checkedAt.replaceAll("-", ".")}.</>}
+        right={<a href={src.href} target="_blank" rel="noreferrer" className="rounded-md border border-[var(--rv-line)] bg-white px-3 py-1.5 text-xs font-bold hover:border-[var(--rv-ink)]">원문 사이트 ↗</a>}
+      />
+      {src.note && <p className="mb-4 rounded-md bg-[var(--wash)] px-3 py-2 text-xs text-[var(--rv-soft)]">{src.note}</p>}
+
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_1fr]">
+        <Card title="최신 공개 발표" desc="발표에 적힌 내용 그대로 옮겼습니다 (수치는 원문 기준)">
+          <ol className="relative space-y-4 border-l-2 border-[var(--rv-line)] pl-4">
+            {src.facts.map((f) => (
+              <li key={f.title} className="relative">
+                <span aria-hidden className="absolute -left-[23px] top-1.5 h-3 w-3 rounded-full border-2 border-white bg-[var(--rv-accent)]" />
+                <p className="font-display text-xs font-bold tabular-nums text-[var(--rv-accent)]">{f.date}</p>
+                <p className="font-bold leading-snug">{f.title}</p>
+                <ul className="mt-1 space-y-1 text-sm text-[var(--rv-soft)]">
+                  {f.points.map((p) => <li key={p} className="flex gap-2"><span aria-hidden className="text-[var(--rv-mute)]">▪</span>{p}</li>)}
+                </ul>
+                <a href={f.url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-[11px] underline decoration-[var(--rv-line)]">출처 ↗</a>
+              </li>
+            ))}
+          </ol>
+        </Card>
+
+        <div className="space-y-4">
+          {src.compare && (
+            <Card title={`${src.by} 발표 vs 우리 기사 기준`} desc="같은 기술을 두 기준으로 나란히 (우리 단계는 지금 분석 기간 기준)">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-[var(--rv-soft)]"><th className="pb-1">기술</th><th className="pb-1">{src.by}</th><th className="pb-1">우리 기사 기준</th></tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--rv-line)]">
+                  {src.compare.map((c) => {
+                    const o = ours(c.tech);
+                    return (
+                      <tr key={c.tech}>
+                        <td className="py-2 font-bold">{c.tech}</td>
+                        <td className="py-2"><a href={c.url} target="_blank" rel="noreferrer" className="underline decoration-[var(--rv-line)]">{c.theirs}</a><span className="block text-[11px] text-[var(--rv-mute)]">{c.note}</span></td>
+                        <td className="py-2">{o ? <><b>{o.stage}</b><span className="block text-[11px] text-[var(--rv-mute)]">기사 {o.count}건{o.confident ? "" : " · 신호 적음"}</span></> : <span className="text-[var(--rv-mute)]">기간 내 기사 없음</span>}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          )}
+          <Card title={`수집 기사 속 ${src.by} 언급`} desc="분석 기간, 매일 자동 갱신">
+            {!mentions || mentions.count === 0 ? (
+              <p className="text-sm text-[var(--rv-mute)]">분석 기간에 {src.by}를 언급한 수집 기사가 없습니다.</p>
+            ) : (
+              <>
+                <p className="mb-1 text-xs text-[var(--rv-soft)]"><b className="text-[var(--rv-ink)]">{mentions.count}건</b>{mentions.count > mentions.articles.length ? ` 중 최신 ${mentions.articles.length}건` : ""}</p>
+                <ul className="divide-y divide-[var(--rv-line)]">
+                  {mentions.articles.map((a) => (
+                    <li key={a.id} className="py-2 text-sm leading-snug">
+                      <a href={a.link} target="_blank" rel="noreferrer" className="font-medium underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
+                      <span className="block text-[11px] text-[var(--rv-mute)]">{a.source} · {day(a.publishedAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </Card>
+        </div>
+      </div>
     </>
   );
 }
