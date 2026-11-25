@@ -16,6 +16,8 @@ export interface ArticleRef {
   source: string;
   publishedAt: string;
   signals: StageKey[];
+  thumbnail?: string;
+  category?: Category;
 }
 
 export interface HypePoint {
@@ -188,6 +190,8 @@ const ref = (p: Prepared): ArticleRef => ({
   source: p.a.source,
   publishedAt: p.a.publishedAt,
   signals: p.signals,
+  thumbnail: p.a.thumbnail,
+  category: p.a.category,
 });
 
 export function computeInsights(articles: Article[], opts: { days?: number; now?: Date } = {}): InsightsData {

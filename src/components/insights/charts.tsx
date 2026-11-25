@@ -346,53 +346,73 @@ export function WeeklyBars({ weekly, tip }: { weekly: InsightsData["weekly"]; ti
  * 동종업계 레이더: 줄 = 기업, 칸 = 단계 신호별 기사 수.
  * 줄에 마우스를 올리면 테두리가 강조되고, 누르면 그 회사 기사 목록이 아래에 열린다.
  */
-export function PeerBoard({ peers, selected, onSelect, tip }: { peers: InsightsData["peers"]; selected?: string; onSelect: (name?: string) => void; tip: TipApi }) {
+export function PeerBoard({
+  peers,
+  selected,
+  signal,
+  onSelect,
+  tip,
+}: {
+  peers: InsightsData["peers"];
+  selected?: string;
+  /** 선택한 칸의 신호 (없으면 그 회사 전체 기사) */
+  signal?: StageKey;
+  onSelect: (name?: string, signal?: StageKey) => void;
+  tip: TipApi;
+}) {
   const max = Math.max(...peers.flatMap((p) => SIGNAL_ORDER.map((k) => p.signals[k])), 1);
   const cols = "grid-cols-[minmax(140px,1.4fr)_repeat(5,minmax(64px,1fr))_64px]";
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[640px]" role="table" aria-label="기업별 단계 신호 기사 수">
-        <div role="row" className={`grid ${cols} gap-[2px] px-1 pb-1 text-xs font-bold text-[var(--rv-soft)]`}>
-          <span role="columnheader" className="px-2">기업</span>
-          {SIGNAL_ORDER.map((k) => <span role="columnheader" key={k} className="text-center">{signalLabel(k)}</span>)}
-          <span role="columnheader" className="text-center">전체</span>
+      <div className="min-w-[640px]" role="group" aria-label="기업별 단계 신호 기사 수">
+        <div className={`grid ${cols} gap-[2px] px-1 pb-1 text-xs font-bold text-[var(--rv-soft)]`}>
+          <span className="px-2">기업</span>
+          {SIGNAL_ORDER.map((k) => <span key={k} className="text-center">{signalLabel(k)}</span>)}
+          <span className="text-center">전체</span>
         </div>
         <div className="space-y-1">
           {peers.map((p) => {
             const on = p.name === selected;
             return (
-              <button
+              <div
                 key={p.name}
-                type="button"
-                role="row"
-                aria-expanded={on}
-                onClick={() => onSelect(on ? undefined : p.name)}
-                className={`peer-row grid w-full ${cols} items-stretch gap-[2px] rounded-md border-2 p-[2px] text-left text-sm transition-[border-color,box-shadow] ${on ? "border-[var(--rv-ink)] shadow-[0_6px_18px_-12px_rgb(28_26_25/0.6)]" : "border-transparent hover:border-[var(--rv-ink)]"}`}
+                className={`peer-row grid w-full ${cols} items-stretch gap-[2px] rounded-md border-2 p-[2px] text-sm transition-[border-color,box-shadow] ${on ? "border-[var(--rv-ink)] shadow-[0_6px_18px_-12px_rgb(28_26_25/0.6)]" : "border-transparent hover:border-[var(--rv-ink)]"}`}
               >
-                <span role="cell" className={`flex items-center gap-1.5 rounded-[3px] px-2 py-1.5 ${p.self ? "bg-[var(--rv-tint)] font-bold" : ""}`}>
+                <button
+                  type="button"
+                  aria-expanded={on && !signal}
+                  title="이 회사 기사 전체 보기"
+                  onClick={() => onSelect(on && !signal ? undefined : p.name)}
+                  className={`flex items-center gap-1.5 rounded-[3px] px-2 py-1.5 text-left ${p.self ? "bg-[var(--rv-tint)] font-bold" : "hover:bg-[var(--wash)]"} ${on && !signal ? "ring-2 ring-inset ring-[var(--rv-ink)]" : ""}`}
+                >
                   {p.self && <span aria-hidden className="h-4 w-1 rounded-full bg-[var(--rv-accent)]" />}
                   {p.name}
                   {p.self && <span className="rounded bg-[var(--rv-accent)] px-1 py-px text-[10px] font-bold text-white">자사</span>}
                   <span aria-hidden className={`ml-auto text-[var(--rv-mute)] transition-transform ${on ? "rotate-180" : ""}`}>▾</span>
-                </span>
+                </button>
                 {SIGNAL_ORDER.map((k) => {
                   const v = p.signals[k];
                   const bg = rampColor(v, max);
+                  const cellOn = on && signal === k;
                   return (
-                    <span
-                      role="cell"
+                    <button
+                      type="button"
                       key={k}
-                      className="flex items-center justify-center rounded-[3px] text-xs font-bold tabular-nums"
+                      disabled={!v}
+                      aria-pressed={cellOn}
+                      aria-label={`${p.name} ${signalLabel(k)} ${v}건`}
+                      onClick={() => onSelect(cellOn ? undefined : p.name, cellOn ? undefined : k)}
+                      className={`flex items-center justify-center rounded-[3px] text-xs font-bold tabular-nums transition-transform enabled:cursor-pointer enabled:hover:scale-[1.04] ${cellOn ? "ring-[3px] ring-inset ring-[var(--rv-accent)]" : ""}`}
                       style={{ background: bg, color: v && (RAMP as readonly string[]).indexOf(bg) >= 3 ? "#fff" : "#232021" }}
-                      onPointerMove={(e) => tip.show(e, <TipRow value={`${v}건`} label={`${p.name} · ${signalLabel(k)}`} color={SIGNAL_COLOR[k]} />)}
+                      onPointerMove={(e) => tip.show(e, <><TipRow value={`${v}건`} label={`${p.name} · ${signalLabel(k)}`} color={SIGNAL_COLOR[k]} />{v > 0 && <p className="mt-1 text-[var(--rv-soft)]">누르면 이 칸의 기사만 봅니다</p>}</>)}
                       onPointerLeave={tip.hide}
                     >
                       {v || ""}
-                    </span>
+                    </button>
                   );
                 })}
-                <span role="cell" className="flex items-center justify-center text-xs font-bold tabular-nums text-[var(--rv-soft)]">{p.total}</span>
-              </button>
+                <span className="flex items-center justify-center text-xs font-bold tabular-nums text-[var(--rv-soft)]">{p.total}</span>
+              </div>
             );
           })}
         </div>
@@ -400,7 +420,7 @@ export function PeerBoard({ peers, selected, onSelect, tip }: { peers: InsightsD
           <span>적음</span>
           {RAMP.map((c) => <span key={c} aria-hidden className="inline-block h-2.5 w-4 rounded-[2px]" style={{ background: c }} />)}
           <span>많음</span>
-          <span className="ml-3">칸 = 그 기업이 언급된 기사 중 해당 신호가 있는 기사 수 · 줄을 누르면 기사 목록</span>
+          <span className="ml-3">칸 = 그 기업이 언급된 기사 중 해당 신호가 있는 기사 수 · 회사명을 누르면 전체 기사, 칸을 누르면 그 칸의 기사만</span>
         </div>
       </div>
     </div>

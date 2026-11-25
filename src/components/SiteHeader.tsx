@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
-import { BrandMark } from "./BrandMark";
+import { BrandMarkInline } from "./BrandMark";
 
 /**
  * 상단 메뉴 (두 단계)
@@ -63,11 +63,11 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
     <header ref={headerRef} className="site-header sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/95 backdrop-blur">
       <div className="mx-auto flex h-[var(--header-h)] max-w-[1600px] items-stretch gap-6 px-4">
         <Link href="/insights" className="flex shrink-0 items-center gap-3 text-[var(--ink)]" aria-label="TDL Trend 홈">
-          <BrandMark className="h-[30px] w-auto" />
+          <BrandMarkInline className="h-[22px] w-auto" />
           <span className="hidden border-l border-[var(--line)] pl-3 text-[11px] leading-tight text-[var(--soft)] md:block">
-            테크이노베이션팀
+            <span className="font-display font-bold tracking-wide text-[var(--ink)]">by LX Pantos</span>
             <br />
-            <span className="font-display tracking-wide">Market Intelligence</span>
+            테크이노베이션팀 MI
           </span>
         </Link>
 
@@ -99,7 +99,7 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
           <Link
             href="/sources"
             aria-current={settings ? "page" : undefined}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 ${settings ? "bg-[var(--ink)] font-bold text-white" : "text-[var(--soft)] hover:bg-[var(--wash)] hover:text-[var(--ink)]"}`}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 ${settings ? "bg-[var(--brand-tint)] font-bold text-[var(--brand)]" : "text-[var(--soft)] hover:bg-[var(--wash)] hover:text-[var(--ink)]"}`}
             title="수집 채널 설정"
           >
             <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -118,9 +118,9 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
 
       {/* 2단: MI 리포트 안의 화면 */}
       {inReport && (
-        <div className="border-t border-[var(--line)] bg-[var(--wash)]">
-          <div className="mx-auto flex max-w-[1600px] items-center gap-1 px-4 py-1.5 text-sm">
-            <span className="mr-2 text-[11px] font-bold text-[var(--mute)]">MI 리포트</span>
+        <div className="border-t border-[var(--line)] bg-white shadow-[0_6px_14px_-12px_rgb(28_26_25/0.4)]">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-1 px-4 py-2 text-sm">
+            <span className="mr-2 font-display text-[11px] font-bold tracking-[0.12em] text-[var(--brand)]">MI REPORT</span>
             {REPORT_TABS.map((t) => {
               const on = t.match(path);
               return (
@@ -128,7 +128,7 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
                   key={t.href}
                   href={t.href}
                   aria-current={on ? "page" : undefined}
-                  className={`rounded-full px-3 py-1 transition-colors ${on ? "bg-[var(--ink)] font-bold text-white" : "text-[var(--soft)] hover:bg-white hover:text-[var(--ink)]"}`}
+                  className={`rounded-md px-3 py-1.5 transition-colors ${on ? "bg-[var(--brand-tint)] font-bold text-[var(--brand)] shadow-[inset_0_-2px_0_var(--brand)]" : "text-[var(--soft)] hover:bg-[var(--wash)] hover:text-[var(--ink)]"}`}
                 >
                   {t.label}
                 </Link>
@@ -138,7 +138,7 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
         </div>
       )}
       {settings && (
-        <div className="border-t border-[var(--line)] bg-[var(--wash)]">
+        <div className="border-t border-[var(--line)] bg-white">
           <div className="mx-auto max-w-[1600px] px-4 py-1.5 text-[11px] font-bold text-[var(--mute)]">설정 · 수집 채널</div>
         </div>
       )}

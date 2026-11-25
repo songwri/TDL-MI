@@ -7,8 +7,8 @@ import { TipRow, type useTip } from "@/components/report/parts";
 
 type TipApi = ReturnType<typeof useTip>;
 
-/** 강조 한 가지: CL사업 연관 높음 = 파랑, 나머지 = 회색 (색은 연관도에 붙고 순위에 따라 바뀌지 않음) */
-export const FOCUS = "#2A78D6";
+/** 강조 한 가지: CL사업 연관 높음 = 브랜드 레드, 나머지 = 회색 (색은 연관도에 붙고 순위에 따라 바뀌지 않음) */
+export const FOCUS = "#A72B2B";
 const colorOf = (p: PortfolioPoint) => (p.relevance === 3 ? FOCUS : NEUTRALS.mid);
 export const pp = (x: number) => `${Math.round(x * 100)}%`;
 

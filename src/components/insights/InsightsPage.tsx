@@ -21,7 +21,7 @@ interface Payload {
 
 type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method";
 const VIEWS: { group: string; items: { id: ViewId; label: string; hint: string }[] }[] = [
-  { group: "지금", items: [
+  { group: "기술 동향", items: [
     { id: "now", label: "최근 근황", hint: "기사 구성과 신호별 최신 소식" },
     { id: "portfolio", label: "기술 포지션 맵", hint: "시장의 성숙도 × 관심도, 과거 → 최근" },
     { id: "maturity", label: "기술 성숙도 곡선", hint: "하이프 사이클 형식" },
@@ -153,10 +153,10 @@ export function InsightsPage() {
                         type="button"
                         aria-current={view === i.id ? "page" : undefined}
                         onClick={() => go(i.id)}
-                        className={`w-full rounded px-2 py-1.5 text-left text-sm ${view === i.id ? "bg-[var(--rv-ink)] font-bold text-white" : "text-[var(--rv-ink)] hover:bg-[#f1f0ec]"}`}
+                        className={`relative w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${view === i.id ? "bg-[var(--rv-tint)] font-bold text-[var(--rv-accent)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-[var(--rv-accent)]" : "text-[var(--rv-ink)] hover:bg-[#f1f0ec]"}`}
                       >
                         {i.label}
-                        <span className={`block text-[11px] font-normal ${view === i.id ? "text-white/70" : "text-[var(--rv-mute)]"}`}>{i.hint}</span>
+                        <span className={`block text-[11px] font-normal ${view === i.id ? "text-[var(--rv-accent)]/70" : "text-[var(--rv-mute)]"}`}>{i.hint}</span>
                       </button>
                     </li>
                   ))}
@@ -270,12 +270,18 @@ function NowView({ d, query, tip }: { d: InsightsData; query: string; tip: TipAp
               ) : (
                 <ul className="divide-y divide-[var(--rv-line)]">
                   {items.map((a) => (
-                    <li key={a.id} className="py-2 text-sm leading-snug">
-                      <a href={a.link} target="_blank" rel="noreferrer" className="font-medium underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
-                      <p className="mt-0.5 text-[11px] text-[var(--rv-mute)]">
-                        {a.source} · {day(a.publishedAt)}
-                        {a.techs.length > 0 && <span className="ml-1 text-[var(--rv-soft)]">· {a.techs.join(" · ")}</span>}
-                      </p>
+                    <li key={a.id} className="flex gap-3 py-2 text-sm leading-snug">
+                      {a.thumbnail && (
+                        // eslint-disable-next-line @next/next/no-img-element -- 언론사 원본 썸네일 (외부 주소)
+                        <img src={a.thumbnail} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-12 w-[72px] shrink-0 rounded object-cover" onError={(e) => (e.currentTarget.style.display = "none")} />
+                      )}
+                      <div className="min-w-0">
+                        <a href={a.link} target="_blank" rel="noreferrer" className="font-medium underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
+                        <p className="mt-0.5 text-[11px] text-[var(--rv-mute)]">
+                          {a.source} · {day(a.publishedAt)}
+                          {a.techs.length > 0 && <span className="ml-1 font-bold text-[var(--rv-accent)]">· {a.techs.join(" · ")}</span>}
+                        </p>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -305,7 +311,7 @@ function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
     <>
       <Head
         title="기술 포지션 맵"
-        lead={<><span className="font-display text-xs font-bold tracking-wider text-[var(--rv-mute)]">TECH POSITION MAP · MATURITY × ATTENTION</span><br />시장(수집 기사 전체)에서 기술마다 <b>성숙도</b>(기사 속 도입·실증 근거가 얼마나 쌓였나)와 <b>관심도</b>(시장의 언급 점유율)를 계산해 배치했습니다. 회색 작은 원은 지난 기간({day(pf.pastFrom)}~), 큰 원은 최근 기간({day(pf.recentFrom)}~)이며 화살표가 이동 방향입니다. <b style={{ color: FOCUS }}>파란 원</b>은 CL사업 연관 높음.</>}
+        lead={<><span className="font-display text-xs font-bold tracking-wider text-[var(--rv-mute)]">TECH POSITION MAP · MATURITY × ATTENTION</span><br />시장(수집 기사 전체)에서 기술마다 <b>성숙도</b>(기사 속 도입·실증 근거가 얼마나 쌓였나)와 <b>관심도</b>(시장의 언급 점유율)를 계산해 배치했습니다. 회색 작은 원은 지난 기간({day(pf.pastFrom)}~), 큰 원은 최근 기간({day(pf.recentFrom)}~)이며 화살표가 이동 방향입니다. <b style={{ color: FOCUS }}>빨간 원</b>은 CL사업 연관 높음.</>}
         right={
           <div className="flex flex-wrap gap-2">
             <Toggle label="표시 범위" value={onlyFocus ? "focus" : "all"} onChange={(v) => setOnlyFocus(v === "focus")} options={[["all", "전체 기술"], ["focus", "CL 연관 높음만"]]} />
@@ -365,7 +371,7 @@ function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
         {noSignal.length > 0 && <p className="mt-2 text-xs text-[var(--rv-mute)]">언급은 있으나 단계 신호가 없어 표시하지 않은 기술: {noSignal.map((p) => `${p.name}(${p.recent.count}건)`).join(", ")}</p>}
       </Card>
       <p className="mt-3 text-xs leading-relaxed text-[var(--rv-soft)]">
-        <b>읽는 법:</b> 우리 회사가 가진 기술이 아니라 시장의 흐름입니다. 파란 원(CL사업 연관 높음)이 오른쪽 위에 있으면 지금 도입을 검토할 때, 왼쪽 위에 있으면 실증으로 먼저 확인할 때입니다. <b>왜 이 차트인가:</b> 트리맵은 &lsquo;얼마나 많이 다뤄졌나&rsquo;만, 하이프 사이클은 &lsquo;어느 단계인가&rsquo;만 보여 줍니다. 전략 판단에는 성숙도와 관심도를 함께 보고, 지난 기간에서 어디로 움직였는지가 필요해 두 축 버블과 이동 화살표를 택했습니다. 두 축 모두 기사에서 계산하는 값이라 근거 기사로 검증할 수 있습니다(계산식은 방법론 메뉴).
+        <b>읽는 법:</b> 우리 회사가 가진 기술이 아니라 시장의 흐름입니다. 빨간 원(CL사업 연관 높음)이 오른쪽 위에 있으면 지금 도입을 검토할 때, 왼쪽 위에 있으면 실증으로 먼저 확인할 때입니다. <b>왜 이 차트인가:</b> 트리맵은 &lsquo;얼마나 많이 다뤄졌나&rsquo;만, 하이프 사이클은 &lsquo;어느 단계인가&rsquo;만 보여 줍니다. 전략 판단에는 성숙도와 관심도를 함께 보고, 지난 기간에서 어디로 움직였는지가 필요해 두 축 버블과 이동 화살표를 택했습니다. 두 축 모두 기사에서 계산하는 값이라 근거 기사로 검증할 수 있습니다(계산식은 방법론 메뉴).
       </p>
     </>
   );
@@ -506,6 +512,23 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
     return { counts, names };
   }, [list, mode]);
   const iso2Sel = sel ? Object.entries(COUNTRIES).find(([, c]) => c.id === sel)?.[0] : undefined;
+  // 경로선: 공급·적용 사례 보기에서는 모두, 본사 보기에서는 고른 나라 회사들의 공급선만
+  const routes = useMemo(() => {
+    if (mode === "hq" && !iso2Sel) return [];
+    const out: { key: string; from: [number, number]; to: [number, number]; label: string }[] = [];
+    for (const v of list) {
+      const from = COUNTRIES[v.country]?.ll;
+      if (!from) continue;
+      const targets = mode === "ref" ? (v.references ?? []).map((r) => r.country ?? "") : v.markets ?? [];
+      for (const t of new Set(targets)) {
+        const to = COUNTRIES[t]?.ll;
+        if (!to || t === v.country) continue;
+        if (iso2Sel && v.country !== iso2Sel && t !== iso2Sel) continue;
+        out.push({ key: `${v.name}-${t}`, from, to, label: `${ko(v.country)} ${v.name} → ${ko(t)}` });
+      }
+    }
+    return out;
+  }, [list, mode, iso2Sel]);
   const inCountry = (v: V) => (mode === "hq" ? v.country === iso2Sel : mode === "market" ? !!v.markets?.includes(iso2Sel!) : !!v.references?.some((r) => r.country === iso2Sel));
   const shown = iso2Sel ? list.filter(inCountry) : list;
   const byHq = [...new Set(list.map((v) => v.country))].map((c) => ({ c, n: list.filter((v) => v.country === c).length })).sort((a, b) => b.n - a.n);
@@ -525,7 +548,8 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
         ))}
       </div>
       <Card>
-        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : mode === "market" ? "공급 실적 확인 회사 수" : "적용 사례가 있는 회사 수"} selected={sel} onSelect={setSel} tip={tip} />
+        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : mode === "market" ? "공급 실적 확인 회사 수" : "적용 사례가 있는 회사 수"} selected={sel} onSelect={setSel} tip={tip} routes={routes} />
+        {routes.length > 0 && <p className="mt-2 text-xs text-[var(--rv-soft)]"><span aria-hidden className="mr-1 inline-block h-[2px] w-5 translate-y-[-3px] bg-[#A72B2B]" />본사 → {mode === "ref" ? "적용 사례" : "공급 확인"} 국가 {routes.length}개 경로 · 검은 점 = 본사, 빨간 핀 = 공급·적용 국가{mode === "hq" ? " (고른 나라 회사)" : ""}</p>}
         {mode === "market" && <p className="mt-2 text-xs text-[var(--rv-mute)]">공급 국가는 출처로 확인된 것만 표시합니다. 비어 있는 회사가 많으니 시트 Vendors 탭의 &lsquo;공급국가&rsquo; 칸을 채워 주세요.</p>}
         <p className="mt-2 text-xs text-[var(--rv-soft)]">본사 국가별: {byHq.map((x) => `${ko(x.c)} ${x.n}`).join(" · ")}</p>
       </Card>
@@ -647,25 +671,37 @@ function ChinaView({ vendors, query }: { vendors: V[]; query: string }) {
 
 function PeersView({ d, tip }: { d: InsightsData; tip: TipApi }) {
   const [sel, setSel] = useState<string>();
+  const [sig, setSig] = useState<StageKey>();
   const picked = d.peers.find((p) => p.name === sel);
+  const list = picked ? picked.articles.filter((a) => !sig || a.signals.includes(sig)) : [];
+  const pick = (name?: string, k?: StageKey) => {
+    setSel(name);
+    setSig(k);
+  };
   const self = d.peers.find((p) => p.self);
   const top = [...d.peers].filter((p) => !p.self).sort((a, b) => b.total - a.total)[0];
   return (
     <>
       <Head title="국내 동종업계 동향" lead={`분석 기간에 국내 물류·유통 기업이 언급된 기사를 단계 신호별로 셌습니다.${top && top.total ? ` 기사가 가장 많은 곳은 ${top.name}(${top.total}건)` : ""}${self ? `, ${self.name}는 ${self.total}건입니다.` : ""}`} />
       <Card>
-        <PeerBoard peers={d.peers} selected={sel} onSelect={setSel} tip={tip} />
+        <PeerBoard peers={d.peers} selected={sel} signal={sig} onSelect={pick} tip={tip} />
         {picked && (
-          <div key={picked.name} className="view-enter mt-4 rounded-lg border-2 border-[var(--rv-ink)] bg-[var(--wash)] p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="font-bold">{picked.name} 기사 <span className="font-normal text-[var(--rv-mute)]">{picked.total}건{picked.total > picked.articles.length ? ` 중 최신 ${picked.articles.length}건` : ""}</span></p>
-              <button type="button" onClick={() => setSel(undefined)} className="text-xs text-[var(--rv-soft)] underline">닫기</button>
+          <div key={`${picked.name}-${sig ?? "all"}`} className="view-enter mt-4 rounded-lg border-2 border-[var(--rv-ink)] bg-[var(--wash)] p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold">
+                {picked.name} 기사{sig && <span className="ml-1.5 rounded-full bg-[var(--rv-accent)] px-2 py-0.5 text-xs text-white">{signalLabel(sig)}</span>}{" "}
+                <span className="font-normal text-[var(--rv-mute)]">{list.length}건{!sig && picked.total > picked.articles.length ? ` (전체 ${picked.total}건 중 최신)` : ""}</span>
+              </p>
+              <div className="flex items-center gap-3 text-xs">
+                {sig && <button type="button" onClick={() => setSig(undefined)} className="text-[var(--rv-accent)] underline">{picked.name} 전체 보기</button>}
+                <button type="button" onClick={() => pick(undefined)} className="text-[var(--rv-soft)] underline">닫기</button>
+              </div>
             </div>
-            {picked.articles.length === 0 ? (
+            {list.length === 0 ? (
               <p className="text-sm text-[var(--rv-mute)]">분석 기간에 이 회사가 언급된 기사가 없습니다.</p>
             ) : (
               <ul className="divide-y divide-[var(--rv-line)] rounded-md bg-white px-3">
-                {picked.articles.map((a) => (
+                {list.map((a) => (
                   <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 py-2 text-sm">
                     <a href={a.link} target="_blank" rel="noreferrer" className="font-medium underline decoration-[var(--rv-line)] underline-offset-2 hover:decoration-[var(--rv-accent)]">{a.titleKo ?? a.title}</a>
                     <span className="text-[11px] text-[var(--rv-mute)]">{a.source} · {day(a.publishedAt)}</span>
