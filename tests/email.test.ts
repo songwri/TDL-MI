@@ -12,7 +12,7 @@ const meta = {
   publishDate: "2026-10-27",
   newsletterName: "TDL Trend",
   tagline: "물류·로봇 Market Intelligence",
-  feedbackContact: "테크이노베이션팀",
+  feedbackContact: "", // 기본값: 조직명 표시 안 함
   feedbackEmail: "tdl@example.com",
   audience: "CL사업부",
   articles: sampleArticles,
@@ -31,7 +31,9 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
   });
 
   it("헤더: TDL TREND REPORT 마크 · 제4호 · 배포 대상 · 이번 호 주제", () => {
-    expect(frag).toContain("테크이노베이션팀");
+    expect(frag).toContain("Market Intelligence Report");
+    expect(frag).not.toContain("테크이노베이션");
+    expect(frag).not.toContain(" · Market Intelligence Report"); // 빈 조직명 앞 구분점 없음
     expect(frag).toContain(">TDL</span>"); // 이미지가 없을 때 글자 마크
     expect(frag).toContain(">TREND REPORT</span>");
     expect(frag).toContain("제4호");
@@ -54,8 +56,8 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(noTheme).toContain(sampleContent.headline);
   });
 
-  it("테크이노베이션팀의 한마디: 맨 위, 어두운 상자로 눈에 띄게", () => {
-    const note = frag.indexOf("테크이노베이션팀의 한마디");
+  it("에디터의 한마디: 맨 위, 어두운 상자로 눈에 띄게", () => {
+    const note = frag.indexOf("에디터의 한마디");
     expect(note).toBeGreaterThan(frag.indexOf(sampleContent.issueTheme!));
     expect(note).toBeLessThan(frag.indexOf("핵심 요약"));
     expect(frag).toContain(sampleContent.teamNote!.slice(0, 30));
@@ -125,12 +127,13 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(html).toMatch(/^<!DOCTYPE html>/);
     expect(html).toContain("<!--[if mso]>");
     const text = renderPlainText(sampleContent, meta);
-    expect(text).toContain("테크이노베이션팀 TDL Trend 제4호 (2026.10.27)");
+    expect(text.startsWith("TDL Trend 제4호 (2026.10.27)")).toBe(true);
+    expect(renderPlainText(sampleContent, { ...meta, feedbackContact: "발행팀" })).toContain("발행팀 TDL Trend 제4호");
     expect(text).toContain("[참고 기사]");
     expect(text).toContain("[1] AutoStore unveils");
     expect(text).toContain("▶ 한 줄 결론:");
     expect(text).toContain(`이번 호 주제: ${sampleContent.issueTheme}`);
-    expect(text).toContain("[테크이노베이션팀의 한마디]");
+    expect(text).toContain("[에디터의 한마디]");
     expect(text).toContain("「시범에서 증설 단계로 전환」");
     expect(text).not.toContain("**");
   });

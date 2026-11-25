@@ -30,7 +30,7 @@ export function LoginForm({ next }: { next?: string }) {
     <div className="view-enter -mt-5 grid min-h-[calc(100vh-40px)] place-items-center">
       <form onSubmit={submit} className="w-full max-w-[380px] rounded-xl border border-[var(--line)] bg-white p-8 shadow-[0_20px_50px_-30px_rgb(28_26_25/0.45)]">
         <BrandMark className="h-12 w-auto text-[var(--ink)]" />
-        <p className="mt-5 text-lg font-bold">테크이노베이션팀 Market Intelligence</p>
+        <p className="mt-5 text-lg font-bold">Market Intelligence</p>
         <p className="mt-1 text-sm text-[var(--soft)]">팀에서 받은 접속 비밀번호를 입력하세요. 이 브라우저에서 30일간 다시 묻지 않습니다.</p>
         <label htmlFor="pw" className="mt-6 block text-xs font-bold text-[var(--soft)]">비밀번호</label>
         <input

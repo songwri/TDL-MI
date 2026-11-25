@@ -7,13 +7,13 @@ import { BrandMarkInline } from "./BrandMark";
 
 /**
  * 상단 메뉴 (두 단계)
- *   1단: 인사이트 대시보드 · MI 리포트   (오른쪽: 수집 채널 설정, 로그아웃)
+ *   1단: MI 리포트(기본 화면) · 인사이트 대시보드   (오른쪽: 수집 채널 설정, 로그아웃)
  *   2단: MI 리포트 안에서 기사 선정·작성 · 발행 이력
  * 지금 화면은 빨간 책갈피 표시와 굵은 글씨로 보여 준다. 표시가 메뉴 사이를 미끄러져 움직인다.
  */
 const PRIMARY = [
-  { href: "/insights", label: "인사이트 대시보드", match: (p: string) => p.startsWith("/insights") },
   { href: "/", label: "MI 리포트", match: (p: string) => p === "/" || p.startsWith("/issues") },
+  { href: "/insights", label: "인사이트 대시보드", match: (p: string) => p.startsWith("/insights") },
 ] as const;
 const REPORT_TABS = [
   { href: "/", label: "기사 선정 · 리포트 작성", match: (p: string) => p === "/" },
@@ -51,7 +51,7 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
   }, [path]);
 
   if (path === "/login") return null;
-  const inReport = PRIMARY[1].match(path);
+  const inReport = PRIMARY[0].match(path);
   const settings = path.startsWith("/sources");
 
   const logout = async () => {
@@ -62,12 +62,12 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
   return (
     <header ref={headerRef} className="site-header sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/95 backdrop-blur">
       <div className="mx-auto flex h-[var(--header-h)] max-w-[1600px] items-stretch gap-6 px-4">
-        <Link href="/insights" className="flex shrink-0 items-center gap-3 text-[var(--ink)]" aria-label="TDL Trend 홈">
+        <Link href="/" className="flex shrink-0 items-center gap-3 text-[var(--ink)]" aria-label="TDL Trend 홈 (MI 리포트)">
           <BrandMarkInline className="h-[22px] w-auto" />
-          <span className="hidden border-l border-[var(--line)] pl-3 text-[11px] leading-tight text-[var(--soft)] md:block">
-            테크이노베이션팀
+          <span className="hidden border-l border-[var(--line)] pl-3 font-display text-[11px] leading-tight tracking-wide text-[var(--soft)] md:block">
+            Market
             <br />
-            <span className="font-display tracking-wide">Market Intelligence</span>
+            Intelligence
           </span>
         </Link>
 

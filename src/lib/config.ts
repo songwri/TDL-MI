@@ -25,7 +25,8 @@ export const config = {
   miLookbackDays: Number(process.env.MI_LOOKBACK_DAYS || 180),
   newsletterName: process.env.NEWSLETTER_NAME || "TDL Trend",
   tagline: process.env.NEWSLETTER_TAGLINE || "물류·로봇 Market Intelligence",
-  feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "테크이노베이션팀",
+  /** 발행 조직 이름 (비우면 리포트에 조직명을 쓰지 않음) */
+  feedbackContact: process.env.NEWSLETTER_FEEDBACK_CONTACT || "",
   /** 배포 대상: 헤더·시사점 제목·프롬프트에 쓰인다 */
   audience: process.env.NEWSLETTER_AUDIENCE || "CL사업부",
   feedbackEmail: process.env.NEWSLETTER_FEEDBACK_EMAIL || "",

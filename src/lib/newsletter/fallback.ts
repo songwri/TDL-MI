@@ -29,7 +29,7 @@ export function buildFallbackDraft(input: {
 
   return {
     issueTheme: "[작성 필요] 이번 호 핵심 주제 (예: 자율주행으로 바라보는 물류)",
-    teamNote: "[작성 필요] 테크이노베이션팀의 한마디 (위트 있는 첫 문장 + 이번 호를 읽는 관점)",
+    teamNote: "[작성 필요] 에디터의 한마디 (위트 있는 첫 문장 + 이번 호를 읽는 관점)",
     headline: truncate(concept || `${issueLabel(input.issueNo)} 물류·로봇 자동화 주요 동향`, 45),
     keyTakeaway: "[작성 필요] 이번 호 한 줄 결론",
     executiveSummary: articles.slice(0, 5).map((a) => truncate(`${a.title} (${a.source})`, 110)),

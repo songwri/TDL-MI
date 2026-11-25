@@ -1,9 +1,9 @@
 /**
  * TDL Trend 브랜드: 이름·호수 표기·색상 (프롬프트와 이메일 템플릿이 공유)
- * 발행: 테크이노베이션팀 / 독자: CL사업부 (이름·독자는 환경변수로 바꿀 수 있음)
+ * 독자: CL사업부 (이름·독자는 환경변수로 바꿀 수 있음)
  */
 export const BRAND = {
-  /** 리포트 이름. 헤더: "테크이노베이션 TDL Trend 제N호" */
+  /** 리포트 이름. 헤더: "TDL Trend 제N호" */
   product: "TDL Trend",
   kind: "Market Intelligence Report",
 };

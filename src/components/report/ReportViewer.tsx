@@ -118,7 +118,7 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
           <div className="text-right">
             <p className="text-[26px] font-bold leading-tight text-[var(--rv-accent)]">{issueLabel(viewer.issueNo)}</p>
             <p className="text-xs text-[var(--rv-soft)]">{day(viewer.publishDate)} 발행 · 배포 대상 {brand.audience}</p>
-            <p className="text-[11px] text-[var(--rv-mute)]">{brand.publisher} · Market Intelligence Report</p>
+            <p className="text-[11px] text-[var(--rv-mute)]">{brand.publisher ? `${brand.publisher} · ` : ""}Market Intelligence Report</p>
           </div>
         </div>
         {c.issueTheme ? (
@@ -167,13 +167,13 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
       </div>
 
       <div className="space-y-12 pb-12 pt-8">
-        {/* 테크이노베이션팀의 한마디 */}
+        {/* 에디터의 한마디 */}
         {c.teamNote && (
           <figure className="relative overflow-hidden rounded-md bg-[#161616] px-6 py-5 text-white sm:px-8 sm:py-6">
             <span aria-hidden className="absolute left-5 top-1 font-serif text-[64px] leading-none text-[#E0675B] sm:left-6">&ldquo;</span>
-            <figcaption className="pl-9 text-xs font-bold tracking-wider text-[#E0675B]">{brand.publisher}의 한마디</figcaption>
+            <figcaption className="pl-9 text-xs font-bold tracking-wider text-[#E0675B]">에디터의 한마디</figcaption>
             <blockquote className="mt-1.5 pl-9 text-[17px] leading-8 [text-wrap:pretty]">{stripRich(c.teamNote)}</blockquote>
-            <p className="mt-2 text-right text-xs text-[#b5b5b5]">&mdash; {brand.publisher} 드림</p>
+            <p className="mt-2 text-right text-xs text-[#b5b5b5]">&mdash; {brand.publisher || brand.product} 에디터</p>
           </figure>
         )}
 

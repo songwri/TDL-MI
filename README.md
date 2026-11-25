@@ -1,4 +1,4 @@
-# TDL Trend: 테크이노베이션 Market Intelligence Report
+# TDL Trend: Market Intelligence Report
 
 CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 도구입니다.
 매일 아침 국내외 뉴스를 수집하고, 2주치 기사에서 후보를 골라 웹에서 선정하면, 선정한 기사 여러 건을 **주제별로 묶어 인사이트를 뽑은 기사형 리포트**(제N호)를 만듭니다. 통계 인포그래픽과 원문 링크가 포함되고, **메일 본문에 그대로 붙여 넣을 수 있는** 형태입니다.
@@ -22,7 +22,7 @@ CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 �
 | 섹션 | 내용 |
 |---|---|
 | 헤더 | 좌측 상단 **TDL TREND REPORT 마크**(TDL LAB 로고 응용) · 제N호 · 발행일 · 배포 대상, 그 아래 **이번 호 주제**(예: "자율주행으로 바라보는 물류")를 큰 제목으로, 리포트 제목은 부제로 |
-| 테크이노베이션팀의 한마디 | 위트 있는 첫 문장 + 이번 호를 읽는 관점. 마크와 같은 어두운 상자로 맨 위에 눈에 띄게 |
+| 에디터의 한마디 | 위트 있는 첫 문장 + 이번 호를 읽는 관점. 마크와 같은 어두운 상자로 맨 위에 눈에 띄게 |
 | 핵심 요약 | 한 줄 결론 + 요약 3~5개 |
 | 핵심 인사이트 | 기사-주제 연결표 + 선정 기사를 주제 2~4개로 묶은 기사형 본문 + 핵심 인사이트 + CL사업부 시사점 + **근거 기사 [번호] 원문 링크** |
 | 추세 분석 | 인포그래픽: 호별 카테고리 추이, 키워드 호별 등장 히트맵 + 해석 |
@@ -75,7 +75,7 @@ npm run dev                    # http://localhost:3000
 | `APP_PASSWORD` | 웹 접속 비밀번호 (비우면 잠금 없음) |
 | `PUBLIC_BASE_URL` | (선택) 웹 주소. 메일 인포그래픽 이미지 주소에 씀. 비우면 복사할 때 현재 접속 주소로 채움 |
 | `CHART_SECRET` | (선택) 이미지 주소 서명용 비밀값. 비우면 `APP_PASSWORD` 를 씀 |
-| `NEWSLETTER_NAME`, `NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE` | 리포트 이름(TDL Trend), 발행 팀(테크이노베이션팀), 배포 대상(CL사업부) |
+| `NEWSLETTER_NAME`, `NEWSLETTER_FEEDBACK_CONTACT`, `NEWSLETTER_AUDIENCE` | 리포트 이름(TDL Trend), 발행 조직 이름(비우면 표시하지 않음), 배포 대상(CL사업부) |
 | `NEWSLETTER_FEEDBACK_EMAIL` | 푸터에 표시할 문의 메일 |
 | `LETTER_WRITER` | 비우면 Claude Code 작성 모드(토큰 없음). `api` 면 웹에서 API 로 바로 작성(`ANTHROPIC_API_KEY` 필요, 과금) |
 | `COLLECT_LOOKBACK_DAYS`, `MI_LOOKBACK_DAYS` | 수집 기간(기본 14일), 지난 호 비교 기간(기본 180일) |

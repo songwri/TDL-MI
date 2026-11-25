@@ -96,17 +96,37 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`기술 성숙도 맵: ${points.map((p) => `${p.name} ${p.stage}`).join(", ")}`}>
-      {/* 단계 구간 */}
+      <defs>
+        {/* 입체감: 곡선 아래 면 그라데이션, 곡선·점 그림자, 빛을 받은 구 */}
+        <linearGradient id="hm-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#1c1a19" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="#1c1a19" stopOpacity="0" />
+        </linearGradient>
+        <filter id="hm-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.6" floodColor="#1c1a19" floodOpacity="0.28" />
+        </filter>
+        <filter id="hm-line-shadow" x="-5%" y="-20%" width="110%" height="140%">
+          <feDropShadow dx="0" dy="5" stdDeviation="4" floodColor="#1c1a19" floodOpacity="0.18" />
+        </filter>
+        <radialGradient id="hm-shine" cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="60%" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {/* 단계 구간: 번갈아 옅은 면 + 바탕에 큰 단계 이름 (설명이 깔린 느낌) */}
       {CURVE_STAGES.map((s, i) => (
         <g key={s.label}>
+          {i % 2 === 1 && <rect x={px(s.from)} y={T} width={px(s.to) - px(s.from)} height={PH} fill="#1c1a19" fillOpacity="0.025" />}
           {i > 0 && <line x1={px(s.from)} x2={px(s.from)} y1={T} y2={T + PH} stroke="#e1e0d9" strokeDasharray="3 4" />}
+          <text aria-hidden x={px((s.from + s.to) / 2)} y={T + 34} textAnchor="middle" fontSize="24" fontWeight="800" fill="#1c1a19" fillOpacity="0.07" pointerEvents="none">{s.label}</text>
           <text x={px((s.from + s.to) / 2)} y={T + PH + 24} textAnchor="middle" fontSize="13" fontWeight="700" fill="#5c5755">{s.label}</text>
         </g>
       ))}
       <line x1={L} x2={L + PW} y1={T + PH} y2={T + PH} stroke="#c9c7c0" />
       <text x={L + PW} y={T + PH + 48} textAnchor="end" fontSize="12" fill="#898781">성숙도 (기사 속 공개 → 투자 → 실증 → 도입 신호) →</text>
       <text transform={`translate(${L - 30} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#898781">관심·기대 ↑</text>
-      <path d={path} pathLength={1} fill="none" stroke="#232021" strokeWidth="2" opacity="0.8" className="draw-in" />
+      <path d={`${path} L${px(1)} ${T + PH} L${px(0)} ${T + PH} Z`} fill="url(#hm-area)" />
+      <path d={path} pathLength={1} fill="none" stroke="#232021" strokeWidth="2.5" opacity="0.85" className="draw-in" filter="url(#hm-line-shadow)" />
       {placed.map(({ p, cx, cy, r, label }, idx) => {
         const near = points.filter((q) => q !== p && Math.abs(q.x - p.x) < 0.02).map((q) => q.name);
         const color = catColor(p.category);
@@ -139,7 +159,8 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
           >
             <circle cx={cx} cy={cy} r={r + 10} fill="transparent" />
             {sel && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke="#232021" strokeWidth="2" />}
-            <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />
+            <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} filter="url(#hm-shadow)" />
+            {p.confident && <circle cx={cx} cy={cy} r={r} fill="url(#hm-shine)" pointerEvents="none" className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />}
             {label.lead !== undefined && <line x1={cx} x2={cx} y1={label.lead} y2={cy - r - 2} stroke="#898781" strokeWidth="1" />}
             <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight={sel ? 800 : 600} fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>
           </g>
@@ -219,7 +240,18 @@ export function SignalDonut({ mix, selected, onPick, tip }: { mix: { key: StageK
             const mid = (p.a0 + p.a1) / 2;
             const on = p.key === selected;
             const dx = on ? Math.sin(mid) * 7 : 0, dy = on ? -Math.cos(mid) * 7 : 0;
-            const body = <><TipRow value={`${p.count}건 · ${Math.round((p.count / total) * 100)}%`} label={mixLabel(p.key)} color={MIX_COLOR[p.key]} /><p className="mt-1 text-[var(--rv-soft)]">누르면 아래 해당 묶음을 표시합니다</p></>;
+            // 이름이 가장 눈에 띄게, 그다음 건수·비율
+            const body = (
+              <>
+                <p className="flex items-center gap-2 text-[15px] font-bold leading-tight text-[var(--rv-ink)]">
+                  <span aria-hidden className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: MIX_COLOR[p.key] }} />
+                  {mixLabel(p.key)}
+                </p>
+                <p className="mt-0.5 pl-5 text-sm tabular-nums text-[var(--rv-soft)]">
+                  {p.count}건 · {Math.round((p.count / total) * 100)}%
+                </p>
+              </>
+            );
             return (
               <path
                 key={p.key}

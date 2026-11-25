@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TDL Trend",
-  description: "테크이노베이션팀 물류·로봇 Market Intelligence: 인사이트 대시보드와 격주 MI 리포트",
+  description: "물류·로봇 Market Intelligence: 격주 MI 리포트와 인사이트 대시보드",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

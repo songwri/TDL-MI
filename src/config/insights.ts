@@ -62,7 +62,7 @@ export const PEERS: { name: string; self?: boolean }[] = [
 ];
 
 /**
- * CL사업 연관도 (팀 판단값: 3 높음 · 2 중간 · 1 낮음). 계약물류 센터 운영 관점에서 테크이노베이션팀이 정해 고친다.
+ * CL사업 연관도 (팀 판단값: 3 높음 · 2 중간 · 1 낮음). 계약물류 센터 운영 관점에서 팀이 정해 고친다.
  * 우선 검토 보드의 열을 정한다. 숫자를 바꾸면 화면이 바로 바뀐다.
  */
 export const CL_RELEVANCE: Record<string, 1 | 2 | 3> = {

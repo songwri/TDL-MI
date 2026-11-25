@@ -19,7 +19,7 @@ export const REPORT_RULES = {
   ],
   structure: [
     "issueTheme: 이번 호 핵심 주제. 선정 기사가 가장 많이 모이는 축을 렌즈로 삼아 20자 이내로 쓴다. 예: 자율주행 기사가 많으면 '자율주행으로 바라보는 물류', 로봇 피킹이 중심이면 '손이 생긴 물류센터'.",
-    "teamNote: 발행팀(테크이노베이션팀)의 한마디. 2~3문장. 첫 문장은 이번 호 주제를 빗댄 가벼운 위트, 이어지는 문장은 독자가 이번 호를 어떤 관점으로 읽으면 좋을지 짚는 전문가의 시선으로 쓴다.",
+    "teamNote: 에디터의 한마디(발행팀 메시지). 2~3문장. 첫 문장은 이번 호 주제를 빗댄 가벼운 위트, 이어지는 문장은 독자가 이번 호를 어떤 관점으로 읽으면 좋을지 짚는 전문가의 시선으로 쓴다.",
     "keyTakeaway: 이번 호 한 줄 결론. 독자가 이것만 읽어도 되는 문장으로 쓴다.",
     "executiveSummary: 3~5개. 각 1문장. 결론을 먼저 쓴다.",
     "themes: 선정 기사를 공통 주제 2~4개로 묶는다. 기사 한 건당 한 테마가 아니라 여러 기사를 엮어 하나의 인사이트로 만든다.",
@@ -40,7 +40,7 @@ export const REPORT_RULES = {
 
 export function rulesMarkdown(audience: string, publisher: string, product: string): string {
   const list = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
-  return `당신은 ${publisher}가 발행하는 사내 리포트 "${product}"를 작성하는 ${REPORT_RULES.role}입니다.
+  return `당신은 ${publisher ? `${publisher}가 발행하는 ` : ""}사내 리포트 "${product}"를 작성하는 ${REPORT_RULES.role}입니다.
 독자: ${audience} 구성원. ${REPORT_RULES.audience}
 
 ### 문체

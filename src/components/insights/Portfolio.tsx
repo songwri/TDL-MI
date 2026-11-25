@@ -1,15 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { NEUTRALS } from "@/config/brand";
-import type { PortfolioData, PortfolioPoint } from "@/lib/insights/compute";
+import type { PortfolioData } from "@/lib/insights/compute";
 import { TipRow, type useTip } from "@/components/report/parts";
 
 type TipApi = ReturnType<typeof useTip>;
 
 /** 강조 한 가지: CL사업 연관 높음 = 브랜드 레드, 나머지 = 회색 (색은 연관도에 붙고 순위에 따라 바뀌지 않음) */
 export const FOCUS = "#A72B2B";
-const colorOf = (p: PortfolioPoint) => (p.relevance === 3 ? FOCUS : NEUTRALS.mid);
 export const pp = (x: number) => `${Math.round(x * 100)}%`;
 
 const W = 960, H = 520, L = 64, R = 28, T = 28, B = 56;
@@ -112,16 +110,46 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
         <marker id="pf-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0 0 L8 4 L0 8 z" fill="#898781" />
         </marker>
+        {/* 입체감: 원은 빛을 받은 구처럼(왼쪽 위 밝게) + 바닥 그림자 */}
+        <filter id="pf-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#1c1a19" floodOpacity="0.28" />
+        </filter>
+        <radialGradient id="pf-ball-focus" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#E2766F" />
+          <stop offset="55%" stopColor="#A72B2B" />
+          <stop offset="100%" stopColor="#6E1717" />
+        </radialGradient>
+        <radialGradient id="pf-ball-gray" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stopColor="#D9D6D0" />
+          <stop offset="55%" stopColor="#A9A7A0" />
+          <stop offset="100%" stopColor="#77746E" />
+        </radialGradient>
+        {/* 사분면 바닥: 위쪽 오른쪽(주류)으로 갈수록 살짝 짙게 → 공간감 */}
+        <linearGradient id="pf-floor" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#F6EEEB" />
+        </linearGradient>
       </defs>
-      {/* 사분면 */}
-      <line x1={mx} x2={mx} y1={T} y2={T + PH} stroke="#c9c7c0" strokeDasharray="4 4" />
-      <line x1={L} x2={L + PW} y1={my} y2={my} stroke="#c9c7c0" strokeDasharray="4 4" />
-      {Q.map((q) => (
-        <g key={q.t}>
-          <text x={q.x} y={q.y} textAnchor={q.anchor} fontSize="13" fontWeight="700" fill="#5c5755">{q.t}</text>
-          <text x={q.x} y={q.y + 16} textAnchor={q.anchor} fontSize="11" fill="#898781">{q.s}</text>
+      {/* 사분면: 배경 면 + 큰 워터마크 글씨 (설명이 바탕에 깔린 느낌) */}
+      <rect x={L} y={T} width={PW} height={PH} fill="url(#pf-floor)" />
+      <rect x={mx} y={T} width={L + PW - mx} height={my - T} fill="#A72B2B" fillOpacity="0.035" />
+      {(
+        [
+          { cx: (L + mx) / 2, cy: (T + my) / 2, q: Q[0] },
+          { cx: (mx + L + PW) / 2, cy: (T + my) / 2, q: Q[1] },
+          { cx: (L + mx) / 2, cy: (my + T + PH) / 2, q: Q[2] },
+          { cx: (mx + L + PW) / 2, cy: (my + T + PH) / 2, q: Q[3] },
+        ] as const
+      ).map(({ cx, cy, q }) => (
+        <g key={q.t} aria-hidden pointerEvents="none">
+          <text x={cx} y={cy} textAnchor="middle" fontSize={Math.min(34, Math.max(18, (mx - L) / 9))} fontWeight="800" fill="#1c1a19" fillOpacity="0.06" style={{ letterSpacing: "-0.5px" }}>
+            {q.t}
+          </text>
+          <text x={cx} y={cy + 24} textAnchor="middle" fontSize="13" fill="#1c1a19" fillOpacity="0.16">{q.s}</text>
         </g>
       ))}
+      <line x1={mx} x2={mx} y1={T} y2={T + PH} stroke="#c9c7c0" strokeDasharray="4 4" />
+      <line x1={L} x2={L + PW} y1={my} y2={my} stroke="#c9c7c0" strokeDasharray="4 4" />
       {/* 축 */}
       <line x1={L} x2={L + PW} y1={T + PH} y2={T + PH} stroke="#9c9a93" />
       <line x1={L} x2={L} y1={T} y2={T + PH} stroke="#9c9a93" />
@@ -177,7 +205,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
               </>
             )}
             <circle cx={cx} cy={cy} r={r + 8} fill="transparent" />
-            <circle cx={cx} cy={cy} r={r} fill={colorOf(p)} fillOpacity={0.92} stroke="#fff" strokeWidth="2" className="pf-dot pop-in" style={{ animationDelay: `${i * 40}ms` }} />
+            <circle cx={cx} cy={cy} r={r} fill={p.relevance === 3 ? "url(#pf-ball-focus)" : "url(#pf-ball-gray)"} stroke="#fff" strokeWidth="1.5" filter="url(#pf-shadow)" className="pf-dot pop-in" style={{ animationDelay: `${i * 40}ms` }} />
             {p.doubtShare >= 0.2 && <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">!</text>}
             {label && <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight="700" fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>}
           </g>

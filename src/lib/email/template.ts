@@ -12,7 +12,7 @@ export interface RenderMeta {
   /** 리포트 이름 (예: TDL Trend) */
   newsletterName: string;
   tagline: string;
-  /** 발행 조직 (예: 테크이노베이션팀) */
+  /** 발행 조직 이름 (비어 있으면 표시하지 않음) */
   feedbackContact: string;
   feedbackEmail?: string;
   /** 배포 대상 (예: CL사업부) */
@@ -115,7 +115,7 @@ function header(c: ReportContent, m: RenderMeta): string {
           td(
             `<span style="${css({ fontSize: 26, lineHeight: "32px", fontWeight: "bold", color: C.brand })}">${issueLabel(m.issueNo)}</span><br>` +
               `<span style="${css(txt(12, C.sub))}">${dotDate(m.publishDate)} 발행${m.audience ? ` · 배포 대상 ${t(m.audience)}` : ""}</span><br>` +
-              `<span style="${css(txt(11, C.mute, { letterSpacing: "0.3px" }))}">${t(m.feedbackContact)} · ${t(BRAND.kind)}</span>`,
+              `<span style="${css(txt(11, C.mute, { letterSpacing: "0.3px" }))}">${m.feedbackContact ? `${t(m.feedbackContact)} · ` : ""}${t(BRAND.kind)}</span>`,
             { align: "right", valign: "bottom" },
           ),
       ) +
@@ -131,7 +131,7 @@ function header(c: ReportContent, m: RenderMeta): string {
 
 const NOTE_BG = "#161616";
 
-/** 테크이노베이션팀의 한마디: 맨 위에서 가장 눈에 띄는 발행팀 메시지 (어두운 바탕) */
+/** 에디터의 한마디: 맨 위에서 가장 눈에 띄는 발행팀 메시지 (어두운 바탕) */
 function teamNote(c: ReportContent, m: RenderMeta): string {
   if (!c.teamNote?.trim()) return "";
   return table(
@@ -140,11 +140,11 @@ function teamNote(c: ReportContent, m: RenderMeta): string {
         tr(
           td(`<span style="${css({ fontSize: 44, lineHeight: "40px", fontWeight: "bold", color: "#E0675B", fontFamily: "Georgia, serif" })}">&ldquo;</span>`, { width: 40, valign: "top" }) +
             td(
-              `<span style="${css(txt(12, "#E0675B", { fontWeight: "bold", letterSpacing: "1px" }))}">${t(m.feedbackContact)}의 한마디</span><br>` +
+              `<span style="${css(txt(12, "#E0675B", { fontWeight: "bold", letterSpacing: "1px" }))}">에디터의 한마디</span><br>` +
                 `<span style="${css(txt(16, "#FFFFFF", { lineHeight: "28px" }))}">${t(stripRich(c.teamNote))}</span>`,
               { valign: "top" },
             ),
-        ) + row(`<span style="${css(txt(12, "#B5B5B5"))}">&mdash; ${t(m.feedbackContact)} 드림</span>`, { colspan: 2, align: "right", style: { paddingTop: 8 } }),
+        ) + row(`<span style="${css(txt(12, "#B5B5B5"))}">&mdash; ${t(m.feedbackContact || m.newsletterName)} 에디터</span>`, { colspan: 2, align: "right", style: { paddingTop: 8 } }),
       ),
       { bgcolor: NOTE_BG, style: { padding: "20px 24px 18px" } },
     ),
@@ -285,7 +285,7 @@ function references(m: RenderMeta): string {
 
 function footer(m: RenderMeta): string {
   return table(
-    row(`${t(m.feedbackContact)} · ${t(BRAND.kind)} ${t(m.newsletterName)} ${issueLabel(m.issueNo)}`, { style: { ...txt(12, C.sub, { fontWeight: "bold" }), paddingTop: 14, borderTop: `1px solid ${C.line}` } }) +
+    row(`${m.feedbackContact ? `${t(m.feedbackContact)} · ` : ""}${t(BRAND.kind)} ${t(m.newsletterName)} ${issueLabel(m.issueNo)}`, { style: { ...txt(12, C.sub, { fontWeight: "bold" }), paddingTop: 14, borderTop: `1px solid ${C.line}` } }) +
       row(
         `${m.audience ? `${t(m.audience)} 내부 공유용 자료입니다. ` : "내부 공유용 자료입니다. "}기사의 저작권은 각 언론사에 있으며, 본 자료의 무단 외부 배포를 금합니다.${m.feedbackEmail ? `<br>문의 및 의견: ${t(m.feedbackEmail)}` : ""}`,
         { style: { ...txt(11, C.mute), paddingTop: 4 } },
@@ -345,10 +345,10 @@ ${renderFragment(c, m)}
 export function renderPlainText(c: ReportContent, m: RenderMeta): string {
   const refNo = new Map(m.articles.map((a, i) => [a.id, i + 1]));
   const L: string[] = [];
-  L.push(`${m.feedbackContact} ${m.newsletterName} ${issueLabel(m.issueNo)} (${dotDate(m.publishDate)})`);
+  L.push(`${m.feedbackContact ? `${m.feedbackContact} ` : ""}${m.newsletterName} ${issueLabel(m.issueNo)} (${dotDate(m.publishDate)})`);
   if (c.issueTheme) L.push(`이번 호 주제: ${c.issueTheme}`);
   L.push(c.headline, "");
-  if (c.teamNote) L.push(`[${m.feedbackContact}의 한마디]`, stripRich(c.teamNote), "");
+  if (c.teamNote) L.push("[에디터의 한마디]", stripRich(c.teamNote), "");
   if (c.keyTakeaway) L.push(`▶ 한 줄 결론: ${stripRich(c.keyTakeaway)}`, "");
   L.push("[핵심 요약]", ...c.executiveSummary.map((x) => `- ${plainRich(x)}`), "");
   c.themes.forEach((th, i) => {
