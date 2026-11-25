@@ -11,7 +11,7 @@ type TipApi = ReturnType<typeof useTip>;
 export const FOCUS = "#A72B2B";
 export const pp = (x: number) => `${Math.round(x * 100)}%`;
 
-const W = 960, H = 520, L = 64, R = 28, T = 28, B = 56;
+const W = 960, H = 580, L = 64, R = 28, T = 60, B = 96;
 const PW = W - L - R, PH = H - T - B;
 
 const textW = (t: string) => [...t].reduce((n, ch) => n + (/[ㄱ-힝]/.test(ch) ? 13.2 : 8), 0);
@@ -70,11 +70,12 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
   const placed = useMemo(() => {
     const dots = relax(pts.map((p) => ({ p, tx: x(p.recent.maturity!), ty: y(p.recent.share), r: Math.min(22, 6 + Math.sqrt(p.recent.count) * 3) })));
     const taken: Box[] = dots.map((d) => ({ x0: d.cx - d.r, y0: d.cy - d.r, x1: d.cx + d.r, y1: d.cy + d.r }));
-    const labels = new Map<string, { x: number; y: number; anchor: "start" | "end" | "middle" }>();
+    const labels = new Map<string, { x: number; y: number; anchor: "start" | "end" | "middle"; dy?: number }>();
     for (const d of [...dots].sort((a, b) => b.p.recent.count - a.p.recent.count)) {
       const w = textW(d.p.name);
       // 옆 자리 → 위·아래 → 비스듬한 옆 자리 순서 (겹친 점은 이름표를 위아래로 비껴 둠)
       const side = (dir: 1 | -1, dy: number) => ({
+        dy,
         x: d.cx + dir * (d.r + 6), y: d.cy + 4 + dy, anchor: dir === 1 ? ("start" as const) : ("end" as const),
         box: dir === 1 ? { x0: d.cx + d.r + 4, y0: d.cy - 9 + dy, x1: d.cx + d.r + 8 + w, y1: d.cy + 8 + dy } : { x0: d.cx - d.r - 8 - w, y0: d.cy - 9 + dy, x1: d.cx - d.r - 4, y1: d.cy + 8 + dy },
       });
@@ -83,7 +84,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
         side(-1, 0),
         { x: d.cx, y: d.cy - d.r - 7, anchor: "middle" as const, box: { x0: d.cx - w / 2 - 3, y0: d.cy - d.r - 21, x1: d.cx + w / 2 + 3, y1: d.cy - d.r - 4 } },
         { x: d.cx, y: d.cy + d.r + 16, anchor: "middle" as const, box: { x0: d.cx - w / 2 - 3, y0: d.cy + d.r + 3, x1: d.cx + w / 2 + 3, y1: d.cy + d.r + 20 } },
-        side(-1, -18), side(-1, 18), side(1, -18), side(1, 18), side(-1, -36), side(-1, 36), side(1, -36), side(1, 36),
+        side(-1, -18), side(-1, 18), side(1, -18), side(1, 18), side(-1, -36), side(-1, 36), side(1, -36), side(1, 36), side(-1, -54), side(-1, 54), side(1, -54), side(1, 54), side(-1, 72), side(-1, -72),
       ].filter((c) => c.box.x0 >= 0 && c.box.x1 <= W && c.box.y0 >= 0 && c.box.y1 <= T + PH);
       const own = (t: Box) => t.x0 === d.cx - d.r && t.y0 === d.cy - d.r;
       const ok = cands.find((c) => !taken.some((t) => !own(t) && hit(c.box, t))) ?? cands[0];
@@ -104,41 +105,6 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
     { x: L + 10, y: T + PH - 26, anchor: "start" as const, t: "관찰", s: "관심도 낮고 초기 단계" },
     { x: L + PW - 10, y: T + PH - 26, anchor: "end" as const, t: "안정 · 운영 최적화", s: "도입은 보편, 화제성은 낮음" },
   ];
-
-  /**
-   * 사분면 바탕 글씨 자리: 각 사분면 안 9곳 중 원·이름표와 가장 덜 겹치는 곳 (같으면 가운데 우선).
-   * 원에 가려 안 보이는 일이 없게 한다.
-   */
-  const watermarks = useMemo(() => {
-    const quads = [
-      { x0: L, x1: mx, y0: T, y1: my, q: Q[0] },
-      { x0: mx, x1: L + PW, y0: T, y1: my, q: Q[1] },
-      { x0: L, x1: mx, y0: my, y1: T + PH, q: Q[2] },
-      { x0: mx, x1: L + PW, y0: my, y1: T + PH, q: Q[3] },
-    ];
-    const obstacles: Box[] = placed.flatMap((d) => [
-      { x0: d.cx - d.r - 4, y0: d.cy - d.r - 4, x1: d.cx + d.r + 4, y1: d.cy + d.r + 4 },
-      ...(d.label ? [{ x0: d.label.anchor === "end" ? d.label.x - textW(d.p.name) : d.label.anchor === "middle" ? d.label.x - textW(d.p.name) / 2 : d.label.x, y0: d.label.y - 13, x1: d.label.anchor === "end" ? d.label.x : d.label.anchor === "middle" ? d.label.x + textW(d.p.name) / 2 : d.label.x + textW(d.p.name), y1: d.label.y + 4 }] : []),
-    ]);
-    const overlap = (a: Box, b: Box) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
-    return quads.map(({ x0, x1, y0, y1, q }) => {
-      const size = Math.min(30, Math.max(16, (x1 - x0) / 11));
-      const w = Math.max([...q.t].length * size * 0.92, [...q.s].length * 13 * 0.9);
-      const h = size + 22;
-      let best = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 + size / 3, score: Infinity };
-      for (const fy of [0.5, 0.3, 0.72, 0.18, 0.86])
-        for (const fx of [0.5, 0.3, 0.7]) {
-          const x = x0 + (x1 - x0) * fx;
-          const y = y0 + (y1 - y0) * fy + size / 3;
-          const box = { x0: x - w / 2, x1: x + w / 2, y0: y - size, y1: y - size + h };
-          if (box.x0 < x0 + 4 || box.x1 > x1 - 4 || box.y0 < y0 + 4 || box.y1 > y1 - 4) continue;
-          const score = obstacles.reduce((n, o) => n + overlap(box, o), 0);
-          if (score < best.score - 1) best = { x, y, score };
-        }
-      return { x: best.x, y: best.y, size, q };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, mx, my]);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`기술 포지션 맵: ${pts.map((p) => `${p.name} 성숙도 ${pp(p.recent.maturity!)} 관심도 ${pp(p.recent.share)}`).join(", ")}`}>
@@ -169,12 +135,21 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
       {/* 사분면: 배경 면 + 큰 워터마크 글씨 (설명이 바탕에 깔린 느낌) */}
       <rect x={L} y={T} width={PW} height={PH} fill="url(#pf-floor)" />
       <rect x={mx} y={T} width={L + PW - mx} height={my - T} fill="#A72B2B" fillOpacity="0.035" />
-      {watermarks.map(({ x: wx, y: wy, size, q }) => (
-        <g key={q.t} aria-hidden pointerEvents="none">
-          <text x={wx} y={wy} textAnchor="middle" fontSize={size} fontWeight="800" fill="#1c1a19" fillOpacity="0.08" style={{ letterSpacing: "-0.5px" }}>
-            {q.t}
+      {/* 사분면 이름: 그래프 밖 위·아래 줄에 또렷하게 (원에 가려지지 않음). 안쪽 모서리 꺾쇠로 어느 칸인지 잇는다 */}
+      {(
+        [
+          { q: Q[0], x: L + 4, y: T - 30, anchor: "start", corner: `M${L + 6} ${T + 22} V${T + 6} H${L + 22}`, mark: "↖" },
+          { q: Q[1], x: L + PW - 4, y: T - 30, anchor: "end", corner: `M${L + PW - 22} ${T + 6} H${L + PW - 6} V${T + 22}`, mark: "↗" },
+          { q: Q[2], x: L + 4, y: T + PH + 50, anchor: "start", corner: `M${L + 6} ${T + PH - 22} V${T + PH - 6} H${L + 22}`, mark: "↙" },
+          { q: Q[3], x: L + PW - 4, y: T + PH + 50, anchor: "end", corner: `M${L + PW - 22} ${T + PH - 6} H${L + PW - 6} V${T + PH - 22}`, mark: "↘" },
+        ] as const
+      ).map(({ q, x: qx, y: qy, anchor, corner, mark }, k) => (
+        <g key={q.t}>
+          <path d={corner} fill="none" stroke={k === 1 ? "#A72B2B" : "#57524f"} strokeWidth="2.5" strokeLinecap="round" opacity="0.7" />
+          <text x={qx} y={qy} textAnchor={anchor} fontSize="14" fontWeight="800" fill={k === 1 ? "#A72B2B" : "#1c1a19"}>
+            {anchor === "start" ? `${mark} ${q.t}` : `${q.t} ${mark}`}
           </text>
-          <text x={wx} y={wy + size * 0.75} textAnchor="middle" fontSize="13" fill="#1c1a19" fillOpacity="0.28">{q.s}</text>
+          <text x={qx} y={qy + 17} textAnchor={anchor} fontSize="12" fill="#57524f">{q.s}</text>
         </g>
       ))}
       <line x1={mx} x2={mx} y1={T} y2={T + PH} stroke="#c9c7c0" strokeDasharray="4 4" />
@@ -189,7 +164,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
           <text x={x(v)} y={T + PH + 18} textAnchor="middle" fontSize="11" fill="#898781">{t}</text>
         </g>
       ))}
-      <text x={L + PW} y={T + PH + 42} textAnchor="end" fontSize="12" fill="#5c5755">성숙도 → (기사 속 공개·투자·실증·도입 신호의 가중 평균)</text>
+      <text x={L + PW / 2} y={T + PH + 34} textAnchor="middle" fontSize="12" fill="#5c5755">성숙도 → (기사 속 공개·투자·실증·도입 신호의 가중 평균)</text>
       <text transform={`translate(${L - 44} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#5c5755">관심도 ↑ (추적 기술 언급 점유율)</text>
       {[0, maxShare / 2].map((v) => <text key={v} x={L - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#898781">{pp(v)}</text>)}
       <text x={mx + 4} y={T + PH - 4} fontSize="10" fill="#898781">중앙값</text>
@@ -245,6 +220,10 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
             <circle cx={cx} cy={cy} r={r + 8} fill="transparent" />
             <circle cx={cx} cy={cy} r={r} fill={p.relevance === 3 ? "url(#pf-ball-focus)" : "url(#pf-ball-gray)"} stroke="#fff" strokeWidth="1.5" filter="url(#pf-shadow)" className="pf-dot pop-in" style={{ animationDelay: `${i * 40}ms` }} />
             {p.doubtShare >= 0.2 && <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">!</text>}
+            {/* 위아래로 비껴 놓은 이름표는 가는 선으로 원과 잇는다 */}
+            {label && label.dy && Math.abs(label.dy) >= 18 && (
+              <line x1={label.anchor === "start" ? cx + r * 0.7 : cx - r * 0.7} y1={cy + (label.dy > 0 ? r * 0.7 : -r * 0.7)} x2={label.anchor === "start" ? label.x - 2 : label.x + 2} y2={label.y - 4} stroke="#898781" strokeWidth="1" />
+            )}
             {label && <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight="700" fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>}
           </g>
         );
