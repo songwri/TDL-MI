@@ -62,6 +62,7 @@ describe("비즈니스 톤 리포트 템플릿 (아웃룩 호환)", () => {
     expect(note).toBeLessThan(frag.indexOf("핵심 요약"));
     expect(frag).toContain(sampleContent.teamNote!.slice(0, 30));
     expect(frag).toContain('bgcolor="#161616"');
+    expect(frag).toContain("&mdash; TDL Trend Reporter"); // 서명
     expect(renderFragment({ ...sampleContent, teamNote: "" }, meta)).not.toContain("의 한마디");
   });
 

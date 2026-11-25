@@ -144,7 +144,7 @@ function teamNote(c: ReportContent, m: RenderMeta): string {
                 `<span style="${css(txt(16, "#FFFFFF", { lineHeight: "28px" }))}">${t(stripRich(c.teamNote))}</span>`,
               { valign: "top" },
             ),
-        ) + row(`<span style="${css(txt(12, "#B5B5B5"))}">&mdash; ${t(m.feedbackContact || m.newsletterName)} 에디터</span>`, { colspan: 2, align: "right", style: { paddingTop: 8 } }),
+        ) + row(`<span style="${css(txt(12, "#B5B5B5"))}">&mdash; ${t(m.newsletterName)} Reporter</span>`, { colspan: 2, align: "right", style: { paddingTop: 8 } }),
       ),
       { bgcolor: NOTE_BG, style: { padding: "20px 24px 18px" } },
     ),

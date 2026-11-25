@@ -173,7 +173,7 @@ export function ReportViewer({ content: c, viewer }: { content: ReportContent; v
             <span aria-hidden className="absolute left-5 top-1 font-serif text-[64px] leading-none text-[#E0675B] sm:left-6">&ldquo;</span>
             <figcaption className="pl-9 text-xs font-bold tracking-wider text-[#E0675B]">에디터의 한마디</figcaption>
             <blockquote className="mt-1.5 pl-9 text-[17px] leading-8 [text-wrap:pretty]">{stripRich(c.teamNote)}</blockquote>
-            <p className="mt-2 text-right text-xs text-[#b5b5b5]">&mdash; {brand.publisher || brand.product} 에디터</p>
+            <p className="mt-2 text-right text-xs text-[#b5b5b5]">&mdash; {brand.product} Reporter</p>
           </figure>
         )}
 
