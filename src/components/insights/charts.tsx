@@ -22,6 +22,48 @@ export const signalLabel = (k: StageKey) => STAGE_SIGNALS.find((s) => s.key === 
 
 export const pct = (m: number | null) => (m === null ? "신규" : `${m >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(m * 100))}%`);
 
+/* ── 차트 툴팁 카드 (버블 공통) ───────────────────────── */
+
+export interface TipStat {
+  label: string;
+  value: string;
+  /** 지난 기간 대비 (예: "▲ 12%p"), 방향은 up/down/flat */
+  delta?: { text: string; dir: "up" | "down" | "flat" };
+}
+
+/**
+ * 툴팁 카드: 이름과 상태를 맨 위에, 핵심 숫자 3개를 큰 글씨로, 부가 설명은 맨 아래 작게.
+ * 줄글로 늘어놓지 않아 한눈에 읽힌다.
+ */
+export function TipCard({ title, badge, badgeTone = "neutral", sub, stats, children }: { title: string; badge?: string; badgeTone?: "brand" | "neutral"; sub?: string; stats: TipStat[]; children?: React.ReactNode }) {
+  return (
+    <div className="w-[268px]">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[15px] font-bold leading-tight text-[var(--rv-ink)]">{title}</p>
+        {badge && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeTone === "brand" ? "bg-[var(--rv-tint)] text-[var(--rv-accent)]" : "bg-[#f1f0ec] text-[var(--rv-soft)]"}`}>{badge}</span>}
+      </div>
+      {sub && <p className="mt-0.5 text-[11px] font-bold text-[var(--rv-soft)]">{sub}</p>}
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        {stats.map((st) => (
+          <div key={st.label} className="rounded-md bg-[#f6f5f2] px-2 py-1.5">
+            <p className="text-[10px] text-[var(--rv-mute)]">{st.label}</p>
+            <p className="font-display text-[15px] font-bold leading-tight tabular-nums text-[var(--rv-ink)]">{st.value}</p>
+            {st.delta && <p className={`text-[10px] font-bold tabular-nums ${st.delta.dir === "up" ? "text-[var(--rv-accent)]" : "text-[var(--rv-mute)]"}`}>{st.delta.text}</p>}
+          </div>
+        ))}
+      </div>
+      {children && <div className="mt-2 space-y-1 border-t border-[var(--rv-line)] pt-2 text-[11px] text-[var(--rv-soft)]">{children}</div>}
+    </div>
+  );
+}
+
+/** 지난 기간 대비 변화 표시 */
+export const deltaOf = (now: number, before: number | null, unit: "%p" | "건"): TipStat["delta"] => {
+  if (before === null) return { text: "지난 기간 없음", dir: "flat" };
+  const d = unit === "%p" ? Math.round((now - before) * 100) : now - before;
+  return { text: d === 0 ? "변화 없음" : `${d > 0 ? "▲" : "▼"} ${Math.abs(d)}${unit}`, dir: d > 0 ? "up" : d < 0 ? "down" : "flat" };
+};
+
 /* ── 기술 성숙도 맵 (하이프 사이클 형식) ───────────────────────── */
 
 const W = 960, H = 400, L = 56, R = 24, T = 28, B = 64;
@@ -147,16 +189,30 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
         const color = catColor(p.category);
         const sel = p.name === selected;
         const body = (
-          <>
-            <p className="font-bold text-[var(--rv-ink)]">{p.name}</p>
-            <TipRow value={p.stage} label={p.confident ? "현재 단계" : "현재 단계 (신호 적음)"} />
-            <TipRow value={`${p.count}건`} label={`기간 내 기사 · 최근 30일 ${p.recent}건`} />
-            <TipRow value={pct(p.momentum)} label="최근 30일 속도 (이전 대비)" />
-            {near.length > 0 && <p className="text-[var(--rv-soft)]">같은 단계 위치: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b> (겹치지 않게 곡선을 따라 벌려 그림)</p>}
-            <div className="mt-1 flex flex-wrap gap-x-2 text-[var(--rv-soft)]">
-              {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k}><span style={{ color: SIGNAL_COLOR[k] }}>■</span> {signalLabel(k)} {p.signals[k]}</span>)}
-            </div>
-          </>
+          <TipCard
+            title={p.name}
+            badge={p.stage}
+            badgeTone="brand"
+            sub={`${p.category}${p.confident ? "" : " · 신호 3건 미만"}`}
+            stats={[
+              { label: "기간 내 기사", value: `${p.count}건` },
+              { label: "최근 30일", value: `${p.recent}건` },
+              { label: "속도 (이전 대비)", value: p.momentum === null ? "신규" : `${p.momentum >= 0 ? "+" : "−"}${Math.abs(Math.round(p.momentum * 100))}%` },
+            ]}
+          >
+            {p.signalTotal > 0 && (
+              <>
+                <div className="flex h-1.5 gap-[2px] overflow-hidden rounded-full">
+                  {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k} style={{ flex: p.signals[k], background: SIGNAL_COLOR[k] }} />)}
+                </div>
+                <p className="flex flex-wrap gap-x-2">
+                  {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k}><span style={{ color: SIGNAL_COLOR[k] }}>■</span> {signalLabel(k)} <b className="text-[var(--rv-ink)]">{p.signals[k]}</b></span>)}
+                </p>
+              </>
+            )}
+            {near.length > 0 && <p>같은 단계 위치: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
+            <p className="text-[var(--rv-mute)]">누르면 근거 기사</p>
+          </TipCard>
         );
         return (
           <g

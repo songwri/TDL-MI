@@ -12,8 +12,8 @@ import { BrandMarkInline } from "./BrandMark";
  * 지금 화면은 빨간 책갈피 표시와 굵은 글씨로 보여 준다. 표시가 메뉴 사이를 미끄러져 움직인다.
  */
 const PRIMARY = [
-  { href: "/", label: "MI 리포트", match: (p: string) => p === "/" || p.startsWith("/issues") },
-  { href: "/insights", label: "인사이트 대시보드", match: (p: string) => p.startsWith("/insights") },
+  { href: "/", label: "MI 리포트", short: "MI 리포트", match: (p: string) => p === "/" || p.startsWith("/issues") },
+  { href: "/insights", label: "인사이트 대시보드", short: "인사이트", match: (p: string) => p.startsWith("/insights") },
 ] as const;
 const REPORT_TABS = [
   { href: "/", label: "기사 선정 · 리포트 작성", match: (p: string) => p === "/" },
@@ -61,9 +61,9 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
 
   return (
     <header ref={headerRef} className="site-header sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/95 backdrop-blur">
-      <div className="mx-auto flex h-[var(--header-h)] max-w-[1600px] items-stretch gap-6 px-4">
+      <div className="mx-auto flex h-[var(--header-h)] max-w-[1600px] items-stretch gap-2 px-3 sm:gap-6 sm:px-4">
         <Link href="/" className="flex shrink-0 items-center gap-3 text-[var(--ink)]" aria-label="TDL Trend 홈 (MI 리포트)">
-          <BrandMarkInline className="h-[22px] w-auto" />
+          <BrandMarkInline className="h-[15px] w-auto sm:h-[22px]" />
           <span className="hidden border-l border-[var(--line)] pl-3 font-display text-[11px] leading-tight tracking-wide text-[var(--soft)] md:block">
             Market
             <br />
@@ -80,9 +80,10 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
                 href={m.href}
                 data-idx={i}
                 aria-current={on ? "page" : undefined}
-                className={`nav-item relative flex items-center whitespace-nowrap px-3 text-[15px] ${on ? "font-bold text-[var(--ink)]" : "text-[var(--soft)] hover:text-[var(--ink)]"}`}
+                className={`nav-item relative flex items-center whitespace-nowrap px-2 text-sm sm:px-3 sm:text-[15px] ${on ? "font-bold text-[var(--ink)]" : "text-[var(--soft)] hover:text-[var(--ink)]"}`}
               >
-                {m.label}
+                <span className="sm:hidden">{m.short}</span>
+                <span className="hidden sm:inline">{m.label}</span>
               </Link>
             );
           })}

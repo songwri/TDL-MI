@@ -25,8 +25,8 @@ export function useTip() {
   const view = tip && (
     <div
       role="tooltip"
-      className="pointer-events-none fixed z-50 max-w-[280px] rounded-md border border-[var(--rv-line)] bg-white px-3 py-2 text-xs shadow-lg"
-      style={{ left: Math.min(tip.x + 14, (typeof window !== "undefined" ? window.innerWidth : 1200) - 296), top: tip.y + 14 }}
+      className="pointer-events-none fixed z-50 max-w-[320px] rounded-lg border border-[var(--rv-line)] bg-white px-3 py-2.5 text-xs shadow-[0_12px_32px_-12px_rgb(28_26_25/0.45)]"
+      style={{ left: Math.min(tip.x + 14, (typeof window !== "undefined" ? window.innerWidth : 1200) - 336), top: Math.min(tip.y + 14, (typeof window !== "undefined" ? window.innerHeight : 900) - 260) }}
     >
       {tip.node}
     </div>

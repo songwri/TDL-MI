@@ -36,9 +36,12 @@ export function WorldMap({
   names,
   label,
   selected,
+  hovered,
   onSelect,
   tip,
 }: {
+  /** 왼쪽 나라 목록에서 마우스를 올린 나라 (지도에서 함께 강조) */
+  hovered?: string;
   /** world-atlas 국가 번호 → 회사 수 */
   counts: Map<string, number>;
   /** 국가 번호 → 툴팁에 보여 줄 회사 이름들 */
@@ -49,7 +52,7 @@ export function WorldMap({
   tip: TipApi;
 }) {
   const max = Math.max(...counts.values(), 1);
-  const sorted = useMemo(() => [...PATHS].sort((a, b) => (a.id === selected ? 1 : 0) - (b.id === selected ? 1 : 0)), [selected]);
+  const sorted = useMemo(() => [...PATHS].sort((a, b) => (a.id === selected || a.id === hovered ? 1 : 0) - (b.id === selected || b.id === hovered ? 1 : 0)), [selected, hovered]);
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`${label}: ${[...counts.entries()].filter(([, n]) => n > 0).length}개국`} onClick={() => onSelect(undefined)}>
@@ -57,6 +60,7 @@ export function WorldMap({
         {sorted.map((c) => {
           const n = counts.get(c.id) ?? 0;
           const sel = c.id === selected;
+          const hov = c.id === hovered && !sel;
           const body = (
             <>
               <p className="font-bold">{c.name}</p>
@@ -69,8 +73,9 @@ export function WorldMap({
               key={c.id + c.name}
               d={c.d}
               fill={fill(n, max)}
-              stroke={sel ? "#232021" : "#fff"}
-              strokeWidth={sel ? 1.6 : 0.6}
+              stroke={sel ? "#232021" : hov ? "#A72B2B" : "#fff"}
+              strokeWidth={sel ? 1.8 : hov ? 1.6 : 0.6}
+              style={{ transition: "stroke 0.15s, stroke-width 0.15s" }}
               className={`outline-none ${n ? "wm-country cursor-pointer" : ""}`}
               tabIndex={n ? 0 : -1}
               role={n ? "button" : undefined}

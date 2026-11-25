@@ -90,8 +90,10 @@ export const FRED_SERIES = [
  * 을 보여 준다. 새 발표가 나오면 facts 를 고친다 (checkedAt 갱신).
  */
 export interface ExternalSource {
-  id: "gartner" | "dhl" | "mckinsey";
+  id: "gartner" | "dhl" | "mckinsey" | "mhi" | "kcci";
   name: string;
+  /** 사이드바에 보일 짧은 이름 */
+  short: string;
   by: string;
   href: string;
   /** 수집 기사에서 이 기관 언급을 찾는 표현 */
@@ -109,6 +111,7 @@ export const EXTERNAL_SOURCES: ExternalSource[] = [
   {
     id: "gartner",
     name: "Gartner Hype Cycle",
+    short: "Gartner Hype Cycle",
     by: "Gartner",
     href: "https://www.gartner.com/en/supply-chain",
     match: /gartner|가트너/i,
@@ -153,6 +156,7 @@ export const EXTERNAL_SOURCES: ExternalSource[] = [
   {
     id: "dhl",
     name: "DHL Logistics Trend Radar",
+    short: "DHL Trend Radar",
     by: "DHL",
     href: "https://www.dhl.com/logistics-trend-radar",
     match: /\bdhl\b/i,
@@ -175,6 +179,7 @@ export const EXTERNAL_SOURCES: ExternalSource[] = [
   {
     id: "mckinsey",
     name: "McKinsey Operations · Supply Chain Insights",
+    short: "McKinsey Supply Chain",
     by: "McKinsey",
     href: "https://www.mckinsey.com/capabilities/operations/our-insights",
     match: /mckinsey|맥킨지/i,
@@ -191,6 +196,46 @@ export const EXTERNAL_SOURCES: ExternalSource[] = [
           "생성형 AI 활용 상위: 수요 예측, 재고 최적화, 공급 계획",
         ],
         url: "https://www.mckinsey.com/capabilities/operations/our-insights/supply-chain-risk-survey",
+      },
+    ],
+  },
+  {
+    id: "mhi",
+    name: "MHI Annual Industry Report",
+    short: "MHI Industry Report",
+    by: "MHI",
+    href: "https://www.mhi.org/publications/report",
+    match: /\bmhi\b|promat|modex/i,
+    checkedAt: "2026-11-25",
+    note: "미국 물류·자재 취급 협회(MHI)가 매년 내는 업계 설문 보고서입니다. 세부 수치는 원문 PDF(무료 등록)에서 볼 수 있습니다. 수집 기사 언급에는 MHI 가 여는 ProMat·MODEX 전시 기사도 포함합니다.",
+    facts: [
+      {
+        date: "2025",
+        title: "MHI Annual Industry Report 2025 (12번째 판)",
+        points: ["업계 리더의 절반 이상이 설비·인력·물자를 끝에서 끝까지 연결하는(엔드투엔드 오케스트레이션) 공급망 기술 투자를 늘릴 계획"],
+        url: "https://www.mhisolutionsmag.com/index.php/tag/mhi-annual-industry-report-2025/",
+      },
+    ],
+  },
+  {
+    id: "kcci",
+    name: "KCCI 한국형 컨테이너 운임지수",
+    short: "KCCI 운임지수",
+    by: "한국해양진흥공사",
+    href: "https://www.kobc.or.kr",
+    match: /kcci|한국형\s*컨테이너\s*운임/i,
+    checkedAt: "2026-11-25",
+    note: "매주 발표되는 지수라, 최신 값은 아래 '수집 기사 속 언급'에서 주간 보도로 확인하는 것이 가장 빠릅니다. 원 데이터는 한국해양진흥공사 사이트에서 봅니다.",
+    facts: [
+      {
+        date: "2025-11",
+        title: "공식 발표 3주년",
+        points: [
+          "2022.11.7 첫 공식 발표, 매주 발표 (3년간 150회), 운임 제공 패널 10개사 → 25개사",
+          "주요 항로: 북미 서안·동안, 중남미, 북유럽·지중해, 중동, 중국·일본·동남아 연근해 (40피트 컨테이너 기준 운임)",
+          "2024.9 블룸버그 터미널, 2025.11 알파라이너 플랫폼에 지수 제공",
+        ],
+        url: "https://www.fnnews.com/news/202511131038475784",
       },
     ],
   },

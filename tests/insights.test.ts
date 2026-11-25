@@ -169,7 +169,14 @@ describe("최근 근황 원그래프: 기사마다 대표 신호 하나", () => 
 describe("외부 리포트: 수집 기사 속 기관 언급", () => {
   it("Gartner·DHL·McKinsey 언급 기사를 따로 모음 (한글 표기 포함)", () => {
     const r = computeInsights([art("가트너, 공급망 기술 하이프 사이클 발표", 2), art("DHL expands robotics", 3), art("맥킨지 공급망 설문", 4), art("AMR 도입", 5)], { now: NOW });
-    expect(Object.fromEntries(r.external.map((e) => [e.id, e.count]))).toEqual({ gartner: 1, dhl: 1, mckinsey: 1 });
+    expect(Object.fromEntries(r.external.map((e) => [e.id, e.count]))).toEqual({ gartner: 1, dhl: 1, mckinsey: 1, mhi: 0, kcci: 0 });
     expect(r.external.find((e) => e.id === "dhl")!.articles[0].title).toBe("DHL expands robotics");
+  });
+});
+
+describe("외부 리포트: KCCI 주간 보도 모으기", () => {
+  it("KCCI·한국형 컨테이너 운임 기사를 찾음", () => {
+    const r = computeInsights([art("KCCI 3주 연속 상승, 미주 항로 강세", 1), art("한국형 컨테이너 운임지수 하락", 8)], { now: NOW });
+    expect(r.external.find((e) => e.id === "kcci")!.count).toBe(2);
   });
 });

@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import type { PortfolioData } from "@/lib/insights/compute";
-import { TipRow, type useTip } from "@/components/report/parts";
+import { type useTip } from "@/components/report/parts";
+import { TipCard, deltaOf } from "./charts";
 
 type TipApi = ReturnType<typeof useTip>;
 
@@ -213,16 +214,25 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
         ) : null,
       )}
       {placed.map(({ p, cx, cy, r, label, near, moved, tx, ty }, i) => {
+        const m = p.recent.maturity!;
+        const quad = p.recent.share >= data.median.share ? (m >= data.median.maturity ? "주류 · 도입 검토" : "기대 선행 · 실증으로 검증") : m >= data.median.maturity ? "안정 · 운영 최적화" : "관찰";
         const body = (
-          <>
-            <p className="font-bold">{p.name} <span className="font-normal text-[var(--rv-soft)]">· CL 연관 {p.relevance === 3 ? "높음" : p.relevance === 2 ? "중간" : "낮음"}</span></p>
-            <TipRow value={pp(p.recent.maturity!)} label={`성숙도 (지난 기간 ${p.past.maturity === null ? "신호 없음" : pp(p.past.maturity)})`} />
-            <TipRow value={pp(p.recent.share)} label={`관심도 (지난 기간 ${pp(p.past.share)})`} />
-            <TipRow value={`${p.recent.count}건`} label={`최근 기간 기사 (지난 기간 ${p.past.count}건)`} />
-            {p.doubtShare >= 0.2 && <p className="mt-1 font-bold text-[var(--rv-ink)]">▲ 주의: 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
-            {near.length > 0 && <p className="mt-1 text-[var(--rv-soft)]">같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
+          <TipCard
+            title={p.name}
+            badge={`CL 연관 ${p.relevance === 3 ? "높음" : p.relevance === 2 ? "중간" : "낮음"}`}
+            badgeTone={p.relevance === 3 ? "brand" : "neutral"}
+            sub={quad}
+            stats={[
+              { label: "성숙도", value: pp(m), delta: deltaOf(m, p.past.maturity, "%p") },
+              { label: "관심도", value: pp(p.recent.share), delta: deltaOf(p.recent.share, p.past.count ? p.past.share : null, "%p") },
+              { label: "최근 기사", value: `${p.recent.count}건`, delta: deltaOf(p.recent.count, p.past.count, "건") },
+            ]}
+          >
+            {p.doubtShare >= 0.2 && <p className="font-bold text-[var(--rv-ink)]">! 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
+            {near.length > 0 && <p>같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
             {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 옮겨 그림 · 작은 점이 실제 위치</p>}
-          </>
+            <p className="text-[var(--rv-mute)]">변화는 지난 기간 대비</p>
+          </TipCard>
         );
         return (
           <g key={p.name} tabIndex={0} className="pf-node outline-none" onPointerMove={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.show(e, body)} onBlur={tip.hide}>

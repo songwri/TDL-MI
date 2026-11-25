@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EXTERNAL_SOURCES, type ExternalSource } from "@/config/insights";
 import { COUNTRIES, SEGMENTS, type Segment, type Vendor } from "@/config/vendors";
 import { curveY, type InsightsData } from "@/lib/insights/compute";
@@ -19,7 +19,7 @@ interface Payload {
   vendors: { vendors: V[]; sheetRows: number; warning?: string };
 }
 
-type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method" | "ext-gartner" | "ext-dhl" | "ext-mckinsey";
+type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method" | "ext-gartner" | "ext-dhl" | "ext-mckinsey" | "ext-mhi" | "ext-kcci";
 const VIEWS: { group: string; items: { id: ViewId; label: string }[] }[] = [
   { group: "기술 동향", items: [
     { id: "now", label: "최근 근황" },
@@ -36,11 +36,7 @@ const VIEWS: { group: string; items: { id: ViewId; label: string }[] }[] = [
     { id: "market", label: "물동량·운임 지표" },
     { id: "method", label: "방법론·데이터 출처" },
   ] },
-  { group: "외부 리포트", items: [
-    { id: "ext-gartner", label: "Gartner Hype Cycle" },
-    { id: "ext-dhl", label: "DHL Trend Radar" },
-    { id: "ext-mckinsey", label: "McKinsey Supply Chain Insights" },
-  ] },
+  { group: "외부 리포트", items: EXTERNAL_SOURCES.map((x) => ({ id: `ext-${x.id}` as ViewId, label: x.short })) },
 ];
 const ALL_IDS = VIEWS.flatMap((g) => g.items.map((i) => i.id));
 const day = (iso?: string) => (iso ? iso.slice(0, 10).replaceAll("-", ".") : "-");
@@ -502,30 +498,38 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
   const [tab, setTab] = useState<"overview" | "revenue" | "refs">("overview");
   const [seg, setSeg] = useState<Segment | "all">("all");
   const [sel, setSel] = useState<string>();
+  const [hover, setHover] = useState<string>();
+  const [find, setFind] = useState("");
   const list = useMemo(() => vendors.filter((v) => (seg === "all" || v.segments.includes(seg)) && (!query || vendorText(v).includes(query))), [vendors, seg, query]);
-  const { counts, names } = useMemo(() => {
+  const keysOf = useCallback((v: V) => (mode === "hq" ? [v.country] : mode === "market" ? v.markets ?? [] : (v.references ?? []).map((r) => r.country ?? "")), [mode]);
+  const { counts, names, nav } = useMemo(() => {
     const counts = new Map<string, number>();
     const names = new Map<string, string[]>();
     for (const v of list) {
-      const keys = mode === "hq" ? [v.country] : mode === "market" ? v.markets ?? [] : (v.references ?? []).map((r) => r.country ?? "");
-      for (const k of new Set(keys)) {
+      for (const k of new Set(keysOf(v))) {
         const id = COUNTRIES[k]?.id;
         if (!id) continue;
         counts.set(id, (counts.get(id) ?? 0) + 1);
         names.set(id, [...(names.get(id) ?? []), v.name]);
       }
     }
-    return { counts, names };
-  }, [list, mode]);
+    // 왼쪽 나라 목록: 회사가 있는 나라만, 많은 순
+    const nav = Object.entries(COUNTRIES)
+      .map(([iso2, c]) => ({ iso2, id: c.id, ko: c.ko, n: counts.get(c.id) ?? 0 }))
+      .filter((x) => x.n > 0)
+      .sort((a, b) => b.n - a.n || a.ko.localeCompare(b.ko, "ko"));
+    return { counts, names, nav };
+  }, [list, keysOf]);
   const iso2Sel = sel ? Object.entries(COUNTRIES).find(([, c]) => c.id === sel)?.[0] : undefined;
-  const inCountry = (v: V) => (mode === "hq" ? v.country === iso2Sel : mode === "market" ? !!v.markets?.includes(iso2Sel!) : !!v.references?.some((r) => r.country === iso2Sel));
-  const shown = iso2Sel ? list.filter(inCountry) : list;
-  const byHq = [...new Set(list.map((v) => v.country))].map((c) => ({ c, n: list.filter((v) => v.country === c).length })).sort((a, b) => b.n - a.n);
+  const shown = iso2Sel ? list.filter((v) => keysOf(v).includes(iso2Sel)) : list;
+  const navShown = nav.filter((c) => !find.trim() || `${c.ko} ${c.iso2}`.toLowerCase().includes(find.trim().toLowerCase()));
+  const maxN = Math.max(...nav.map((c) => c.n), 1);
+  const modeWord = mode === "hq" ? "본사" : mode === "market" ? "공급 확인" : "적용 사례";
   return (
     <>
       <Head
         title="글로벌 공급사 지도"
-        lead="어느 나라의 어떤 회사가 어떤 물류기술을 공급하는지 봅니다. 공급·적용 국가는 출처로 확인된 것만 표시하며, 팀이 시트 Vendors 탭에서 보강합니다."
+        lead="나라 목록에서 고르면 지도와 기업 목록이 그 나라로 맞춰집니다. 공급·적용 국가는 출처로 확인된 것만 표시하며, 팀이 시트 Vendors 탭에서 보강합니다."
         right={<Toggle label="지도 기준" value={mode} onChange={(v) => { setMode(v); setSel(undefined); if (v === "ref") setTab("refs"); }} options={[["hq", "본사 국가"], ["market", "공급 국가"], ["ref", "적용 사례 국가"]]} />}
       />
       {warning && <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{warning}</p>}
@@ -536,23 +540,65 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
           </button>
         ))}
       </div>
-      <Card>
-        <WorldMap counts={counts} names={names} label={mode === "hq" ? "본사 기준 회사 수" : mode === "market" ? "공급 실적 확인 회사 수" : "적용 사례가 있는 회사 수"} selected={sel} onSelect={setSel} tip={tip} />
-        {mode === "market" && <p className="mt-2 text-xs text-[var(--rv-mute)]">공급 국가는 출처로 확인된 것만 표시합니다. 비어 있는 회사가 많으니 시트 Vendors 탭의 &lsquo;공급국가&rsquo; 칸을 채워 주세요.</p>}
-        <p className="mt-2 text-xs text-[var(--rv-soft)]">본사 국가별: {byHq.map((x) => `${ko(x.c)} ${x.n}`).join(" · ")}</p>
-      </Card>
-      <div className="mt-4">
-        <p className="mb-2 text-sm font-bold">
-          {iso2Sel ? `${ko(iso2Sel)} ${mode === "hq" ? "본사" : "공급"} 기업 ${shown.length}곳` : `전체 ${shown.length}곳`}
-          {iso2Sel && <button type="button" onClick={() => setSel(undefined)} className="ml-2 text-xs font-normal text-[var(--rv-accent)] underline">전체 보기</button>}
-        </p>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Toggle label="표 종류" value={tab} onChange={setTab} options={[["overview", "기업 개요"], ["revenue", `매출 (${shown.filter((v) => v.revenue).length})`], ["refs", `적용 사례 (${shown.reduce((n, v) => n + (v.references?.length ?? 0), 0)})`]]} />
-        </div>
-        <div key={tab} className="view-enter">
-          {tab === "overview" && <VendorTable vendors={shown} />}
-          {tab === "revenue" && <RevenueTable vendors={shown} />}
-          {tab === "refs" && <ReferenceList vendors={shown} country={mode === "ref" ? iso2Sel : undefined} />}
+
+      <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
+        {/* 나라 목록 (지도를 몰라도 이름으로 찾기) */}
+        <nav aria-label="나라 목록" className="min-w-0 rounded-lg border border-[var(--rv-line)] bg-white p-3 lg:sticky lg:top-[calc(var(--header-total,60px)+16px)] lg:max-h-[calc(100vh-var(--header-total,60px)-32px)] lg:self-start lg:overflow-y-auto">
+          <p className="mb-2 px-1 text-[11px] font-bold text-[var(--rv-mute)]">{modeWord} 기준 · {nav.length}개국</p>
+          <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="나라 찾기" aria-label="나라 찾기" className="mb-2 w-full rounded border border-[var(--rv-line)] px-2 py-1.5 text-sm" />
+          <ul className="flex gap-1 overflow-x-auto lg:block lg:space-y-0.5 lg:overflow-visible">
+            <li className="shrink-0">
+              <button type="button" onClick={() => setSel(undefined)} className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm ${!sel ? "bg-[var(--rv-tint)] font-bold text-[var(--rv-accent)]" : "hover:bg-[#f6f5f2]"}`}>
+                전체 국가 <span className="ml-auto text-xs tabular-nums text-[var(--rv-mute)]">{list.length}곳</span>
+              </button>
+            </li>
+            {navShown.map((c) => {
+              const on = c.id === sel;
+              return (
+                <li key={c.iso2} className="shrink-0">
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSel(on ? undefined : c.id)}
+                    onPointerEnter={() => setHover(c.id)}
+                    onPointerLeave={() => setHover(undefined)}
+                    onFocus={() => setHover(c.id)}
+                    onBlur={() => setHover(undefined)}
+                    className={`grid w-full grid-cols-[28px_1fr_auto] items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 text-left text-sm transition-colors ${on ? "bg-[var(--rv-tint)] font-bold text-[var(--rv-accent)]" : "hover:bg-[#f6f5f2]"}`}
+                  >
+                    <span className="font-display text-[10px] font-bold tracking-wider text-[var(--rv-mute)]">{c.iso2}</span>
+                    <span className="min-w-0">
+                      {c.ko}
+                      <span aria-hidden className="mt-0.5 hidden h-1 rounded-full bg-[#e8f1fb] lg:block"><span className="block h-1 rounded-full bg-[#3987E5]" style={{ width: `${(c.n / maxN) * 100}%` }} /></span>
+                    </span>
+                    <span className="text-xs tabular-nums text-[var(--rv-soft)]">{c.n}</span>
+                  </button>
+                </li>
+              );
+            })}
+            {navShown.length === 0 && <li className="px-2 py-3 text-xs text-[var(--rv-mute)]">해당하는 나라가 없습니다.</li>}
+          </ul>
+        </nav>
+
+        <div className="min-w-0 space-y-4">
+          <Card>
+            <div className="mx-auto max-w-[820px]">
+              <WorldMap counts={counts} names={names} label={`${modeWord} 기준 회사 수`} selected={sel} hovered={hover} onSelect={setSel} tip={tip} />
+            </div>
+          </Card>
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-base font-bold">
+                {iso2Sel ? <>{ko(iso2Sel)} <span className="font-normal text-[var(--rv-soft)]">{modeWord} 기업 {shown.length}곳</span></> : <>전체 <span className="font-normal text-[var(--rv-soft)]">{shown.length}곳</span></>}
+              </p>
+              <Toggle label="표 종류" value={tab} onChange={setTab} options={[["overview", "기업 개요"], ["revenue", `매출 (${shown.filter((v) => v.revenue).length})`], ["refs", `적용 사례 (${shown.reduce((n, v) => n + (v.references?.length ?? 0), 0)})`]]} />
+            </div>
+            <div key={`${tab}-${sel ?? "all"}`} className="view-enter">
+              {tab === "overview" && <VendorTable vendors={shown} />}
+              {tab === "revenue" && <RevenueTable vendors={shown} />}
+              {tab === "refs" && <ReferenceList vendors={shown} country={mode === "ref" ? iso2Sel : undefined} />}
+            </div>
+          </div>
         </div>
       </div>
     </>
