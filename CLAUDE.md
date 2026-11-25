@@ -13,5 +13,5 @@ CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 �
 - 템플릿(`src/lib/email/template.ts`)은 뼈대 table + 인라인 스타일. class·div·SVG 금지, 이미지는 인포그래픽에만(width·height·alt 필수).
 - 웹 인터랙티브 리포트(`src/components/report/`)는 메일 HTML 과 같은 데이터(ReportContent + ViewerData)를 쓴다. 차트 색은 `src/config/brand.ts` 의 검증된 팔레트(카테고리 색은 항목에 고정, 브랜드 레드는 강조 한 가지에만)
 - 물류기술 인텔리전스(`/insights`, 사이드바 대시보드): 최근 근황(첫 화면, 대표 신호 원그래프↔기사 묶음)·기술 포지션 맵(시장 기준 성숙도×관심도 버블, 과거→최근 화살표, 겹침은 relax+실제 위치 점)·성숙도 곡선(Gartner 평가 아님)·글로벌 공급사 지도(d3-geo+world-atlas, 본사→공급·적용 국가 경로선)·중국 기업·동종사·흐름·FRED 지표·방법론. 계산 `src/lib/insights/compute.ts`, 설정 `src/config/insights.ts`. 공급사는 `src/config/vendors.ts`(출처·확인 상태 필수, 순위는 근거 있을 때만) + 시트 Vendors 탭(`src/lib/vendors.ts`, 매출·레퍼런스 칸 포함). 외부 리포트 수치는 옮기지 않음
-- 화면: 상단 메뉴 `SiteHeader`(인사이트 대시보드 / MI 리포트[작성·발행 이력] / 수집 채널 설정), 로고 `BrandMark`/`BrandMarkInline`(TDL LAB 응용, 헤더는 가로형 + by LX Pantos), 활성 메뉴는 연한 레드 바탕+레드 글씨, 글꼴 Wanted Sans(본문)+Archivo Expanded(영문·숫자). 접속은 로그인 화면+쿠키(`src/lib/auth/session.ts`, 미들웨어), 브라우저 기본 인증 창 금지
+- 화면: 상단 메뉴 `SiteHeader`(인사이트 대시보드 / MI 리포트[작성·발행 이력] / 수집 채널 설정), 로고 `BrandMark`/`BrandMarkInline`(TDL LAB 응용, 헤더는 가로형. "by LX Pantos" 문구는 쓰지 않음), 활성 메뉴는 연한 레드 바탕+레드 글씨, 글꼴 Wanted Sans(본문)+Archivo Expanded(영문·숫자). 접속은 로그인 화면+쿠키(`src/lib/auth/session.ts`, 미들웨어), 브라우저 기본 인증 창 금지
 - 확인: `npm test`, `npm run typecheck`, `npm run lint`

@@ -65,9 +65,9 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
         <Link href="/insights" className="flex shrink-0 items-center gap-3 text-[var(--ink)]" aria-label="TDL Trend 홈">
           <BrandMarkInline className="h-[22px] w-auto" />
           <span className="hidden border-l border-[var(--line)] pl-3 text-[11px] leading-tight text-[var(--soft)] md:block">
-            <span className="font-display font-bold tracking-wide text-[var(--ink)]">by LX Pantos</span>
+            테크이노베이션팀
             <br />
-            테크이노베이션팀 MI
+            <span className="font-display tracking-wide">Market Intelligence</span>
           </span>
         </Link>
 

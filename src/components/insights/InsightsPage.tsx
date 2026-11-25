@@ -294,7 +294,7 @@ function NowView({ d, query, tip }: { d: InsightsData; query: string; tip: TipAp
   );
 }
 
-/* ── LX Pantos 기술 포트폴리오 ───────────────────────────── */
+/* ── 기술 포지션 맵 ───────────────────────────── */
 
 function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
   const [onlyFocus, setOnlyFocus] = useState(false);
