@@ -3,12 +3,12 @@
 CL사업부 대상 격주 물류·로봇 Market Intelligence 리포트 생성 도구입니다.
 매일 아침 국내외 뉴스를 수집하고, 2주치 기사에서 후보를 골라 웹에서 선정하면, 선정한 기사 여러 건을 **주제별로 묶어 인사이트를 뽑은 기사형 리포트**(제N호)를 만듭니다. 통계 인포그래픽과 원문 링크가 포함되고, **메일 본문에 그대로 붙여 넣을 수 있는** 형태입니다.
 
-> **웹으로 운영하려면(전부 무료)** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고(Apps Script 연결, 구글 클라우드 불필요), Vercel 또는 Render 무료 플랜에 웹을 올리고, GitHub Actions가 매일 08:00(한국시간)에 기사를 수집합니다.
+> **웹으로 운영하려면(전부 무료)** [`docs/DEPLOY.md`](docs/DEPLOY.md): 구글 시트를 유일한 원본으로 쓰고(Apps Script 연결, 구글 클라우드 불필요), Vercel 또는 Render 무료 플랜에 웹을 올리고, GitHub Actions가 매일 새벽(한국시간 01:17, 예비 05:43)에 기사를 수집합니다.
 
 ## 흐름
 
 ```
-[GitHub Actions 매일 08:00]  뉴스 수집 ─▶ 구글 시트 Raw_Articles
+[GitHub Actions 매일 새벽]  뉴스 수집 ─▶ 구글 시트 Raw_Articles
 [웹]  최근 2주 기사에서 후보 선정(체크) · 기획 의도 입력 · 📝 작성 의뢰 저장 ─▶ 시트 Handoffs
 [Claude Code]  /write-report N  ─ 의뢰서·통계·지난 호 이력을 읽고 리포트 작성 ─▶ 시트 Handoffs
 [웹]  작성본 불러오기 ─▶ 미리보기·편집 ─▶ 📋 메일 본문용 복사(아웃룩에 Ctrl+V) ─▶ ✅ 발행 확정 ─▶ 시트 Newsletter_Issues

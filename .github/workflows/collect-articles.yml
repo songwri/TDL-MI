@@ -1,12 +1,15 @@
 name: collect-articles
 
-# 매일 08:00(한국시간)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
+# 매일 새벽(한국시간 01:17, 예비 05:43)에 뉴스 사이트를 돌며 새 기사를 구글 시트(Raw_Articles)에 쌓는다.
+# GitHub 예약 작업은 붐비는 시간(정각, 한국 아침)에 몇 시간씩 늦어지므로 새벽의 정각이 아닌 분으로 잡았다.
+# 두 번 돌아도 같은 기사는 중복 제거되어 한 번만 쌓인다 (예비 실행은 첫 실행이 늦거나 실패할 때 대비).
 # 필요한 값: 저장소 Settings → Secrets and variables → Actions → Repository secrets
 #   SHEETS_WEBAPP_URL, SHEETS_WEBAPP_TOKEN   (시트에 붙인 Apps Script 웹 앱 주소와 토큰, 무료)
 #   서비스 계정 방식을 쓴다면 GOOGLE_SHEETS_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_KEY_JSON
 on:
   schedule:
-    - cron: "0 23 * * *"
+    - cron: "17 16 * * *" # 한국시간 01:17
+    - cron: "43 20 * * *" # 한국시간 05:43 (예비)
   workflow_dispatch:
     inputs:
       days:

@@ -441,7 +441,7 @@ export function IndicatorCard({ ind, tip }: { ind: Indicator; tip: TipApi }) {
           </svg>
         </>
       ) : (
-        <p className="mt-4 rounded border border-dashed border-[var(--rv-line)] p-3 text-center text-xs text-[var(--rv-mute)]">아직 받은 값이 없습니다. 매일 08:00 기사 수집 때 함께 받아 옵니다.</p>
+        <p className="mt-4 rounded border border-dashed border-[var(--rv-line)] p-3 text-center text-xs text-[var(--rv-mute)]">아직 받은 값이 없습니다. 매일 새벽 기사 수집 때 함께 받아 옵니다.</p>
       )}
     </div>
   );

@@ -389,7 +389,7 @@ export function Dashboard() {
               <p className="font-display text-[11px] font-bold tracking-[0.14em] text-[var(--mute)]">NEWS INBOX</p>
               <h2 id="inbox-title" className="text-lg font-bold leading-tight">수집 기사함</h2>
             </div>
-            <p className="text-xs text-[var(--soft)]">매일 08:00 자동 수집 · 체크한 기사가 오른쪽 작성 데스크에 담깁니다</p>
+            <p className="text-xs text-[var(--soft)]">매일 새벽 자동 수집 · 체크한 기사가 오른쪽 작성 데스크에 담깁니다</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-3">
             <Button variant="primary" onClick={refresh} disabled={refreshing}>
