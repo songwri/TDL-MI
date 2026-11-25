@@ -20,21 +20,21 @@ interface Payload {
 }
 
 type ViewId = "now" | "portfolio" | "maturity" | "world" | "china" | "peers" | "flow" | "market" | "method";
-const VIEWS: { group: string; items: { id: ViewId; label: string; hint: string }[] }[] = [
+const VIEWS: { group: string; items: { id: ViewId; label: string }[] }[] = [
   { group: "기술 동향", items: [
-    { id: "now", label: "최근 근황", hint: "기사 구성과 신호별 최신 소식" },
-    { id: "portfolio", label: "기술 포지션 맵", hint: "시장의 성숙도 × 관심도, 과거 → 최근" },
-    { id: "maturity", label: "기술 성숙도 곡선", hint: "하이프 사이클 형식" },
+    { id: "now", label: "최근 근황" },
+    { id: "portfolio", label: "기술 포지션 맵" },
+    { id: "maturity", label: "기술 성숙도 곡선" },
   ] },
   { group: "시장·경쟁", items: [
-    { id: "world", label: "글로벌 공급사 지도", hint: "어느 나라의 누가 무엇을" },
-    { id: "china", label: "중국 물류기술 기업", hint: "분야별 기업·순위 근거" },
-    { id: "peers", label: "국내 동종업계 동향", hint: "LX판토스와 국내 물류기업" },
+    { id: "world", label: "글로벌 공급사 지도" },
+    { id: "china", label: "중국 물류기술 기업" },
+    { id: "peers", label: "국내 동종업계 동향" },
   ] },
   { group: "흐름·지표", items: [
-    { id: "flow", label: "키워드·주간 흐름", hint: "급상승 키워드, 12주 흐름" },
-    { id: "market", label: "물동량·운임 지표", hint: "공개 경제 지표" },
-    { id: "method", label: "방법론·데이터 출처", hint: "계산 방법, 입력 필요 항목" },
+    { id: "flow", label: "키워드·주간 흐름" },
+    { id: "market", label: "물동량·운임 지표" },
+    { id: "method", label: "방법론·데이터 출처" },
   ] },
 ];
 const ALL_IDS = VIEWS.flatMap((g) => g.items.map((i) => i.id));
@@ -43,13 +43,14 @@ const ko = (iso2: string) => COUNTRIES[iso2]?.ko ?? iso2;
 type TipApi = ReturnType<typeof useTip>;
 
 function Head({ title, lead, right }: { title: string; lead?: React.ReactNode; right?: React.ReactNode }) {
+  // 제목 줄 오른쪽에 버튼을 두고, 설명은 아래 줄 전체 폭을 써서 한 줄로 읽히게
   return (
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-[var(--rv-ink)] pb-3">
-      <div className="min-w-0">
+    <div className="mb-5 border-b border-[var(--rv-ink)] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-        {lead && <p className="mt-1 max-w-3xl text-sm text-[var(--rv-soft)]">{lead}</p>}
+        {right}
       </div>
-      {right}
+      {lead && <p className="mt-1 text-sm text-[var(--rv-soft)] [text-wrap:pretty]">{lead}</p>}
     </div>
   );
 }
@@ -156,7 +157,6 @@ export function InsightsPage() {
                         className={`relative w-full rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${view === i.id ? "bg-[var(--rv-tint)] font-bold text-[var(--rv-accent)] before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-[var(--rv-accent)]" : "text-[var(--rv-ink)] hover:bg-[#f1f0ec]"}`}
                       >
                         {i.label}
-                        <span className={`block text-[11px] font-normal ${view === i.id ? "text-[var(--rv-accent)]/70" : "text-[var(--rv-mute)]"}`}>{i.hint}</span>
                       </button>
                     </li>
                   ))}
@@ -218,7 +218,7 @@ function NowView({ d, query, tip }: { d: InsightsData; query: string; tip: TipAp
   };
   return (
     <>
-      <Head title="최근 근황" lead="분석 기간에 수집된 물류기술 기사를 대표 신호(도입·실증·투자·공개·회의)로 나눴습니다. 원그래프 조각을 누르면 아래에서 해당 기사 묶음을 표시합니다." />
+      <Head title="최근 근황" lead="분석 기간 기사를 대표 신호(도입·실증·투자·공개·회의)로 나눴습니다. 원그래프 조각을 누르면 해당 기사 묶음을 표시합니다." />
       <section className="grid items-center gap-6 rounded-lg border border-[var(--rv-line)] bg-white p-5 md:grid-cols-[260px_1fr]">
         <div className="mx-auto w-full max-w-[260px]">
           <SignalDonut mix={d.now.mix} selected={pick} onPick={choose} tip={tip} />
@@ -311,7 +311,7 @@ function PortfolioView({ d, tip }: { d: InsightsData; tip: TipApi }) {
     <>
       <Head
         title="기술 포지션 맵"
-        lead={<><span className="font-display text-xs font-bold tracking-wider text-[var(--rv-mute)]">TECH POSITION MAP · MATURITY × ATTENTION</span><br />시장(수집 기사 전체)에서 기술마다 <b>성숙도</b>(기사 속 도입·실증 근거가 얼마나 쌓였나)와 <b>관심도</b>(시장의 언급 점유율)를 계산해 배치했습니다. 회색 작은 원은 지난 기간({day(pf.pastFrom)}~), 큰 원은 최근 기간({day(pf.recentFrom)}~)이며 화살표가 이동 방향입니다. <b style={{ color: FOCUS }}>빨간 원</b>은 CL사업 연관 높음.</>}
+        lead={<>시장 기사 기준 <b>성숙도</b>(도입·실증 근거) × <b>관심도</b>(언급 점유율). 회색 작은 원({day(pf.pastFrom)}~) → 큰 원({day(pf.recentFrom)}~)이 이동, <b style={{ color: FOCUS }}>빨간 원</b>은 CL사업 연관 높음.</>}
         right={
           <div className="flex flex-wrap gap-2">
             <Toggle label="표시 범위" value={onlyFocus ? "focus" : "all"} onChange={(v) => setOnlyFocus(v === "focus")} options={[["all", "전체 기술"], ["focus", "CL 연관 높음만"]]} />
@@ -384,7 +384,7 @@ function MaturityView({ d, tip }: { d: InsightsData; tip: TipApi }) {
   const sel = d.hype.find((h) => h.name === selected);
   return (
     <>
-      <Head title="기술 성숙도 곡선" lead="같은 기사 신호를 하이프 사이클 형식으로 본 화면입니다. Gartner의 평가가 아니라 우리 수집 기사 기준이며, 점을 누르면 근거 기사가 나옵니다." />
+      <Head title="기술 성숙도 곡선" lead="기사 신호를 하이프 사이클 형식으로 본 화면입니다(우리 수집 기사 기준, Gartner 평가 아님). 점을 누르면 근거 기사를 봅니다." />
       <Card>
         {d.hype.length === 0 ? (
           <p className="py-10 text-center text-sm text-[var(--rv-mute)]">기간 내 추적 기술이 언급된 기사가 없습니다.</p>
@@ -536,7 +536,7 @@ function WorldView({ vendors, query, tip, warning }: { vendors: V[]; query: stri
     <>
       <Head
         title="글로벌 공급사 지도"
-        lead="어느 나라의 어떤 회사가 어떤 물류기술을 공급하는지 봅니다. 본사 기준과 공급 실적(출처로 확인된 국가만) 기준을 바꿔 볼 수 있습니다. 목록 = 웹 검색으로 확인한 기본값 + 팀이 시트 Vendors 탭에 입력한 내용."
+        lead="어느 나라의 어떤 회사가 어떤 물류기술을 공급하는지 봅니다. 공급·적용 국가는 출처로 확인된 것만 표시하며, 팀이 시트 Vendors 탭에서 보강합니다."
         right={<Toggle label="지도 기준" value={mode} onChange={(v) => { setMode(v); setSel(undefined); if (v === "ref") setTab("refs"); }} options={[["hq", "본사 국가"], ["market", "공급 국가"], ["ref", "적용 사례 국가"]]} />}
       />
       {warning && <p className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{warning}</p>}
@@ -636,7 +636,7 @@ function ChinaView({ vendors, query }: { vendors: V[]; query: string }) {
   const inKorea = cn.filter((v) => v.korea);
   return (
     <>
-      <Head title="중국 물류기술 기업" lead="Full-Stack SI, AMR, 셔틀·자동창고, 디지털 트윈 등 분야별로 중국 기업과 공급 솔루션을 정리했습니다. 중국은 권위 있는 공개 순위표를 찾지 못해, 순위는 상장 서류·회사 발표처럼 근거가 있을 때만 근거와 함께 적었습니다." />
+      <Head title="중국 물류기술 기업" lead="Full-Stack SI·AMR·셔틀·디지털 트윈 등 분야별 중국 기업과 솔루션입니다. 공개 순위표가 없어 순위는 상장 서류·회사 발표 등 근거가 있을 때만 적었습니다." />
       <div className="mb-4 grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4"><p className="text-xs font-bold text-[var(--rv-soft)]">정리된 중국 기업</p><p className="text-[28px] font-bold tabular-nums">{cn.length}</p><p className="text-[11px] text-[var(--rv-mute)]">중국 자본이 소유한 해외 기업 포함 (예: Swisslog)</p></div>
         <div className="rounded-lg border border-[var(--rv-line)] bg-white p-4"><p className="text-xs font-bold text-[var(--rv-soft)]">한국 사업 확인</p><p className="text-[28px] font-bold tabular-nums">{inKorea.length}</p><p className="text-[11px] text-[var(--rv-mute)]">{inKorea.map((v) => v.name).join(", ") || "-"}</p></div>
@@ -764,7 +764,7 @@ function FlowView({ d, tip }: { d: InsightsData; tip: TipApi }) {
 function MarketView({ indicators, tip }: { indicators: Indicator[]; tip: TipApi }) {
   return (
     <>
-      <Head title="물동량·운임 지표" lead="미국 세인트루이스 연준(FRED) 무료 공개 데이터입니다. 매일 기사 수집 때 갱신되며, 월간 지표라 한두 달 늦게 반영됩니다." />
+      <Head title="물동량·운임 지표" lead="미국 연준(FRED) 무료 공개 데이터입니다. 매일 수집 때 갱신되며, 월간 지표라 한두 달 늦게 반영됩니다." />
       <div className="grid gap-3 sm:grid-cols-2">{indicators.map((ind) => <IndicatorCard key={ind.id} ind={ind} tip={tip} />)}</div>
       <h3 className="mb-2 mt-6 font-bold">함께 볼 외부 리포트 <span className="text-xs font-normal text-[var(--rv-mute)]">수치는 옮기지 않고 링크만</span></h3>
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
