@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { PortfolioData } from "@/lib/insights/compute";
 import { type useTip } from "@/components/report/parts";
 import { TipCard, deltaOf } from "./charts";
+import { relax } from "./relax";
 
 type TipApi = ReturnType<typeof useTip>;
 
@@ -14,6 +15,9 @@ export const pp = (x: number) => `${Math.round(x * 100)}%`;
 const W = 960, H = 580, L = 64, R = 28, T = 60, B = 96;
 const PW = W - L - R, PH = H - T - B;
 
+/** 눈금 값: 5%·10%·20% 같은 둥근 값 (제곱근 눈금이라 아래쪽이 촘촘함) */
+const niceTicks = (max: number) => [0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5].filter((v) => v <= max * 1.001 && (v === 0 || Math.sqrt(v / max) > 0.12));
+
 const textW = (t: string) => [...t].reduce((n, ch) => n + (/[ㄱ-힝]/.test(ch) ? 13.2 : 8), 0);
 type Box = { x0: number; y0: number; x1: number; y1: number };
 const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
@@ -23,52 +27,20 @@ const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y
  * 가로 = 성숙도(기사 속 도입·실증 신호 비중), 세로 = 관심도(추적 기술 언급 점유율), 크기 = 최근 기사 수.
  * 회색 작은 원 → 큰 원: 지난 기간 → 최근 기간 이동. 사분면 기준선 = 최근 기간 중앙값.
  */
-/**
- * 겹침 풀기: 원끼리 겹치면 서로 밀어내고, 실제 위치로 약하게 당긴다 (최대 몇십 px 이동).
- * 옮겨진 원은 실제 위치에 작은 점 + 가는 선을 남겨, 값은 그대로 읽히게 한다.
- */
-function relax<T extends { tx: number; ty: number; r: number }>(nodes: T[]): (T & { cx: number; cy: number })[] {
-  const n = nodes.map((d, i) => ({ ...d, cx: d.tx + (i % 3) * 0.01, cy: d.ty + (i % 2) * 0.01 }));
-  for (let it = 0; it < 160; it++) {
-    for (let i = 0; i < n.length; i++)
-      for (let j = i + 1; j < n.length; j++) {
-        const a = n[i], b = n[j];
-        let dx = b.cx - a.cx, dy = b.cy - a.cy;
-        let d = Math.hypot(dx, dy);
-        const min = a.r + b.r + 3;
-        if (d >= min) continue;
-        if (d < 1e-6) {
-          const ang = (j * 2.4) % (Math.PI * 2);
-          dx = Math.cos(ang);
-          dy = Math.sin(ang);
-          d = 1;
-        }
-        const push = (min - d) / 2;
-        a.cx -= (dx / d) * push;
-        a.cy -= (dy / d) * push;
-        b.cx += (dx / d) * push;
-        b.cy += (dy / d) * push;
-      }
-    for (const d of n) {
-      d.cx += (d.tx - d.cx) * 0.04;
-      d.cy += (d.ty - d.cy) * 0.04;
-      d.cx = Math.min(Math.max(d.cx, L + d.r + 2), L + PW - d.r - 2);
-      d.cy = Math.min(Math.max(d.cy, T + d.r + 2), T + PH - d.r - 2);
-    }
-  }
-  return n;
-}
-
 export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData; onlyFocus: boolean; tip: TipApi }) {
   const pts = data.points.filter((p) => p.recent.maturity !== null && (!onlyFocus || p.relevance === 3));
   const maxShare = Math.max(...pts.flatMap((p) => [p.recent.share, p.past.maturity !== null ? p.past.share : 0]), 0.05) * 1.15;
   // 양 끝 점이 축에 붙지 않게 가로 범위를 조금 넓힘
   const x = (m: number) => L + ((m + 0.05) / 1.1) * PW;
-  const y = (s: number) => T + (1 - s / maxShare) * PH;
+  // 세로(관심도)는 제곱근 눈금: 한두 기술이 매우 커도 나머지가 바닥에 눌리지 않고 펼쳐진다
+  const y = (s: number) => T + (1 - Math.sqrt(Math.max(s, 0) / maxShare)) * PH;
   const mx = x(data.median.maturity), my = y(data.median.share);
 
   const placed = useMemo(() => {
-    const dots = relax(pts.map((p) => ({ p, tx: x(p.recent.maturity!), ty: y(p.recent.share), r: Math.min(22, 6 + Math.sqrt(p.recent.count) * 3) })));
+    const dots = relax(pts.map((p) => {
+      const r = Math.min(22, 6 + Math.sqrt(p.recent.count) * 3);
+      return { p, tx: x(p.recent.maturity!), ty: y(p.recent.share), r, minX: L + 2, maxX: L + PW - 2, minY: T + 2, maxY: T + PH - 2 };
+    }), { gap: 6, pull: 0.012, iterations: 300 });
     const taken: Box[] = dots.map((d) => ({ x0: d.cx - d.r, y0: d.cy - d.r, x1: d.cx + d.r, y1: d.cy + d.r }));
     const labels = new Map<string, { x: number; y: number; anchor: "start" | "end" | "middle"; dy?: number }>();
     for (const d of [...dots].sort((a, b) => b.p.recent.count - a.p.recent.count)) {
@@ -165,8 +137,13 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
         </g>
       ))}
       <text x={L + PW / 2} y={T + PH + 34} textAnchor="middle" fontSize="12" fill="#5c5755">성숙도 → (기사 속 공개·투자·실증·도입 신호의 가중 평균)</text>
-      <text transform={`translate(${L - 44} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#5c5755">관심도 ↑ (추적 기술 언급 점유율)</text>
-      {[0, maxShare / 2].map((v) => <text key={v} x={L - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#898781">{pp(v)}</text>)}
+      <text transform={`translate(${L - 44} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#5c5755">관심도 ↑ (추적 기술 언급 점유율, 제곱근 눈금)</text>
+      {niceTicks(maxShare).map((v) => (
+        <g key={v}>
+          {v > 0 && <line x1={L} x2={L + PW} y1={y(v)} y2={y(v)} stroke="#1c1a19" strokeOpacity="0.05" />}
+          <text x={L - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#898781">{pp(v)}</text>
+        </g>
+      ))}
       <text x={mx + 4} y={T + PH - 4} fontSize="10" fill="#898781">중앙값</text>
 
       {/* 이동 화살표 (지난 기간 → 최근) */}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { curveY, computeInsights, detectSignals, stageOf, weekStart } from "@/lib/insights/compute";
+import { CURVE_STAGES, type StageKey } from "@/config/insights";
+import { classifyStage, curveY, computeInsights, detectSignals, stageOf, weekStart, type Signals } from "@/lib/insights/compute";
 import { parseFredCsv, summarize } from "@/lib/indicators";
 import type { Article } from "@/lib/types";
 
@@ -30,7 +31,7 @@ describe("트렌드 인사이트 계산 (수집 기사만으로)", () => {
     expect(stageOf(0.88)).toBe("생산성 안정");
   });
 
-  it("기술 위치 = 신호 위치의 평균, 기사 수·최근 30일·모멘텀 계산", () => {
+  it("기사 수·최근 30일·모멘텀·단계(증거 비율) 계산", () => {
     const arts = [
       art("CJ대한통운, AMR 200대 추가 도입", 5),
       art("물류센터 AMR 증설 확대", 10),
@@ -44,12 +45,13 @@ describe("트렌드 인사이트 계산 (수집 기사만으로)", () => {
     expect(amr.count).toBe(3); // 180일 밖 기사 제외
     expect(amr.recent).toBe(2);
     expect(amr.signals).toMatchObject({ adopt: 2, launch: 1 });
-    expect(amr.x).toBeCloseTo((0.88 * 2 + 0.12) / 3, 5);
-    expect(amr.stage).toBe("실증 확산");
+    expect(amr.stage).toBe("실증 확산"); // 증거 2/3 = 67%
+    expect(amr.x).toBeCloseTo(0.62 + ((2 / 3 - 0.5) / 0.25) * 0.16, 5);
+    expect(amr.why).toContain("시범·도입 증거가 67%");
     expect(amr.confident).toBe(true);
     expect(amr.momentum).toBeCloseTo(2 / 30 / (1 / 150) - 1, 5);
     const hum = r.hype.find((h) => h.name === "휴머노이드")!;
-    expect(hum.stage).toBe("기술 태동");
+    expect(hum.stage).toBe("기술 태동"); // 공개·투자 우세지만 기사 2건뿐
     expect(hum.confident).toBe(false);
     expect(r.hype.find((h) => h.name === "드론 배송")).toBeUndefined(); // 언급 없는 기술은 표시 안 함
     expect(r.coverage).toMatchObject({ total: 6, inWindow: 5 });
@@ -178,5 +180,45 @@ describe("외부 리포트: KCCI 주간 보도 모으기", () => {
   it("KCCI·한국형 컨테이너 운임 기사를 찾음", () => {
     const r = computeInsights([art("KCCI 3주 연속 상승, 미주 항로 강세", 1), art("한국형 컨테이너 운임지수 하락", 8)], { now: NOW });
     expect(r.external.find((e) => e.id === "kcci")!.count).toBe(2);
+  });
+});
+
+describe("하이프 사이클 단계 판정 (평균이 아니라 우세한 신호로)", () => {
+  const sig = (o: Partial<Record<StageKey, number>>): Signals => ({ launch: 0, invest: 0, pilot: 0, adopt: 0, doubt: 0, ...o });
+
+  it("공개·투자·시범·도입이 고루 섞인 기술을 가운데(검증의 골)로 몰지 않음", () => {
+    // 예전 방식(위치 평균)은 x=0.50 → 검증의 골이었다. 회의 신호는 5%뿐이다.
+    const c = classifyStage(sig({ launch: 10, invest: 10, pilot: 10, adopt: 10, doubt: 2 }), 40, 8);
+    expect(c.stage).not.toBe("검증의 골");
+    expect(c.stage).toBe("실증 확산");
+  });
+
+  it("검증의 골은 회의(중단·지연) 신호가 25% 이상이고 3건 이상일 때만", () => {
+    expect(classifyStage(sig({ launch: 4, invest: 2, pilot: 3, adopt: 3, doubt: 6 }), 18, 8).stage).toBe("검증의 골");
+    expect(classifyStage(sig({ launch: 4, invest: 2, pilot: 3, adopt: 3, doubt: 2 }), 14, 8).stage).not.toBe("검증의 골"); // 2건
+    expect(classifyStage(sig({ launch: 10, invest: 10, pilot: 5, adopt: 5, doubt: 5 }), 35, 8).stage).not.toBe("검증의 골"); // 14%
+    // 회의가 많을수록 골 깊숙이
+    expect(classifyStage(sig({ pilot: 2, doubt: 8 }), 10, 8).x).toBeGreaterThan(classifyStage(sig({ pilot: 6, doubt: 3 }), 9, 8).x);
+  });
+
+  it("공개·투자가 우세하고 기사가 많으면 기대 정점, 적으면 기술 태동", () => {
+    const hot = classifyStage(sig({ launch: 14, invest: 12, pilot: 4, adopt: 2, doubt: 1 }), 33, 8);
+    expect(hot.stage).toBe("기대 정점");
+    expect(classifyStage(sig({ launch: 14, invest: 4, pilot: 4, adopt: 2, doubt: 1 }), 25, 8).x).toBeLessThan(hot.x); // 투자 비중이 클수록 정점 쪽
+    expect(classifyStage(sig({ launch: 2, invest: 1 }), 3, 2).stage).toBe("기술 태동");
+  });
+
+  it("도입 증거가 75% 이상이면 생산성 안정, 신호가 없으면 태동·신뢰 낮음", () => {
+    expect(classifyStage(sig({ launch: 2, pilot: 3, adopt: 25 }), 30, 8).stage).toBe("생산성 안정");
+    expect(classifyStage(sig({}), 5, 8)).toMatchObject({ stage: "기술 태동", x: 0.1 });
+  });
+
+  it("단계 안에서의 위치는 항상 그 단계 구간 안", () => {
+    const samples = [sig({ launch: 10, invest: 2 }), sig({ doubt: 5, pilot: 2 }), sig({ adopt: 9 }), sig({ pilot: 5, adopt: 5 }), sig({ launch: 1 })];
+    for (const s of samples) {
+      const c = classifyStage(s, 20, 8);
+      const band = CURVE_STAGES.find((st) => c.x >= st.from && c.x < st.to)!;
+      expect(band.label).toBe(c.stage);
+    }
   });
 });

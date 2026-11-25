@@ -6,6 +6,7 @@ import { CURVE_STAGES, STAGE_SIGNALS, type StageKey } from "@/config/insights";
 import type { HypePoint, InsightsData, Mover } from "@/lib/insights/compute";
 import type { Indicator } from "@/lib/indicators";
 import { TipRow, catColor, rampColor, type useTip } from "@/components/report/parts";
+import { relax } from "./relax";
 
 type TipApi = ReturnType<typeof useTip>;
 
@@ -71,52 +72,45 @@ const PW = W - L - R, PH = H - T - B;
 const px = (x: number) => L + x * PW;
 const py = (y: number) => T + (1 - y) * PH;
 
-/** 곡선 위 점 사이 최소 간격 (가장 큰 점 지름 + 여백) */
-const MIN_GAP = (2 * 17 + 10) / PW;
 /** 글자 폭 추정 (한글 12.5px, 영문·숫자 7.4px) */
 const textW = (t: string) => [...t].reduce((n, ch) => n + (/[\u3131-\uD79D]/.test(ch) ? 13.2 : 8), 0);
 type Box = { x0: number; y0: number; x1: number; y1: number };
 const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 
 /**
- * 점 배치: 같은 단계에 몰린 점은 무리 가운데를 기준으로 곡선을 따라 좌우로 벌리고(값은 툴팁·표에서 그대로),
+ * 점 배치: 점은 자기 단계 구간(세로 띠) 안에서만 움직인다. 겹치면 위아래로 쌓고, 실제 위치에는 작은 점과 가는 선을 남긴다.
+ * (예전에는 몰린 점을 곡선을 따라 좌우로 벌려, 다른 단계 칸에 있는 것처럼 보이는 문제가 있었다)
  * 이름표는 위·아래·오른쪽·왼쪽 중 다른 이름표·점과 겹치지 않는 자리에 둔다.
  */
 function layoutPoints(points: HypePoint[], curve: (x: number) => number) {
   const sorted = [...points].sort((a, b) => a.x - b.x || b.count - a.count);
-  const xs = sorted.map((p) => p.x);
-  for (let pass = 0; pass < 4; pass++) {
-    let i = 0;
-    while (i < xs.length) {
-      let j = i;
-      while (j + 1 < xs.length && xs[j + 1] - xs[j] < MIN_GAP - 1e-6) j++;
-      if (j > i) {
-        const k = j - i + 1;
-        const mean = xs.slice(i, j + 1).reduce((a, b) => a + b, 0) / k;
-        let start = mean - ((k - 1) / 2) * MIN_GAP;
-        start = Math.min(Math.max(start, 0.02), 0.98 - (k - 1) * MIN_GAP);
-        for (let m = 0; m < k; m++) xs[i + m] = start + m * MIN_GAP;
-      }
-      i = j + 1;
-    }
-  }
-  const dots = sorted.map((p, i) => {
-    const cx = px(xs[i]), cy = py(curve(xs[i]));
-    return { p, cx, cy, r: Math.min(17, 5 + Math.sqrt(p.count) * 2.6) };
-  });
+  const bandOf = (x: number) => CURVE_STAGES.find((st) => x >= st.from && x < st.to) ?? CURVE_STAGES[CURVE_STAGES.length - 1];
+  const inBand = new Map<string, number>();
+  for (const p of sorted) inBand.set(bandOf(p.x).label, (inBand.get(bandOf(p.x).label) ?? 0) + 1);
+  const dots = relax(
+    sorted.map((p) => {
+      const band = bandOf(p.x);
+      const r = Math.min(15, 5 + Math.sqrt(p.count) * 2.2);
+      // 한 단계에 점이 많을수록 여백을 넓혀 이름표 자리를 확보 (구간 넓이 × 높이의 절반을 점 수로 나눈 칸 크기 기준)
+      const side = Math.sqrt((0.5 * (px(band.to) - px(band.from)) * PH) / (inBand.get(band.label) ?? 1));
+      return { p, tx: px(p.x), ty: py(curve(p.x)), r, minX: px(band.from) + 3, maxX: px(band.to) - 3, minY: T + 4, maxY: T + PH - 4, gap: Math.min(30, Math.max(10, side - 26)) };
+    }),
+    { pull: 0.004, iterations: 500 },
+  ).map((d) => ({ ...d, moved: Math.hypot(d.cx - d.tx, d.cy - d.ty) > 3 }));
   const taken: Box[] = dots.map((d) => ({ x0: d.cx - d.r - 2, y0: d.cy - d.r - 2, x1: d.cx + d.r + 2, y1: d.cy + d.r + 2 }));
   const order = [...dots].sort((a, b) => b.p.count - a.p.count);
-  const labels = new Map<string, { x: number; y: number; anchor: "middle" | "start" | "end"; lead?: number }>();
+  const labels = new Map<string, { x: number; y: number; anchor: "middle" | "start" | "end"; lead?: number; leadBelow?: number }>();
   for (const d of order) {
     const w = textW(d.p.name), h = 15;
-    type Cand = { x: number; y: number; anchor: "middle" | "start" | "end"; box: Box; lead?: boolean };
+    type Cand = { x: number; y: number; anchor: "middle" | "start" | "end"; box: Box; lead?: boolean; leadBelow?: boolean };
+    const belowAt = (off: number): Cand => ({ x: d.cx, y: d.cy + d.r + off, anchor: "middle", box: { x0: d.cx - w / 2, y0: d.cy + d.r + off - 12, x1: d.cx + w / 2, y1: d.cy + d.r + off + 4 }, leadBelow: off > 20 });
     const above = (off: number): Cand => ({ x: d.cx, y: d.cy - d.r - off, anchor: "middle", box: { x0: d.cx - w / 2, y0: d.cy - d.r - off - h + 3, x1: d.cx + w / 2, y1: d.cy - d.r - off + 3 }, lead: off > 10 });
     const base: Cand[] = [
       above(8),
       { x: d.cx, y: d.cy + d.r + 16, anchor: "middle", box: { x0: d.cx - w / 2, y0: d.cy + d.r + 4, x1: d.cx + w / 2, y1: d.cy + d.r + 19 } },
       { x: d.cx + d.r + 6, y: d.cy + 4, anchor: "start", box: { x0: d.cx + d.r + 5, y0: d.cy - 8, x1: d.cx + d.r + 7 + w, y1: d.cy + 7 } },
       { x: d.cx - d.r - 6, y: d.cy + 4, anchor: "end", box: { x0: d.cx - d.r - 7 - w, y0: d.cy - 8, x1: d.cx - d.r - 5, y1: d.cy + 7 } },
-      above(26), above(44), above(62), above(80), above(98),
+      above(26), belowAt(34), above(44), belowAt(52), above(62), belowAt(70), above(80), above(98),
     ];
     const cands = base
       .map((c): Cand => ({ ...c, box: { x0: c.box.x0 - 4, y0: c.box.y0 - 1, x1: c.box.x1 + 4, y1: c.box.y1 + 1 } }))
@@ -127,7 +121,8 @@ function layoutPoints(points: HypePoint[], curve: (x: number) => number) {
     taken.push(ok.box);
     // 위로 띄운 이름표는 점까지 가는 가는 선을 그어 어느 점인지 보이게 한다
     if (ok.lead) taken.push({ x0: d.cx - 1, y0: ok.box.y1, x1: d.cx + 1, y1: d.cy - d.r });
-    labels.set(d.p.name, { x: ok.x, y: ok.y, anchor: ok.anchor, lead: ok.lead ? ok.y + 4 : undefined });
+    if (ok.leadBelow) taken.push({ x0: d.cx - 1, y0: d.cy + d.r, x1: d.cx + 1, y1: ok.box.y0 });
+    labels.set(d.p.name, { x: ok.x, y: ok.y, anchor: ok.anchor, lead: ok.lead ? ok.y + 4 : undefined, leadBelow: ok.leadBelow ? ok.y - 13 : undefined });
   }
   return dots.map((d) => ({ ...d, label: labels.get(d.p.name)! }));
 }
@@ -184,8 +179,8 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
       <text transform={`translate(${L - 30} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#898781">관심·기대 ↑</text>
       <path d={`${path} L${px(1)} ${T + PH} L${px(0)} ${T + PH} Z`} fill="url(#hm-area)" />
       <path d={path} pathLength={1} fill="none" stroke="#232021" strokeWidth="2.5" opacity="0.85" className="draw-in" filter="url(#hm-line-shadow)" />
-      {placed.map(({ p, cx, cy, r, label }, idx) => {
-        const near = points.filter((q) => q !== p && Math.abs(q.x - p.x) < 0.02).map((q) => q.name);
+      {placed.map(({ p, cx, cy, r, label, tx, ty, moved }, idx) => {
+        const peers = points.filter((q) => q !== p && q.stage === p.stage).map((q) => q.name);
         const color = catColor(p.category);
         const sel = p.name === selected;
         const body = (
@@ -210,7 +205,9 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
                 </p>
               </>
             )}
-            {near.length > 0 && <p>같은 단계 위치: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
+            <p><b className="text-[var(--rv-ink)]">판정 근거</b> {p.why}</p>
+            {peers.length > 0 && <p>같은 단계: <b className="text-[var(--rv-ink)]">{peers.slice(0, 6).join(", ")}{peers.length > 6 ? ` 외 ${peers.length - 6}` : ""}</b></p>}
+            {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 같은 단계 구간 안에서 옮겨 그림 · 작은 점이 실제 위치</p>}
             <p className="text-[var(--rv-mute)]">누르면 근거 기사</p>
           </TipCard>
         );
@@ -228,11 +225,18 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
             onFocus={(e) => tip.show(e, body)}
             onBlur={tip.hide}
           >
+            {moved && (
+              <>
+                <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
+                <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
+              </>
+            )}
             <circle cx={cx} cy={cy} r={r + 10} fill="transparent" />
             {sel && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke="#232021" strokeWidth="2" />}
             <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} filter="url(#hm-shadow)" />
             {p.confident && <circle cx={cx} cy={cy} r={r} fill="url(#hm-shine)" pointerEvents="none" className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />}
             {label.lead !== undefined && <line x1={cx} x2={cx} y1={label.lead} y2={cy - r - 2} stroke="#898781" strokeWidth="1" />}
+            {label.leadBelow !== undefined && <line x1={cx} x2={cx} y1={cy + r + 2} y2={label.leadBelow} stroke="#898781" strokeWidth="1" />}
             <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight={sel ? 800 : 600} fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>
           </g>
         );

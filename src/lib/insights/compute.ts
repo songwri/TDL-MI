@@ -35,6 +35,8 @@ export interface HypePoint {
   x: number;
   y: number;
   stage: string;
+  /** 단계 판정 근거 */
+  why: string;
   /** 단계 신호가 3건 이상이면 true (적으면 위치가 흔들릴 수 있음) */
   confident: boolean;
   articles: ArticleRef[];
@@ -149,6 +151,57 @@ export function curveY(x: number): number {
   return Math.min(1, peak + slope + 0.04);
 }
 
+export interface StageCall {
+  /** 곡선 위 가로 위치 (0~1) */
+  x: number;
+  stage: string;
+  /** 판정 근거 (툴팁에 그대로 보여 줌) */
+  why: string;
+}
+
+/**
+ * 하이프 사이클 단계 판정 (신호 비율 규칙).
+ *
+ * 예전에는 신호 위치의 평균으로 정했는데, 공개·투자(앞쪽)와 도입(뒤쪽) 기사가 섞이면 평균이 늘 가운데(검증의 골)로 쏠렸다.
+ * 이제는 '무엇이 우세한가'로 단계를 먼저 정하고, 단계 안에서의 위치만 비율로 정한다.
+ *
+ *   회의(중단·지연 등) 신호가 25% 이상이고 3건 이상 → 검증의 골
+ *   그 밖에는 증거 비율 = (시범+도입) ÷ (공개+투자+시범+도입)
+ *     75% 이상 → 생산성 안정 · 50~75% → 실증 확산
+ *     50% 미만(공개·투자가 우세) → 기사가 충분히 많으면 기대 정점, 적으면 기술 태동
+ */
+export function classifyStage(sig: Signals, count: number, medianCount: number): StageCall {
+  const S = sig.launch + sig.invest + sig.pilot + sig.adopt + sig.doubt;
+  if (!S) return { x: 0.1, stage: stageOf(0.1), why: "단계 신호 없음 (언급만 있음)" };
+  const pctOf = (n: number) => `${Math.round((n / S) * 100)}%`;
+  const hype = sig.launch + sig.invest;
+  const proof = sig.pilot + sig.adopt;
+  const dShare = sig.doubt / S;
+  const ratio = proof / Math.max(hype + proof, 1);
+  const mix = `공개·투자 ${pctOf(hype)} · 시범·도입 ${pctOf(proof)} · 회의 ${pctOf(sig.doubt)}`;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+  if (sig.doubt >= 3 && dShare >= 0.25) {
+    const x = 0.45 + clamp((dShare - 0.25) / 0.35, 0, 1) * 0.13; // 회의 비중이 클수록 골 깊숙이
+    return { x, stage: stageOf(x), why: `회의 신호 비중 ${pctOf(sig.doubt)} (25% 이상) · ${mix}` };
+  }
+  if (ratio >= 0.75) {
+    const x = 0.82 + clamp((ratio - 0.75) / 0.25, 0, 1) * 0.15;
+    return { x, stage: stageOf(x), why: `시범·도입 증거가 ${Math.round(ratio * 100)}% · ${mix}` };
+  }
+  if (ratio >= 0.5) {
+    const x = 0.62 + clamp((ratio - 0.5) / 0.25, 0, 1) * 0.16;
+    return { x, stage: stageOf(x), why: `시범·도입 증거가 ${Math.round(ratio * 100)}% · ${mix}` };
+  }
+  // 공개·투자가 우세: 기사가 충분히 많으면 기대 정점, 적으면 태동
+  if (count >= Math.max(4, medianCount)) {
+    const x = 0.25 + (sig.invest / Math.max(hype, 1)) * 0.15; // 투자 기사가 많을수록 정점 쪽
+    return { x, stage: stageOf(x), why: `공개·투자가 우세 (증거 ${Math.round(ratio * 100)}%) · 기사 ${count}건으로 관심 높음 · ${mix}` };
+  }
+  const x = 0.06 + ratio * 0.28;
+  return { x, stage: stageOf(x), why: `공개·투자가 우세하나 기사 ${count}건으로 아직 적음 · ${mix}` };
+}
+
 export function stageOf(x: number): string {
   return (CURVE_STAGES.find((s) => x >= s.from && x < s.to) ?? CURVE_STAGES[CURVE_STAGES.length - 1]).label;
 }
@@ -205,18 +258,23 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
   const recentFrom = now - RECENT_DAYS * DAY;
 
   /* 기술 성숙도 맵 */
-  const hype: HypePoint[] = TRACKED_TECH.flatMap(({ name, category }) => {
+  const techRows = TRACKED_TECH.flatMap(({ name, category }) => {
     const hits = inWin.filter((p) => p.names.has(name));
     if (!hits.length) return [];
     const signals = emptySignals();
-    for (const h of hits) for (const s of h.signals) signals[s]++;
+    for (const h of hits) for (const sg of h.signals) signals[sg]++;
+    return [{ name, category, hits, signals }];
+  });
+  const sortedCounts = techRows.map((r) => r.hits.length).sort((a, b) => a - b);
+  const medianCount = sortedCounts.length ? sortedCounts[Math.floor(sortedCounts.length / 2)] : 0;
+  const hype: HypePoint[] = techRows.map(({ name, category, hits, signals }) => {
     const signalTotal = Object.values(signals).reduce((n, v) => n + v, 0);
-    const x = signalTotal ? STAGE_SIGNALS.reduce((sum, s) => sum + s.pos * signals[s.key], 0) / signalTotal : STAGE_SIGNALS[0].pos;
+    const call = classifyStage(signals, hits.length, medianCount);
     const recent = hits.filter((p) => p.t >= recentFrom).length;
     const priorDays = days - RECENT_DAYS;
     const prior = hits.length - recent;
     const momentum = priorDays > 0 && prior > 0 ? recent / RECENT_DAYS / (prior / priorDays) - 1 : null;
-    return [{ name, category, count: hits.length, recent, momentum, signals, signalTotal, x, y: curveY(x), stage: stageOf(x), confident: signalTotal >= 3, articles: hits.slice(0, 6).map(ref) }];
+    return { name, category, count: hits.length, recent, momentum, signals, signalTotal, x: call.x, y: curveY(call.x), stage: call.stage, why: call.why, confident: signalTotal >= 3, articles: hits.slice(0, 6).map(ref) };
   });
 
   /* 급상승·주춤 키워드: 최근 14일 vs 그 전 56일 속도 */
