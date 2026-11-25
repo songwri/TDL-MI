@@ -1,4 +1,5 @@
 import { SEGMENTS, VENDORS, VENDOR_HEADERS, type Confidence, type Segment, type Vendor } from "@/config/vendors";
+import { cached } from "@/lib/cache";
 import { sheetsEnabled, storeMode } from "@/lib/config";
 import * as sheets from "@/lib/store/sheets";
 
@@ -58,16 +59,17 @@ export function mergeVendors(base: Vendor[], rows: string[][]): (Vendor & { from
   return [...byName.values()];
 }
 
-export async function listVendors() {
-  let rows: string[][] = [];
-  let warning: string | undefined;
-  if (sheetsEnabled()) {
-    try {
+export async function listVendors(opts: { fresh?: boolean } = {}) {
+  if (!sheetsEnabled()) return { vendors: mergeVendors(VENDORS, []), sheetRows: 0 as number, warning: undefined as string | undefined };
+  try {
+    // 시트 Vendors 탭은 팀이 가끔 고친다: 2분 안이면 그대로, 그 뒤는 일단 보여 주고 뒤에서 새로 읽음
+    const rows = await cached("vendors", { soft: 2 * 60_000, hard: 6 * 3_600_000, fresh: opts.fresh }, async () => {
       if (storeMode() === "sheets") await sheets.ensureSchemaOnce();
-      rows = await sheets.listVendorRows();
-    } catch (e) {
-      warning = `시트 Vendors 탭을 읽지 못해 기본 목록만 표시합니다: ${(e as Error).message}`;
-    }
+      return sheets.listVendorRows();
+    });
+    return { vendors: mergeVendors(VENDORS, rows), sheetRows: rows.length, warning: undefined as string | undefined };
+  } catch (e) {
+    // 실패한 결과는 저장하지 않는다 (다음 방문 때 다시 시도)
+    return { vendors: mergeVendors(VENDORS, []), sheetRows: 0, warning: `시트 Vendors 탭을 읽지 못해 기본 목록만 표시합니다: ${(e as Error).message}` };
   }
-  return { vendors: mergeVendors(VENDORS, rows), sheetRows: rows.length, warning };
 }

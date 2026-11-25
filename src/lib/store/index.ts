@@ -85,6 +85,20 @@ export async function getArticlesWithBodies(ids: string[]): Promise<Article[]> {
   return articles.map((a) => clean({ ...a, content: bodies.get(a.id) ?? a.content }));
 }
 
+/**
+ * 분석 화면용 읽기. 시트에서 읽은 지 5분 안이면 그대로, 30분 안이면 일단 지금 값을 주고 뒤에서 새로 읽는다.
+ * (분석은 하루 한 번 쌓이는 데이터라 20초마다 시트를 다시 읽을 필요가 없다)
+ */
+export async function getAllArticlesSoft(): Promise<Article[]> {
+  const age = Date.now() - lastPull;
+  if (inSheetsMode() && lastPull && age < 30 * 60_000) {
+    if (age >= 5 * 60_000) refresh(true).catch(() => {});
+    return read((db) => db.articles);
+  }
+  await refresh();
+  return read((db) => db.articles);
+}
+
 export async function getAllArticles(): Promise<Article[]> {
   await refresh();
   return read((db) => db.articles);

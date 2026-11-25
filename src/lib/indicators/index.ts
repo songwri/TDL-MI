@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { FRED_SERIES } from "@/config/insights";
 import { config, sheetsEnabled, storeMode } from "@/lib/config";
+import { cached, invalidate } from "@/lib/cache";
 import * as sheets from "@/lib/store/sheets";
 
 /**
@@ -86,12 +87,14 @@ async function store(id: string, name: string, points: Observation[]) {
   if (inSheets()) {
     await sheets.ensureSchemaOnce();
     await sheets.upsertIndicatorRow({ id, name, updatedAt, json: JSON.stringify(kept) });
+    invalidate("indicators");
     return;
   }
   const all = Object.fromEntries(await readStored());
   all[id] = { updatedAt, points: kept };
   await fs.mkdir(config.dataDir, { recursive: true });
   await fs.writeFile(localPath(), JSON.stringify(all, null, 2), "utf8");
+  invalidate("indicators");
 }
 
 /** 설정된 지표를 모두 받아 저장. 실패한 지표는 건너뛰고 결과에 남긴다 */
@@ -111,8 +114,9 @@ export async function refreshIndicators(fetchImpl?: typeof fetch) {
 }
 
 /** 화면용: 설정 순서대로, 저장된 값이 없으면 points 가 빈 배열 */
-export async function listIndicators(): Promise<Indicator[]> {
-  const stored = await readStored().catch(() => new Map<string, { updatedAt: string; points: Observation[] }>());
+export async function listIndicators(opts: { fresh?: boolean } = {}): Promise<Indicator[]> {
+  // 지표는 하루 한 번(수집 때) 바뀐다: 30분 안이면 시트를 다시 읽지 않는다
+  const stored = await cached("indicators", { soft: 30 * 60_000, hard: 24 * 3_600_000, fresh: opts.fresh }, readStored).catch(() => new Map<string, { updatedAt: string; points: Observation[] }>());
   return FRED_SERIES.map((s) => {
     const st = stored.get(s.id);
     const points = st?.points ?? [];

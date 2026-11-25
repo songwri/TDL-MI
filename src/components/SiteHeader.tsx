@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrandMarkInline } from "./BrandMark";
+import { prefetchInsights } from "./insights/useInsights";
 
 /**
  * 상단 메뉴 (두 단계)
@@ -48,6 +49,13 @@ export function SiteHeader({ authEnabled }: { authEnabled: boolean }) {
     const ro = new ResizeObserver(set);
     ro.observe(el);
     return () => ro.disconnect();
+  }, [path]);
+
+  // MI 리포트 등 다른 화면에 있는 동안 인사이트 데이터를 미리 받아 둔다 (넘어갈 때 바로 보이도록)
+  useEffect(() => {
+    if (path === "/login" || path.startsWith("/insights")) return;
+    const t = setTimeout(() => prefetchInsights(180), 3000); // 지금 화면이 다 뜬 뒤에
+    return () => clearTimeout(t);
   }, [path]);
 
   if (path === "/login") return null;

@@ -6,11 +6,16 @@ import { COUNTRIES, SEGMENTS, type Segment, type Vendor } from "@/config/vendors
 import { curveY, type InsightsData } from "@/lib/insights/compute";
 import type { Indicator } from "@/lib/indicators";
 import { catColor, useTip } from "@/components/report/parts";
-import { api } from "@/components/ui";
+import dynamic from "next/dynamic";
+import { useInsights } from "./useInsights";
 import { HypeMap, IndicatorCard, MIX_COLOR, MoverList, PeerBoard, SignalBar, SignalDonut, WeeklyBars, mixLabel, pct, signalLabel } from "./charts";
 import type { StageKey } from "@/config/insights";
 import { FOCUS, PortfolioMatrix, pp } from "./Portfolio";
-import { WorldMap } from "./WorldMap";
+// 세계 지도 데이터(약 100KB)는 공급사 지도 화면을 열 때만 불러온다
+const WorldMap = dynamic(() => import("./WorldMap").then((m) => m.WorldMap), {
+  ssr: false,
+  loading: () => <div className="h-[320px] animate-pulse rounded-md bg-[#f1f0ec]" aria-label="지도 불러오는 중" />,
+});
 
 type V = Vendor & { fromSheet?: boolean };
 interface Payload {
@@ -42,6 +47,35 @@ const ALL_IDS = VIEWS.flatMap((g) => g.items.map((i) => i.id));
 const day = (iso?: string) => (iso ? iso.slice(0, 10).replaceAll("-", ".") : "-");
 const ko = (iso2: string) => COUNTRIES[iso2]?.ko ?? iso2;
 type TipApi = ReturnType<typeof useTip>;
+
+/** "3분 전" 처럼 지난 시간 (1분마다 갱신) */
+function useAgo(at: number | null) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!at) return "";
+  const m = Math.floor((Date.now() - at) / 60_000);
+  return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
+}
+
+/** 처음 불러오는 동안 화면 모양을 먼저 보여 준다 */
+function Skeleton() {
+  return (
+    <div aria-busy="true" aria-label="불러오는 중" className="mx-auto max-w-[1180px] space-y-4">
+      <div className="skeleton h-8 w-48 rounded" />
+      <div className="skeleton h-4 w-2/3 rounded" />
+      <div className="grid gap-4 md:grid-cols-[260px_1fr]">
+        <div className="skeleton h-[260px] rounded-lg" />
+        <div className="skeleton h-[260px] rounded-lg" />
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {[0, 1, 2].map((i) => <div key={i} className="skeleton h-[200px] rounded-lg" />)}
+      </div>
+    </div>
+  );
+}
 
 function Head({ title, lead, right }: { title: string; lead?: React.ReactNode; right?: React.ReactNode }) {
   // 제목 줄 오른쪽에 버튼을 두고, 설명은 아래 줄 전체 폭을 써서 한 줄로 읽히게
@@ -92,8 +126,8 @@ export function InsightsPage() {
   const [view, setView] = useState<ViewId>("now");
   const [days, setDays] = useState(180);
   const [q, setQ] = useState("");
-  const [data, setData] = useState<Payload | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, refreshing, updatedAt, reload } = useInsights(days);
+  const ago = useAgo(updatedAt);
 
   // 주소의 #보기 와 맞춤 (링크 공유·뒤로 가기)
   useEffect(() => {
@@ -111,11 +145,6 @@ export function InsightsPage() {
     window.scrollTo({ top: 0 });
   };
 
-  useEffect(() => {
-    setError(null);
-    api<Payload>(`/api/insights?days=${days}`).then(setData).catch((e) => setError((e as Error).message));
-  }, [days]);
-
   const query = q.trim().toLowerCase();
   const current = VIEWS.flatMap((g) => g.items).find((i) => i.id === view)!;
   const thin = data && data.insights.coverage.inWindow < 60 && !["world", "china", "method"].includes(view);
@@ -123,6 +152,7 @@ export function InsightsPage() {
   return (
     <div className="rv -mx-4 -my-5 grid min-h-[calc(100vh-var(--header-total,60px))] break-keep text-[15px] leading-7 lg:grid-cols-[248px_1fr]">
       {tip.view}
+      {refreshing && data && <div aria-hidden className="load-bar fixed inset-x-0 z-40 h-[2px]" style={{ top: "var(--header-total, 60px)" }} />}
 
       {/* 사이드바: 보기 · 기간 · 검색 */}
       <aside className="border-b border-[var(--rv-line)] bg-[#fbfaf8] lg:sticky lg:top-[var(--header-total,60px)] lg:h-[calc(100vh-var(--header-total,60px))] lg:overflow-y-auto lg:border-b-0 lg:border-r">
@@ -131,6 +161,10 @@ export function InsightsPage() {
             <p className="text-[11px] font-bold tracking-widest text-[var(--rv-accent)]">LOGISTICS TECH INTELLIGENCE</p>
             <p className="text-lg font-bold leading-tight">물류기술 인텔리전스</p>
             <p className="text-[11px] text-[var(--rv-mute)]">{data ? `수집 기사 ${data.insights.coverage.total.toLocaleString()}건 · ${day(data.insights.coverage.last)} 기준` : "불러오는 중"}</p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--rv-mute)]">
+              <span aria-live="polite">{refreshing ? "최신 데이터 확인 중…" : ago ? `${ago} 갱신` : ""}</span>
+              <button type="button" onClick={reload} disabled={refreshing} className="rounded px-1 text-[var(--rv-soft)] underline decoration-[var(--rv-line)] hover:text-[var(--rv-ink)] disabled:opacity-40" title="시트에서 다시 읽기 (공급사·지표 입력 직후)">↻ 새로고침</button>
+            </p>
           </div>
 
           <label className="block lg:hidden">
@@ -182,7 +216,7 @@ export function InsightsPage() {
 
       <div className="min-w-0 px-4 py-6 lg:px-8">
         {error && <p className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</p>}
-        {!data && !error && <p className="p-8 text-center text-sm text-[var(--rv-mute)]">수집 기사로 계산하는 중…</p>}
+        {!data && !error && <Skeleton />}
         {data && (
           <div key={view} className="view-enter mx-auto max-w-[1180px]">
             {thin && (
