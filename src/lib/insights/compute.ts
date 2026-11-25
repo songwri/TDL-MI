@@ -1,5 +1,6 @@
 import { CL_RELEVANCE, CURVE_STAGES, EXTERNAL_SOURCES, PEERS, STAGE_SIGNALS, TRACKED_TECH, type StageKey } from "@/config/insights";
-import { extractKeywords, leadingSubject, mentionsEntity } from "@/lib/mi/matcher";
+import { extractKeywords } from "@/lib/mi/matcher";
+import { subjectScore } from "@/lib/mi/subject";
 import { CATEGORIES, type Article, type Category } from "@/lib/types";
 
 /**
@@ -228,8 +229,6 @@ interface Prepared {
   allSignals: StageKey[];
   /** 제목·요약(소문자): 본문 속 지나가는 언급과 구분하기 위함 */
   headline: string;
-  /** 제목 맨 앞 "회사명," 의 회사 */
-  lead: string | null;
 }
 
 function prepare(articles: Article[]): Prepared[] {
@@ -240,7 +239,7 @@ function prepare(articles: Article[]): Prepared[] {
       const names = new Set([...a.keywords, ...extractKeywords(text)]);
       // 기술 위주 분류: 추적 기술이 언급된 기사만 단계 신호를 센다 (기업·행사 이야기에 섞인 '도입·확대' 같은 말이 기술 단계로 잡히지 않게)
       const techy = TRACKED_TECH.some((t) => names.has(t.name));
-      return { a, t: new Date(a.publishedAt).getTime(), names, signals: techy ? detectSignals(text) : [], allSignals: detectSignals(text), headline: text.toLowerCase(), lead: leadingSubject(`${a.titleKo || a.title}`) ?? leadingSubject(a.title) };
+      return { a, t: new Date(a.publishedAt).getTime(), names, signals: techy ? detectSignals(text) : [], allSignals: detectSignals(text), headline: text.toLowerCase() };
     })
     .filter((p) => !Number.isNaN(p.t));
 }
@@ -320,7 +319,8 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
   const peers: PeerRow[] = PEERS.map(({ name, self }) => {
     // 동종사: 제목·요약에 이름이 나온 기사만 (본문 끝에 스쳐 지나가는 언급은 제외)
     // 제목이 "회사명, …" 로 시작하면 그 회사 기사로 본다. 별칭(예: 대한통운)도 같은 회사로 센다
-    const hits = inWin.filter((p) => p.lead === name || (p.names.has(name) && mentionsEntity(p.headline, name)));
+    // 제목 구조(회사명 앞·쉼표)와 제목·요약 내용을 점수로 분석해 그 회사 기사인 것만 센다 (src/lib/mi/subject.ts)
+    const hits = inWin.filter((p) => subjectScore(p.a.titleKo || p.a.title, p.a.summary, name).isSubject || subjectScore(p.a.title, p.a.summary, name).isSubject);
     const signals = emptySignals();
     // 동종사는 기업 소식 자체를 보는 화면이라 기술 언급이 없어도 신호를 센다 (제목·요약에 이름이 나온 기사로 이미 좁혔다)
     const refAll = (p: Prepared) => ({ ...ref(p), signals: p.allSignals });
