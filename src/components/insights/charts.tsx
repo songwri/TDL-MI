@@ -73,13 +73,11 @@ const py = (y: number) => T + (1 - y) * PH;
 
 /** 글자 폭 추정 (한글 12.5px, 영문·숫자 7.4px) */
 const textW = (t: string) => [...t].reduce((n, ch) => n + (/[\u3131-\uD79D]/.test(ch) ? 13.2 : 8), 0);
-type Box = { x0: number; y0: number; x1: number; y1: number };
-const hit = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
 
 /**
  * 점 배치: 모든 점은 곡선 위 자기 실제 위치(x = 성숙도 판정, y = 곡선 높이)에 그대로 찍는다. 옮기지 않는다.
  * 같은 자리에 몰리면 큰 원을 아래, 작은 원을 위에 겹쳐 그리고(툴팁에 겹친 기술을 알려 줌), 이름표만 빈 자리로 피한다.
- * 이름표는 위·아래·오른쪽·왼쪽 중 다른 이름표·점과 겹치지 않는 자리에 둔다.
+ * 이름표는 원 위 수직선상에 성숙도 순서대로 계단처럼 쌓는다.
  */
 function layoutPoints(points: HypePoint[], curve: (x: number) => number) {
   const sorted = [...points].sort((a, b) => a.x - b.x || b.count - a.count);
@@ -88,41 +86,27 @@ function layoutPoints(points: HypePoint[], curve: (x: number) => number) {
     const r = Math.min(11, 5 + Math.sqrt(p.count) * 1.1);
     return { p, cx, cy, tx: cx, ty: cy, r };
   });
-  const taken: Box[] = dots.map((d) => ({ x0: d.cx - d.r - 2, y0: d.cy - d.r - 2, x1: d.cx + d.r + 2, y1: d.cy + d.r + 2 }));
   type Line = { x1: number; y1: number; x2: number; y2: number };
   const labels = new Map<string, { x: number; y: number; anchor: "middle" | "start" | "end"; line?: Line }>();
-  // 이름표 놓는 순서: 기사 많은 것부터. 가까운 자리(위·아래·옆)를 먼저, 안 되면 멀리 띄우고 가는 선으로 잇는다
-  for (const d of [...dots].sort((a, b) => b.p.count - a.p.count)) {
-    const w = textW(d.p.name), h = 15;
-    type Cand = { x: number; y: number; anchor: "middle" | "start" | "end"; box: Box; line?: Line };
-    const near: Cand[] = [
-      { x: d.cx, y: d.cy - d.r - 8, anchor: "middle", box: { x0: d.cx - w / 2, y0: d.cy - d.r - 8 - h + 3, x1: d.cx + w / 2, y1: d.cy - d.r - 5 } },
-      { x: d.cx, y: d.cy + d.r + 16, anchor: "middle", box: { x0: d.cx - w / 2, y0: d.cy + d.r + 4, x1: d.cx + w / 2, y1: d.cy + d.r + 19 } },
-      { x: d.cx + d.r + 6, y: d.cy + 4, anchor: "start", box: { x0: d.cx + d.r + 5, y0: d.cy - 8, x1: d.cx + d.r + 7 + w, y1: d.cy + 7 } },
-      { x: d.cx - d.r - 6, y: d.cy + 4, anchor: "end", box: { x0: d.cx - d.r - 7 - w, y0: d.cy - 8, x1: d.cx - d.r - 5, y1: d.cy + 7 } },
-    ];
-    const far: Cand[] = [];
-    for (const dist of [34, 52, 70, 90, 112, 136, 162]) {
-      for (const dx of [0, -28, 28, -56, 56, -90, 90, -130, 130]) {
-        for (const up of [true, false]) {
-          const x = d.cx + dx, y = up ? d.cy - dist : d.cy + dist + 8;
-          far.push({ x, y, anchor: "middle", box: { x0: x - w / 2, y0: y - h + 3, x1: x + w / 2, y1: y + 3 }, line: { x1: d.cx, y1: d.cy + (up ? -d.r : d.r), x2: x, y2: up ? y + 5 : y - 13 } });
-        }
-      }
-    }
-    const cands = [...near, ...far]
-      .map((c): Cand => ({ ...c, box: { x0: c.box.x0 - 4, y0: c.box.y0 - 1, x1: c.box.x1 + 4, y1: c.box.y1 + 1 } }))
-      // 화면 안, 그리고 아래 단계 이름 줄(가로축 아래)은 비워 둔다
-      .filter((c) => c.box.x0 >= 0 && c.box.x1 <= W && c.box.y0 >= 0 && c.box.y1 <= T + PH + 4);
-    const own = { x0: d.cx - d.r - 2, y0: d.cy - d.r - 2 };
-    // 이름표 상자도, 그 선도 다른 점·이름표 위를 지나지 않아야 한다 (선은 점에서 벗어난 뒤 구간만 확인: 몰려 있는 점 위에서 출발하는 것은 막지 않는다)
-    const lineClear = (ln?: Line) => !ln || Array.from({ length: 6 }, (_, i) => 0.45 + i * 0.11).every((t) => {
-      const x = ln.x1 + (ln.x2 - ln.x1) * t, y = ln.y1 + (ln.y2 - ln.y1) * t;
-      return !taken.some((b) => !(b.x0 === own.x0 && b.y0 === own.y0) && x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1);
-    });
-    const ok = cands.find((c) => !taken.some((t) => !(t.x0 === own.x0 && t.y0 === own.y0) && hit(c.box, t)) && lineClear(c.line)) ?? cands[0];
-    taken.push(ok.box);
-    labels.set(d.p.name, { x: ok.x, y: ok.y, anchor: ok.anchor, line: ok.line });
+  // 이름표는 원 바로 위 수직선상에 둔다. 왼쪽 → 오른쪽(성숙도 순)으로 놓으며, 앞 이름표와 가로로 겹치면
+  // 한 칸씩 위로 올려 계단을 만든다. 겹쳐도 계단 순서가 곧 성숙도 순서이고, 가는 수직선이 자기 원과 잇는다.
+  const GAP = 15, h = 15;
+  const placed: { d: (typeof dots)[number]; y: number; x0: number; x1: number }[] = [];
+  for (const d of dots) {
+    const w = textW(d.p.name) + 8;
+    const x0 = Math.max(0, Math.min(W - w, d.cx - w / 2)), x1 = x0 + w;
+    const yAt = (t: number) => d.cy - d.r - 8 - t * GAP;
+    const bad = (y: number) =>
+      // 앞 이름표·이웃 원과 겹치면 안 되고, 바로 옆 순서(가까운 원)의 이름표보다는 반드시 위여야 순서가 보인다
+      placed.some((q) => q.x0 < x1 && q.x1 > x0 && (Math.abs(q.y - y) < GAP - 1 || (Math.abs(q.d.cx - d.cx) < 40 && y > q.y - GAP + 1))) ||
+      dots.some((o) => o !== d && o.cx + o.r > x0 && o.cx - o.r < x1 && o.cy + o.r > y - h + 3 && o.cy - o.r < y + 3);
+    let t = 0;
+    while (t < 20 && yAt(t) > 12 && bad(yAt(t))) t++;
+    if (yAt(t) <= 12) { t = 0; while (t < 20 && bad(yAt(t))) t++; } // 위쪽이 모자라면 겹침만 피한다
+    placed.push({ d, y: yAt(Math.min(t, 20)), x0, x1 });
+  }
+  for (const { d, y, x0, x1 } of placed) {
+    labels.set(d.p.name, { x: (x0 + x1) / 2, y, anchor: "middle", line: y < d.cy - d.r - 14 ? { x1: d.cx, y1: d.cy - d.r, x2: d.cx, y2: y + 5 } : undefined });
   }
   return dots.map((d) => ({ ...d, label: labels.get(d.p.name)! }));
 }
