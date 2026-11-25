@@ -71,6 +71,9 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pts.map((p) => p.name).join(), maxShare]);
 
+  /** 그리는 순서: 큰 원이 아래, 작은 원이 위 (작은 원이 큰 원에 가려 마우스가 안 닿는 일이 없게). 순서는 고정이라 마우스를 올려도 깜빡이지 않음 */
+  const drawOrder = useMemo(() => [...placed].sort((a, b) => b.r - a.r), [placed]);
+
   const Q = [
     { x: L + 10, y: T + 18, anchor: "start" as const, t: "기대 선행 · 실증으로 검증", s: "관심은 높고 도입 근거는 아직 적음" },
     { x: L + PW - 10, y: T + 18, anchor: "end" as const, t: "주류 · 도입 검토", s: "관심도 높고 도입 사례도 많음" },
@@ -149,7 +152,7 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
       {/* 이동 화살표 (지난 기간 → 최근) */}
       {placed.map(({ p, cx, cy, r }) =>
         p.past.maturity !== null && p.past.count > 0 ? (
-          <g key={`m-${p.name}`} aria-hidden>
+          <g key={`m-${p.name}`} aria-hidden pointerEvents="none">
             <circle cx={x(p.past.maturity)} cy={y(p.past.share)} r={4} fill="#fff" stroke="#898781" strokeWidth="1.5" />
             {Math.hypot(cx - x(p.past.maturity), cy - y(p.past.share)) > r + 8 && (
               <line
@@ -165,46 +168,68 @@ export function PortfolioMatrix({ data, onlyFocus, tip }: { data: PortfolioData;
           </g>
         ) : null,
       )}
-      {placed.map(({ p, cx, cy, r, label, near, moved, tx, ty }, i) => {
-        const m = p.recent.maturity!;
-        const quad = p.recent.share >= data.median.share ? (m >= data.median.maturity ? "주류 · 도입 검토" : "기대 선행 · 실증으로 검증") : m >= data.median.maturity ? "안정 · 운영 최적화" : "관찰";
-        const body = (
-          <TipCard
-            title={p.name}
-            badge={`CL 연관 ${p.relevance === 3 ? "높음" : p.relevance === 2 ? "중간" : "낮음"}`}
-            badgeTone={p.relevance === 3 ? "brand" : "neutral"}
-            sub={quad}
-            stats={[
-              { label: "성숙도", value: pp(m), delta: deltaOf(m, p.past.maturity, "%p") },
-              { label: "관심도", value: pp(p.recent.share), delta: deltaOf(p.recent.share, p.past.count ? p.past.share : null, "%p") },
-              { label: "최근 기사", value: `${p.recent.count}건`, delta: deltaOf(p.recent.count, p.past.count, "건") },
-            ]}
-          >
-            {p.doubtShare >= 0.2 && <p className="font-bold text-[var(--rv-ink)]">! 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
-            {near.length > 0 && <p>같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
-            {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 옮겨 그림 · 작은 점이 실제 위치</p>}
-            <p className="text-[var(--rv-mute)]">변화는 지난 기간 대비</p>
-          </TipCard>
-        );
+      {(() => {
+        // 이름표 층(아래)과 원 층(위)으로 나눠 그린다. 두 층 모두 같은 툴팁을 보여 주되, 겹치는 곳에서는 항상 원이 마우스를 받는다
+        const items = drawOrder.map((d, i) => {
+          const { p, near, moved } = d;
+          const m = p.recent.maturity!;
+          const quad = p.recent.share >= data.median.share ? (m >= data.median.maturity ? "주류 · 도입 검토" : "기대 선행 · 실증으로 검증") : m >= data.median.maturity ? "안정 · 운영 최적화" : "관찰";
+          const body = (
+            <TipCard
+              title={p.name}
+              badge={`CL 연관 ${p.relevance === 3 ? "높음" : p.relevance === 2 ? "중간" : "낮음"}`}
+              badgeTone={p.relevance === 3 ? "brand" : "neutral"}
+              sub={quad}
+              stats={[
+                { label: "성숙도", value: pp(m), delta: deltaOf(m, p.past.maturity, "%p") },
+                { label: "관심도", value: pp(p.recent.share), delta: deltaOf(p.recent.share, p.past.count ? p.past.share : null, "%p") },
+                { label: "최근 기사", value: `${p.recent.count}건`, delta: deltaOf(p.recent.count, p.past.count, "건") },
+              ]}
+            >
+              {p.doubtShare >= 0.2 && <p className="font-bold text-[var(--rv-ink)]">! 신호의 {pp(p.doubtShare)}가 중단·지연 등 회의 신호</p>}
+              {near.length > 0 && <p>같은 자리: <b className="text-[var(--rv-ink)]">{near.join(", ")}</b></p>}
+              {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 옮겨 그림 · 작은 점이 실제 위치</p>}
+              <p className="text-[var(--rv-mute)]">변화는 지난 기간 대비</p>
+            </TipCard>
+          );
+          return { ...d, i, body };
+        });
+        const handlers = (body: React.ReactNode) => ({
+          onPointerMove: (e: React.PointerEvent) => tip.show(e, body),
+          onPointerLeave: tip.hide,
+        });
         return (
-          <g key={p.name} tabIndex={0} className="pf-node outline-none" onPointerMove={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onFocus={(e) => tip.show(e, body)} onBlur={tip.hide}>
-            {moved && (
-              <>
-                <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
-                <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
-              </>
-            )}
-            <circle cx={cx} cy={cy} r={r + 8} fill="transparent" />
-            <circle cx={cx} cy={cy} r={r} fill={p.relevance === 3 ? "url(#pf-ball-focus)" : "url(#pf-ball-gray)"} stroke="#fff" strokeWidth="1.5" filter="url(#pf-shadow)" className="pf-dot pop-in" style={{ animationDelay: `${i * 40}ms` }} />
-            {p.doubtShare >= 0.2 && <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">!</text>}
-            {/* 위아래로 비껴 놓은 이름표는 가는 선으로 원과 잇는다 */}
-            {label && label.dy && Math.abs(label.dy) >= 18 && (
-              <line x1={label.anchor === "start" ? cx + r * 0.7 : cx - r * 0.7} y1={cy + (label.dy > 0 ? r * 0.7 : -r * 0.7)} x2={label.anchor === "start" ? label.x - 2 : label.x + 2} y2={label.y - 4} stroke="#898781" strokeWidth="1" />
-            )}
-            {label && <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight="700" fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>}
-          </g>
+          <>
+            {/* 아래 층: 실제 위치 표시, 이름표, 이름표 선. 이름표 글자만 마우스를 받음 */}
+            {items.map(({ p, cx, cy, r, label, moved, tx, ty, body }) => (
+              <g key={`l-${p.name}`} pointerEvents="none">
+                {moved && (
+                  <>
+                    <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
+                    <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
+                  </>
+                )}
+                {/* 위아래로 비껴 놓은 이름표는 가는 선으로 원과 잇는다 */}
+                {label && label.dy && Math.abs(label.dy) >= 18 && (
+                  <line x1={label.anchor === "start" ? cx + r * 0.7 : cx - r * 0.7} y1={cy + (label.dy > 0 ? r * 0.7 : -r * 0.7)} x2={label.anchor === "start" ? label.x - 2 : label.x + 2} y2={label.y - 4} stroke="#898781" strokeWidth="1" />
+                )}
+                {label && (
+                  <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight="700" fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4" pointerEvents="all" style={{ cursor: "default" }} {...handlers(body)}>
+                    {p.name}
+                  </text>
+                )}
+              </g>
+            ))}
+            {/* 위 층: 원. 큰 원이 먼저, 작은 원이 나중(위)이라 어느 원이든 마우스가 닿는다 */}
+            {items.map(({ p, cx, cy, r, i, body }) => (
+              <g key={`b-${p.name}`} data-name={p.name} tabIndex={0} pointerEvents="none" className="pf-node outline-none" {...handlers(body)} onFocus={(e) => tip.show(e, body)} onBlur={tip.hide}>
+                <circle cx={cx} cy={cy} r={r} fill={p.relevance === 3 ? "url(#pf-ball-focus)" : "url(#pf-ball-gray)"} stroke="#fff" strokeWidth="1.5" filter="url(#pf-shadow)" className="pf-dot pop-in" pointerEvents="all" style={{ animationDelay: `${i * 40}ms`, cursor: "pointer" }} />
+                {p.doubtShare >= 0.2 && <text x={cx} y={cy + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">!</text>}
+              </g>
+            ))}
+          </>
         );
-      })}
+      })()}
     </svg>
   );
 }

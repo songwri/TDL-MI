@@ -131,6 +131,8 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
   const path = useMemo(() => Array.from({ length: 101 }, (_, i) => `${i ? "L" : "M"}${px(i / 100).toFixed(1)} ${py(curve(i / 100)).toFixed(1)}`).join(" "), [curve]);
   const placed = useMemo(() => layoutPoints(points, curve), [points, curve]);
   /** 단계 이름(바탕 글씨) 높이: 곡선·점·이름표와 겹치지 않는 자리 (위 → 가운데 → 아래 순서로 찾음) */
+  /** 그리는 순서: 큰 원이 아래, 작은 원이 위 (작은 원도 마우스가 닿게) */
+  const drawOrder = useMemo(() => [...placed].sort((a, b) => b.r - a.r), [placed]);
   const stageMarkY = useMemo(
     () =>
       CURVE_STAGES.map((st) => {
@@ -179,68 +181,88 @@ export function HypeMap({ points, curve, selected, onSelect, tip }: { points: Hy
       <text transform={`translate(${L - 30} ${T + PH / 2}) rotate(-90)`} textAnchor="middle" fontSize="12" fill="#898781">관심·기대 ↑</text>
       <path d={`${path} L${px(1)} ${T + PH} L${px(0)} ${T + PH} Z`} fill="url(#hm-area)" />
       <path d={path} pathLength={1} fill="none" stroke="#232021" strokeWidth="2.5" opacity="0.85" className="draw-in" filter="url(#hm-line-shadow)" />
-      {placed.map(({ p, cx, cy, r, label, tx, ty, moved }, idx) => {
-        const peers = points.filter((q) => q !== p && q.stage === p.stage).map((q) => q.name);
-        const color = catColor(p.category);
-        const sel = p.name === selected;
-        const body = (
-          <TipCard
-            title={p.name}
-            badge={p.stage}
-            badgeTone="brand"
-            sub={`${p.category}${p.confident ? "" : " · 신호 3건 미만"}`}
-            stats={[
-              { label: "기간 내 기사", value: `${p.count}건` },
-              { label: "최근 30일", value: `${p.recent}건` },
-              { label: "속도 (이전 대비)", value: p.momentum === null ? "신규" : `${p.momentum >= 0 ? "+" : "−"}${Math.abs(Math.round(p.momentum * 100))}%` },
-            ]}
-          >
-            {p.signalTotal > 0 && (
-              <>
-                <div className="flex h-1.5 gap-[2px] overflow-hidden rounded-full">
-                  {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k} style={{ flex: p.signals[k], background: SIGNAL_COLOR[k] }} />)}
-                </div>
-                <p className="flex flex-wrap gap-x-2">
-                  {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k}><span style={{ color: SIGNAL_COLOR[k] }}>■</span> {signalLabel(k)} <b className="text-[var(--rv-ink)]">{p.signals[k]}</b></span>)}
-                </p>
-              </>
-            )}
-            <p><b className="text-[var(--rv-ink)]">판정 근거</b> {p.why}</p>
-            {peers.length > 0 && <p>같은 단계: <b className="text-[var(--rv-ink)]">{peers.slice(0, 6).join(", ")}{peers.length > 6 ? ` 외 ${peers.length - 6}` : ""}</b></p>}
-            {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 같은 단계 구간 안에서 옮겨 그림 · 작은 점이 실제 위치</p>}
-            <p className="text-[var(--rv-mute)]">누르면 근거 기사</p>
-          </TipCard>
-        );
+      {(() => {
+        // 이름표 층(아래)과 원 층(위)으로 나눠 그린다. 두 층 모두 같은 툴팁·클릭(선택)을 쓰되, 겹치는 곳에서는 항상 원이 마우스를 받는다
+        const items = drawOrder.map((d, idx) => {
+          const { p, moved } = d;
+          const peers = points.filter((q) => q !== p && q.stage === p.stage).map((q) => q.name);
+          const color = catColor(p.category);
+          const sel = p.name === selected;
+          const body = (
+            <TipCard
+              title={p.name}
+              badge={p.stage}
+              badgeTone="brand"
+              sub={`${p.category}${p.confident ? "" : " · 신호 3건 미만"}`}
+              stats={[
+                { label: "기간 내 기사", value: `${p.count}건` },
+                { label: "최근 30일", value: `${p.recent}건` },
+                { label: "속도 (이전 대비)", value: p.momentum === null ? "신규" : `${p.momentum >= 0 ? "+" : "−"}${Math.abs(Math.round(p.momentum * 100))}%` },
+              ]}
+            >
+              {p.signalTotal > 0 && (
+                <>
+                  <div className="flex h-1.5 gap-[2px] overflow-hidden rounded-full">
+                    {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k} style={{ flex: p.signals[k], background: SIGNAL_COLOR[k] }} />)}
+                  </div>
+                  <p className="flex flex-wrap gap-x-2">
+                    {SIGNAL_ORDER.filter((k) => p.signals[k]).map((k) => <span key={k}><span style={{ color: SIGNAL_COLOR[k] }}>■</span> {signalLabel(k)} <b className="text-[var(--rv-ink)]">{p.signals[k]}</b></span>)}
+                  </p>
+                </>
+              )}
+              <p><b className="text-[var(--rv-ink)]">판정 근거</b> {p.why}</p>
+              {peers.length > 0 && <p>같은 단계: <b className="text-[var(--rv-ink)]">{peers.slice(0, 6).join(", ")}{peers.length > 6 ? ` 외 ${peers.length - 6}` : ""}</b></p>}
+              {moved && <p className="text-[var(--rv-mute)]">겹치지 않게 같은 단계 구간 안에서 옮겨 그림 · 작은 점이 실제 위치</p>}
+              <p className="text-[var(--rv-mute)]">누르면 근거 기사</p>
+            </TipCard>
+          );
+          return { ...d, idx, body, color, sel };
+        });
+        const pick = (name: string) => ({
+          onClick: () => onSelect(name),
+          onPointerLeave: tip.hide,
+        });
         return (
-          <g
-            key={p.name}
-            role="button"
-            tabIndex={0}
-            aria-label={`${p.name}: ${p.stage}, 기사 ${p.count}건`}
-            className="cursor-pointer outline-none"
-            onClick={() => onSelect(p.name)}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(p.name)}
-            onPointerMove={(e) => tip.show(e, body)}
-            onPointerLeave={tip.hide}
-            onFocus={(e) => tip.show(e, body)}
-            onBlur={tip.hide}
-          >
-            {moved && (
-              <>
-                <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
-                <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
-              </>
-            )}
-            <circle cx={cx} cy={cy} r={r + 10} fill="transparent" />
-            {sel && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke="#232021" strokeWidth="2" />}
-            <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} filter="url(#hm-shadow)" />
-            {p.confident && <circle cx={cx} cy={cy} r={r} fill="url(#hm-shine)" pointerEvents="none" className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />}
-            {label.lead !== undefined && <line x1={cx} x2={cx} y1={label.lead} y2={cy - r - 2} stroke="#898781" strokeWidth="1" />}
-            {label.leadBelow !== undefined && <line x1={cx} x2={cx} y1={cy + r + 2} y2={label.leadBelow} stroke="#898781" strokeWidth="1" />}
-            <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight={sel ? 800 : 600} fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4">{p.name}</text>
-          </g>
+          <>
+            {items.map(({ p, cx, cy, r, label, tx, ty, moved, body, sel }) => (
+              <g key={`l-${p.name}`} pointerEvents="none">
+                {moved && (
+                  <>
+                    <line x1={tx} y1={ty} x2={cx} y2={cy} stroke="#57524f" strokeWidth="1" strokeDasharray="2 2" />
+                    <circle cx={tx} cy={ty} r={2.5} fill="#57524f" />
+                  </>
+                )}
+                {label.lead !== undefined && <line x1={cx} x2={cx} y1={label.lead} y2={cy - r - 2} stroke="#898781" strokeWidth="1" />}
+                {label.leadBelow !== undefined && <line x1={cx} x2={cx} y1={cy + r + 2} y2={label.leadBelow} stroke="#898781" strokeWidth="1" />}
+                <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize="12.5" fontWeight={sel ? 800 : 600} fill="#232021" paintOrder="stroke" stroke="#fff" strokeWidth="4" pointerEvents="all" style={{ cursor: "pointer" }} onPointerMove={(e) => tip.show(e, body)} {...pick(p.name)}>
+                  {p.name}
+                </text>
+              </g>
+            ))}
+            {items.map(({ p, cx, cy, r, idx, body, color, sel }) => (
+              <g
+                key={`b-${p.name}`}
+                data-name={p.name}
+                role="button"
+                tabIndex={0}
+                aria-label={`${p.name}: ${p.stage}, 기사 ${p.count}건`}
+                // 묶음 자체는 마우스를 받지 않고, 원(공)만 받는다
+                pointerEvents="none"
+                className="outline-none"
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(p.name)}
+                onPointerMove={(e) => tip.show(e, body)}
+                onFocus={(e) => tip.show(e, body)}
+                onBlur={tip.hide}
+                {...pick(p.name)}
+              >
+                {sel && <circle cx={cx} cy={cy} r={r + 5} fill="none" stroke="#232021" strokeWidth="2" />}
+                <circle cx={cx} cy={cy} r={r} fill={p.confident ? color : "#fff"} stroke={p.confident ? "#fff" : color} strokeWidth={p.confident ? 2 : 2.5} className="pop-in" pointerEvents="all" style={{ animationDelay: `${300 + idx * 45}ms`, cursor: "pointer" }} filter="url(#hm-shadow)" />
+                {p.confident && <circle cx={cx} cy={cy} r={r} fill="url(#hm-shine)" pointerEvents="none" className="pop-in" style={{ animationDelay: `${300 + idx * 45}ms` }} />}
+              </g>
+            ))}
+          </>
         );
-      })}
+      })()}
     </svg>
   );
 }
