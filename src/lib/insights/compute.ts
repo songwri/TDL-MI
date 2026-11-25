@@ -224,6 +224,8 @@ interface Prepared {
   t: number;
   names: Set<string>;
   signals: StageKey[];
+  /** 기술 언급 여부와 무관하게 찾은 신호 (동종사 기사처럼 기업 소식 자체를 볼 때 사용) */
+  allSignals: StageKey[];
   /** 제목·요약(소문자): 본문 속 지나가는 언급과 구분하기 위함 */
   headline: string;
 }
@@ -236,7 +238,7 @@ function prepare(articles: Article[]): Prepared[] {
       const names = new Set([...a.keywords, ...extractKeywords(text)]);
       // 기술 위주 분류: 추적 기술이 언급된 기사만 단계 신호를 센다 (기업·행사 이야기에 섞인 '도입·확대' 같은 말이 기술 단계로 잡히지 않게)
       const techy = TRACKED_TECH.some((t) => names.has(t.name));
-      return { a, t: new Date(a.publishedAt).getTime(), names, signals: techy ? detectSignals(text) : [], headline: text.toLowerCase() };
+      return { a, t: new Date(a.publishedAt).getTime(), names, signals: techy ? detectSignals(text) : [], allSignals: detectSignals(text), headline: text.toLowerCase() };
     })
     .filter((p) => !Number.isNaN(p.t));
 }
@@ -318,8 +320,10 @@ export function computeInsights(articles: Article[], opts: { days?: number; now?
     const needle = name.toLowerCase();
     const hits = inWin.filter((p) => p.names.has(name) && p.headline.includes(needle));
     const signals = emptySignals();
-    for (const h of hits) for (const s of h.signals) signals[s]++;
-    return { name, self: !!self, total: hits.length, signals, latest: hits[0] ? ref(hits[0]) : undefined, articles: hits.slice(0, 30).map(ref) };
+    // 동종사는 기업 소식 자체를 보는 화면이라 기술 언급이 없어도 신호를 센다 (제목·요약에 이름이 나온 기사로 이미 좁혔다)
+    const refAll = (p: Prepared) => ({ ...ref(p), signals: p.allSignals });
+    for (const h of hits) for (const s of h.allSignals) signals[s]++;
+    return { name, self: !!self, total: hits.length, signals, latest: hits[0] ? refAll(hits[0]) : undefined, articles: hits.slice(0, 30).map(refAll) };
   });
 
   /* CL사업부 우선 검토 보드: 연관도 열 × 모멘텀 순 */

@@ -65,7 +65,7 @@ describe("트렌드 인사이트 계산 (수집 기사만으로)", () => {
     expect(self.total).toBe(1);
     expect(self.latest?.title).toContain("LX판토스");
     const hanjin = r.peers.find((p) => p.name === "한진")!;
-    expect(hanjin.signals).toMatchObject({ adopt: 1, pilot: 1 }); // 기술(AMR) 언급 기사만 단계로 센다
+    expect(hanjin.signals).toMatchObject({ adopt: 2, pilot: 1 }); // 동종사는 기술 언급 없이도 기업 소식의 신호를 센다
     expect(hanjin.total).toBe(3);
   });
 
